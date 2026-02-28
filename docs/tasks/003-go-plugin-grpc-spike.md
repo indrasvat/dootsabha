@@ -1,6 +1,6 @@
 # Task 0.4: go-plugin gRPC Handshake Spike
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - None

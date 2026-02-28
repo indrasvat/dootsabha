@@ -38,6 +38,16 @@ bin/
 dist/
 dootsabha
 
+# Spike compiled binaries
+_spikes/codex-jsonl/codex-jsonl
+_spikes/claude-json/claude-json
+_spikes/gemini-json/gemini-json
+_spikes/cobra-alias/cobra-alias
+_spikes/subprocess/subprocess
+_spikes/terminal-ux/terminal-ux
+_spikes/pty-pipe/pty-pipe
+_spikes/go-plugin-grpc/plugin/greeter-plugin
+
 # Coverage
 coverage/
 

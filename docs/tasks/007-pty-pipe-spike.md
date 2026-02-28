@@ -1,6 +1,6 @@
 # Task 0.8: PTY vs Pipe Subprocess Spike
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - None

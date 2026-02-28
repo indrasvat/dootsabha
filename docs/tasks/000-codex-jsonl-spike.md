@@ -1,6 +1,6 @@
 # Task 0.1: Codex JSONL Parsing Spike
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - None (first spike)

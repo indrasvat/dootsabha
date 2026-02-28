@@ -1,6 +1,6 @@
 # Task 0.5: Subprocess Management Spike
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - None

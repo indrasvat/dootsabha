@@ -1,6 +1,6 @@
 # Task 0.7: Terminal UX Foundations Spike
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - None
