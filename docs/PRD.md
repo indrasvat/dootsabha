@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.4 |
+| **Version** | 1.5 |
 | **Author** | indrasvat |
 | **Date** | 2026-02-28 |
 | **Status** | Draft |
@@ -899,3 +899,4 @@ Mark DONE → Update PROGRESS.md → Commit
 | 2026-02-28 | 1.2 | Gemini review: PTY vs pipe spike added, subprocess reaper pattern, chair fallback re-invocation fix, Provider.Cancel method, config key redaction, SIGPIPE handling, multi-round context cap, orphaned process risk |
 | 2026-02-28 | 1.3 | Testing overhaul: extracted testing-strategy.md (447 lines), PRD §10 is now a compact summary (64 lines) |
 | 2026-02-28 | 1.4 | Progressive disclosure structure: document hierarchy section, "Also read" cross-refs on all §6 commands, annotated ToC with line counts and typical references |
+| 2026-02-28 | 1.5 | Task files + git hooks: 37 numbered task files (docs/tasks/, P0-P5), lefthook spec delegating to Makefile (pre-commit→`make pre-commit`, pre-push→`make ci`), new targets (pre-commit, fmt-check, fix-check), `make build` depends on `hooks`, two-layer quality system (testing-strategy.md §8) |
