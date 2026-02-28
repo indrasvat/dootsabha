@@ -22,10 +22,15 @@ Some CLIs behave differently when spawned via pipe vs PTY (buffering, interactiv
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/pty-pipe && cd _spikes/pty-pipe`
+- `go mod init dootsabha-spike/pty-pipe`
+
+### Step 2: Read context
 1. Read PRD §4.1 (CLI flags per provider)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - For each CLI (claude, codex, gemini):
   - Spawn via `os/exec` (pipe mode) with YOLO+JSON flags
   - Capture stdout/stderr separately
@@ -33,13 +38,13 @@ Some CLIs behave differently when spawned via pipe vs PTY (buffering, interactiv
 - Compare: is JSON output complete and valid?
 - Check: any interactive prompts that would block?
 
-### Step 3: Test each CLI
+### Step 4: Test each CLI
 - `claude -p "PONG" --output-format json --dangerously-skip-permissions` via pipe
 - `codex exec --json --sandbox danger-full-access "PONG"` via pipe
 - `gemini --yolo --output-format json "PONG"` via pipe
 - Verify: no prompts, no blocking, valid JSON
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Which CLIs work perfectly via pipe
 - Any differences vs interactive terminal execution
 - Whether `creack/pty` is needed (ideally not)
@@ -79,7 +84,7 @@ spike(pty-pipe): verify CLI behavior with plain pipes vs PTY
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §4.1

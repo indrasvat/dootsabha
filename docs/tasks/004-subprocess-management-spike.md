@@ -23,24 +23,30 @@
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/subprocess && cd _spikes/subprocess`
+- `go mod init dootsabha-spike/subprocess`
+- `go get golang.org/x/sync`
+
+### Step 2: Read context
 1. Read PRD §5.2 (subprocess runner component)
 2. Read PRD §7.2 (reliability: Ctrl+C behavior)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Use `errgroup.Group` with context to fan-out 3 `sleep` commands
 - Set `SysProcAttr.Setpgid = true` for process group isolation
 - Implement context cancellation → SIGTERM to process group → grace period → SIGKILL
 - Implement orphan reaper goroutine
 
-### Step 3: Test scenarios
+### Step 4: Test scenarios
 - Normal completion (all 3 succeed)
 - One process fails → context cancelled → others killed
 - Ctrl+C during execution → clean shutdown
 - Kill parent → verify children are reaped (no orphans via `ps aux | grep`)
 - macOS-specific: verify Setpgid works under SIP
 
-### Step 4: Document findings
+### Step 5: Document findings
 - errgroup + context cancellation patterns that work
 - Process group cleanup timing (grace period needed?)
 - Orphan reaper effectiveness
@@ -81,7 +87,7 @@ spike(subprocess): validate errgroup, Setpgid, and orphan reaper
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §5.2, §7.2

@@ -23,21 +23,26 @@ Claude CLI's `--output-format json` schema is not formally documented. We must c
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/claude-json && cd _spikes/claude-json`
+- `go mod init dootsabha-spike/claude-json`
+
+### Step 2: Read context
 1. Read PRD §4.1 (Claude CLI flags + nested session gotcha)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Run `claude -p "Say PONG" --output-format json --dangerously-skip-permissions` with `CLAUDECODE` unset
 - Parse JSON response and extract: content, session_id, cost, model, tokens
 - Test with and without `CLAUDECODE` set to verify the nested session error
 - Test `--model` override
 
-### Step 3: Test error cases
+### Step 4: Test error cases
 - Invalid auth (unset API key) → capture error JSON structure
 - Timeout behavior
 - Invalid model name
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Exact JSON schema with all fields
 - Which fields are nullable/optional
 - Error response format
@@ -74,7 +79,7 @@ spike(claude-json): validate JSON output schema and env var gotcha
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §4.1, §5.5

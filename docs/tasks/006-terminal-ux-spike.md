@@ -24,28 +24,34 @@
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/terminal-ux && cd _spikes/terminal-ux`
+- `go mod init dootsabha-spike/terminal-ux`
+- `go get github.com/charmbracelet/lipgloss@v1.1.0 github.com/charmbracelet/huh@v0.8.0`
+
+### Step 2: Read context
 1. Read PRD §8 (all subsections)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Render a sample provider status table using lipgloss/table
 - Render colored provider dots (Claude amber, Codex emerald, Gemini blue)
 - Run huh spinner on stderr while printing to stdout
 - Test graceful degradation: TTY vs pipe vs NO_COLOR
 
-### Step 3: Test scenarios
+### Step 4: Test scenarios
 - `go run main.go` (TTY with color)
 - `go run main.go | cat` (piped — no color, no spinner, no Unicode)
 - `NO_COLOR=1 go run main.go` (TTY without color)
 - Terminal width 40 cols — verify no ugly wrapping
 - Verify: no ANSI codes in piped output (`| grep -P '\x1b\['`)
 
-### Step 4: Verify lipgloss pitfalls
+### Step 5: Verify lipgloss pitfalls
 - Background bleed: test `lipgloss.Background()` rendering
 - Width calculation: test `lipgloss.Width()` on nested elements
 - ANSI reset: verify explicit `\033[0m` between styled elements
 
-### Step 5: Document findings
+### Step 6: Document findings
 - Which lipgloss pitfalls from §8.4 were reproduced
 - huh spinner stderr isolation confirmed
 - Degradation behavior documented per matrix in §8.3
@@ -81,7 +87,7 @@ spike(terminal-ux): validate lipgloss degradation and huh spinner isolation
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §8

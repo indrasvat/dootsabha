@@ -25,22 +25,28 @@ hashicorp/go-plugin v1.7.0 is the plugin foundation for Phase 3. We must validat
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/go-plugin-grpc && cd _spikes/go-plugin-grpc`
+- `go mod init dootsabha-spike/go-plugin-grpc`
+- `go get github.com/hashicorp/go-plugin@v1.7.0 google.golang.org/grpc`
+
+### Step 2: Read context
 1. Read PRD §5.3 (plugin types and interfaces)
 2. Read hashicorp/go-plugin examples
 
-### Step 2: Write minimal plugin pair
+### Step 3: Write minimal plugin pair
 - Define a simple `Greeter` interface with one `Greet(string) string` method
 - Implement gRPC server (plugin side) and client (host side)
 - Use `plugin.Serve()` in plugin, `plugin.NewClient()` in host
 
-### Step 3: Measure
+### Step 4: Measure
 - Handshake latency (time from NewClient to first RPC call)
 - Per-call latency (subsequent RPC calls)
 - Memory overhead (host + plugin processes)
 - Plugin crash → host recovery behavior
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Measured latencies (median, p95)
 - Plugin crash recovery mechanism
 - Recommended patterns for production use
@@ -79,7 +85,7 @@ spike(go-plugin): validate gRPC handshake latency and crash recovery
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §4, §5.3

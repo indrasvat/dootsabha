@@ -23,24 +23,30 @@
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/cobra-alias && cd _spikes/cobra-alias`
+- `go mod init dootsabha-spike/cobra-alias`
+- `go get github.com/spf13/cobra@v1.10.2`
+
+### Step 2: Read context
 1. Read PRD §6.1 (root command, unknown command handler)
 2. Read PRD §1.2 (bilingual UX principle)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Create Cobra root command with 3 subcommands, each with an alias
 - Test: `council` and `sabha` both work
 - Test: `--help` shows both names (e.g., `council (sabha)`)
 - Test: unknown command triggers custom RunE handler
 - Test: flag aliases (e.g., `--agent` and `--doota`)
 
-### Step 3: Test edge cases
+### Step 4: Test edge cases
 - Non-ASCII alias rendering in help text
 - Tab completion with aliases
 - Unknown command with closest match suggestion
 - `cobra.EnablePrefixMatching` behavior with aliases
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Alias rendering in help text (does Cobra show aliases?)
 - Flag alias mechanism (cobra vs pflag)
 - Unknown command hook mechanism
@@ -76,7 +82,7 @@ spike(cobra-alias): validate bilingual aliases and extension discovery
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §1.2, §6.1

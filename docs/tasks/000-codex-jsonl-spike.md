@@ -22,23 +22,29 @@ Codex CLI outputs a JSONL event stream, not a single JSON object. We must reliab
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/codex-jsonl && cd _spikes/codex-jsonl`
+- `go mod init dootsabha-spike/codex-jsonl`
+- Add dependencies as needed (`go get`)
+
+### Step 2: Read context
 1. Read PRD §4.1 (Codex JSONL format block)
 2. Read PRD §11 (Codex JSONL risk)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Run `codex exec --json "Say PONG" 2>/dev/null` and capture stdout
 - Parse JSONL line-by-line with `json.Decoder`
 - Extract final content from `item.completed` where `item.type == "agent_message"`
 - Extract token usage from `turn.completed`
 - Handle edge cases: empty stream, no agent_message, malformed JSON lines
 
-### Step 3: Test with real CLI
+### Step 4: Test with real CLI
 - Run spike against real Codex CLI
 - Test with different prompts (short, long, error-inducing)
 - Test with `--sandbox danger-full-access` and `--skip-git-repo-check`
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Exact event types observed
 - Any undocumented fields
 - Error behavior (auth failure, rate limit, timeout)
@@ -76,7 +82,7 @@ spike(codex-jsonl): validate JSONL event stream parsing
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §4.1

@@ -22,21 +22,26 @@ Gemini CLI v0.30.0 has `--output-format json` and `--yolo` flag, but the exact J
 
 ## Execution Steps
 
-### Step 1: Read context
+### Step 1: Initialize spike module
+- **No top-level `go.mod` exists yet** (created in Task 1.1). Each spike is a standalone module.
+- `mkdir -p _spikes/gemini-json && cd _spikes/gemini-json`
+- `go mod init dootsabha-spike/gemini-json`
+
+### Step 2: Read context
 1. Read PRD §4.1 (Gemini CLI flags, verified v0.30.0 behavior)
 
-### Step 2: Write spike program
+### Step 3: Write spike program
 - Run `gemini --yolo --output-format json "Say PONG"` and parse response
 - Also test: `gemini --yolo -p "Say PONG" --output-format json`
 - Also test: `gemini --approval-mode yolo --output-format json "Say PONG"`
 - Extract: content, model, duration, tokens
 
-### Step 3: Test variations
+### Step 4: Test variations
 - Positional prompt vs `-p` flag — compare JSON output
 - `--yolo` vs `--approval-mode yolo` — confirm identical behavior
 - Error cases: no auth, invalid model, timeout
 
-### Step 4: Document findings
+### Step 5: Document findings
 - Exact JSON schema
 - Which prompt mechanism is preferred (positional or `-p`)
 - Differences between `--yolo` variants (if any)
@@ -73,7 +78,7 @@ spike(gemini-json): validate JSON output schema and flag variants
 
 ## Session Protocol
 
-1. Read CLAUDE.md
+1. Read CLAUDE.md — **skip if it doesn't exist yet (created in Task 1.1)**
 2. Read this task file
 3. **Change status to `IN PROGRESS`**
 4. Read PRD §4.1
