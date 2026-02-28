@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>दूतसभा — MVP Build Plan</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2234;
+  --bg-code: #0d1321;
+  --border-subtle: #1e2d4a;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-gold: #f59e0b;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-purple: #8b5cf6;
+  --accent-red: #ef4444;
+  --accent-rose: #f43f5e;
+  --sanskrit-gold: #fbbf24;
+  --glow-gold: rgba(245, 158, 11, 0.15);
+  --radius: 10px;
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,14,23,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 0;
+}
+nav .nav-inner {
+  max-width: 1200px; margin: 0 auto; padding: 0 24px;
+  display: flex; align-items: center; gap: 24px;
+  overflow-x: auto; scrollbar-width: none;
+}
+nav .nav-inner::-webkit-scrollbar { display: none; }
+nav .brand {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 1.1rem;
+  color: var(--accent-gold); white-space: nowrap; text-decoration: none;
+}
+nav a {
+  color: var(--text-secondary); text-decoration: none;
+  font-size: 0.82rem; font-weight: 500; white-space: nowrap; transition: color 0.2s;
+}
+nav a:hover { color: var(--accent-gold); }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+.hero {
+  padding: 64px 0 40px; text-align: center;
+  border-bottom: 1px solid var(--border-subtle); margin-bottom: 48px;
+  position: relative;
+}
+.hero::before {
+  content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 300px;
+  background: radial-gradient(ellipse, var(--glow-gold), transparent 70%);
+  pointer-events: none; opacity: 0.4;
+}
+.hero h1 {
+  font-family: 'Crimson Pro', serif; font-size: 2.8rem; font-weight: 700;
+  color: var(--accent-gold); margin-bottom: 8px;
+}
+.hero .subtitle {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: var(--text-muted);
+  margin-bottom: 12px;
+}
+.hero .tagline {
+  font-size: 1.05rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto;
+}
+.version-badge {
+  display: inline-block; margin-top: 14px; padding: 4px 14px; border-radius: 20px;
+  background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--accent-gold);
+}
+section { margin-bottom: 52px; }
+section > h2 {
+  font-family: 'Crimson Pro', serif; font-size: 1.85rem; font-weight: 700;
+  color: var(--text-primary); margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 2px solid var(--border-subtle);
+  display: flex; align-items: center; gap: 12px;
+}
+section > h2 .num {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--accent-gold);
+  background: rgba(245,158,11,0.1); padding: 3px 10px; border-radius: 6px;
+}
+h3 {
+  font-family: 'DM Sans', sans-serif; font-size: 1.22rem; font-weight: 600;
+  color: var(--accent-cyan); margin: 26px 0 12px;
+}
+h4 { font-size: 1.02rem; font-weight: 600; color: var(--text-primary); margin: 18px 0 10px; }
+p { margin-bottom: 12px; color: var(--text-secondary); }
+strong { color: var(--text-primary); font-weight: 600; }
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius); padding: 22px; margin-bottom: 18px;
+  box-shadow: var(--shadow-card);
+}
+.card.highlight { border-left: 3px solid var(--accent-gold); }
+.card.phase { border-left: 3px solid var(--accent-cyan); }
+.card.danger { border-left: 3px solid var(--accent-red); }
+.card.done { border-left: 3px solid var(--accent-green); }
+.card-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px;
+}
+.table-wrap {
+  overflow-x: auto; margin: 14px 0; border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th {
+  background: var(--bg-secondary); color: var(--accent-gold);
+  font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600;
+  text-align: left; padding: 11px 16px; border-bottom: 2px solid var(--border-subtle);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 16px; border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary); vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+td code {
+  font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  background: var(--bg-code); padding: 2px 7px; border-radius: 4px;
+  color: var(--accent-cyan); white-space: nowrap;
+}
+pre {
+  background: var(--bg-code); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius); padding: 16px 18px; overflow-x: auto; margin: 12px 0;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  line-height: 1.65; color: var(--text-secondary);
+}
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.badge-gold { background: rgba(245,158,11,0.15); color: var(--accent-gold); }
+.badge-blue { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+.badge-green { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.badge-purple { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+.badge-red { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.badge-cyan { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+.callout {
+  border-radius: var(--radius); padding: 14px 18px; margin: 14px 0; font-size: 0.9rem;
+}
+.callout-info { background: rgba(59,130,246,0.08); border-left: 3px solid var(--accent-blue); }
+.callout-warn { background: rgba(245,158,11,0.08); border-left: 3px solid var(--accent-gold); }
+.callout-tip { background: rgba(16,185,129,0.08); border-left: 3px solid var(--accent-green); }
+.callout-danger { background: rgba(239,68,68,0.08); border-left: 3px solid var(--accent-red); }
+.callout strong { display: block; margin-bottom: 4px; }
+/* Phase timeline */
+.phase-marker {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 600;
+  margin-bottom: 6px;
+}
+.phase-marker .dot { width: 10px; height: 10px; border-radius: 50%; }
+.done-item::before {
+  content: '☐'; margin-right: 8px; color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.done-item { display: block; padding: 3px 0; color: var(--text-secondary); font-size: 0.92rem; }
+/* Checklist styling */
+.checklist { list-style: none; padding: 0; margin: 10px 0; }
+.checklist li {
+  padding: 6px 0 6px 28px; position: relative; color: var(--text-secondary); font-size: 0.92rem;
+  border-bottom: 1px solid rgba(30,45,74,0.4);
+}
+.checklist li:last-child { border-bottom: none; }
+.checklist li::before {
+  content: '☐'; position: absolute; left: 4px; top: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: var(--text-muted);
+}
+.checklist li.critical::after {
+  content: 'CRITICAL'; position: absolute; right: 0; top: 8px;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+  background: rgba(239,68,68,0.15); color: var(--accent-red);
+  padding: 1px 8px; border-radius: 8px;
+}
+/* Testing layers */
+.test-layer {
+  display: flex; align-items: flex-start; gap: 16px; padding: 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.test-layer:last-child { border-bottom: none; }
+.test-num {
+  font-family: 'JetBrains Mono', monospace; font-size: 1.2rem; font-weight: 700;
+  color: var(--accent-gold); min-width: 28px;
+}
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2.1rem; }
+  .card-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="brand">दूतसभा · Build Plan</a>
+    <a href="#philosophy">Philosophy</a>
+    <a href="#testing">Testing</a>
+    <a href="#terminal">Terminal UX</a>
+    <a href="#phase0">Phase 0</a>
+    <a href="#phase1">Phase 1</a>
+    <a href="#phase2">Phase 2</a>
+    <a href="#phase3">Phase 3</a>
+    <a href="#phase4">Phase 4</a>
+    <a href="#phase5">Phase 5</a>
+    <a href="#risks">Risks</a>
+  </div>
+</nav>
+
+<div class="container">
+
+<div class="hero">
+  <h1>दूतसभा — MVP Build Plan</h1>
+  <div class="subtitle">v0.1.0 · Phased, Spike-First, Reality-Checked</div>
+  <p class="tagline">
+    Every phase proves its assumptions before building on them. Every milestone has a binary "does it work?" gate the agent must pass by actually running the thing.
+  </p>
+  <span class="version-badge">6 Phases · ~14 days · Agent-Buildable</span>
+</div>
+
+<!-- ═══════════════════════════ PHILOSOPHY ═══════════════════════════ -->
+<section id="philosophy">
+<h2><span class="num">00</span> Build Philosophy</h2>
+
+<div class="card highlight">
+  <h4>Three Non-Negotiable Rules</h4>
+  <p><strong>1. Spike before you build.</strong> Every technical assumption (Codex JSONL parsing, go-plugin gRPC handshake, cobra alias behavior) gets validated with a throwaway script <em>before</em> it becomes load-bearing code. Phase 0 exists entirely for this. No surprises.</p>
+  <p><strong>2. Run it, don't just test it.</strong> Unit tests are a safety net, not proof of correctness. After every phase, the agent must <em>actually execute the binary</em>, observe the terminal output, and verify behavior matches expectations. "It compiles" and "tests pass" are necessary but insufficient. The agent must also run the real binary against real CLIs — then screenshot / capture the output as evidence.</p>
+  <p><strong>3. Incremental, shippable layers.</strong> Each phase produces a working binary that does something useful. Phase 1 gives you <code>dootsabha consult</code>. Phase 2 adds council. Phase 3 adds plugins. Each is independently valuable, not a half-finished skeleton.</p>
+</div>
+
+<h3>Agent Session Bootstrap</h3>
+<p>Every coding session (Claude Code, Codex CLI, etc.) MUST begin with this setup. Non-negotiable.</p>
+<pre>
+┌──────────────────────────────────────────────────────┐
+│  SESSION START — run once per coding session          │
+│                                                       │
+│  1. LOAD cm SKILL (episodic memory):                  │
+│     Source the Cass Memory System skill for cross-    │
+│     session learning capture. Stores gotchas, fixes,  │
+│     and discoveries so the next session doesn't       │
+│     repeat mistakes.                                  │
+│                                                       │
+│  2. LOAD iterm2-driver SKILL:                         │
+│     Source the iTerm2 screenshot automation skill      │
+│     for visual CLI/TUI testing. Required for L5       │
+│     acceptance tests — the agent takes screenshots,   │
+│     inspects rendering, colors, alignment.            │
+│                                                       │
+│  3. READ CLAUDE.md:                                   │
+│     Project conventions, make targets, coding style.  │
+│     This is the ground truth, not memory.             │
+│                                                       │
+│  4. RECALL cm memories:                               │
+│     Check for relevant learnings from prior sessions  │
+│     (lipgloss quirks, go-plugin gotchas, etc.)        │
+└──────────────────────────────────────────────────────┘
+</pre>
+
+<h3>Agent Development Workflow</h3>
+<p>This plan is designed to be executed by Claude Code (or any coding agent). The feedback loop at each step — always prefer <code>make</code> targets over raw commands:</p>
+<pre>
+┌──────────────────────────────────────────────────────┐
+│  1. READ the phase spec + done criteria               │
+│  2. IMPLEMENT the code                                │
+│  3. make fmt          (gofmt + goimports)             │
+│  4. make fix          (go fix — adopt latest idioms)  │
+│  5. make lint         (golangci-lint, zero warnings)  │
+│  6. make test         (go test ./..., 100% pass)      │
+│  7. make smoke        (run binary against mocks)      │
+│  8. make integration  (run against real CLIs)         │
+│  9. make screenshot   (iTerm2-driver visual capture)  │
+│  10. VERIFY: output matches expected rendering        │
+│  11. COMMIT: only if 3-10 all pass                    │
+│  12. CAPTURE: cm save learnings from this iteration   │
+│  13. PROVE: paste actual terminal output as evidence  │
+└──────────────────────────────────────────────────────┘
+</pre>
+
+<div class="callout callout-warn">
+  <strong>Agent Discipline:</strong> The agent MUST NOT claim a phase is done without showing actual terminal output from running the binary. "I believe this works" is not evidence. <code>$ dootsabha status</code> followed by the actual output — that's evidence. For visual quality (colors, alignment, theme), iTerm2-driver screenshots are the proof.
+</div>
+
+<div class="callout callout-info">
+  <strong><code>go fix</code> Discipline (Go 1.26+):</strong> Run <code>make fix</code> after every phase. Go 1.26's <code>go fix</code> (<a href="https://go.dev/blog/gofix" style="color:var(--accent-cyan)">go.dev/blog/gofix</a>) automatically rewrites code to use latest language features — new loop variable semantics, range-over-func, updated stdlib APIs. Keeps the codebase idiomatically current. Also run after every dependency update.
+</div>
+
+<h3>Episodic Memory (<code>cm</code> SKILL)</h3>
+<p>
+  The <a href="https://github.com/Dicklesworthstone/cass_memory_system" style="color:var(--accent-cyan)">Cass Memory System</a> skill captures learnings across coding sessions. This is critical for a multi-phase project — Phase 3's go-plugin work benefits from Phase 0's spike findings, and lipgloss quirks discovered in Phase 1 shouldn't be rediscovered in Phase 4.
+</p>
+<div class="card">
+  <h4>What to Capture</h4>
+  <p>After every significant discovery, workaround, or gotcha — save it to <code>cm</code>:</p>
+<pre>
+# Examples of what to save:
+cm save "Codex JSONL: final content is in last item.created event with type=message, 
+         NOT in turn.completed. turn.completed has no content field."
+
+cm save "lipgloss: HasDarkBackground() returns false when piped. Must check 
+         lipgloss.ColorProfile() != lipgloss.Ascii instead for reliable detection."
+
+cm save "go-plugin: handshake takes ~45ms cold start. Acceptable. Plugin binary 
+         must be built with CGO_ENABLED=0 on macOS for cross-compile."
+
+cm save "BubbleTea spinner: must call spinner.Tick() in Init() or it won't animate.
+         See lipgloss/bubbletea learnings in cm for more patterns."
+</pre>
+  <p>At session start, <code>cm recall</code> surfaces relevant memories. This compounds — by Phase 4, the agent has a rich knowledge base of project-specific learnings.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════ TESTING METHODOLOGY ═══════════════════════════ -->
+<section id="testing">
+<h2><span class="num">01</span> Testing Methodology</h2>
+
+<p>
+  Five layers, each catching different classes of bugs. Higher layers are more valuable but slower. The agent should run layers 1-4 continuously during development, layer 5 at phase completion.
+</p>
+
+<div class="card">
+<div class="test-layer">
+  <span class="test-num">L1</span>
+  <div>
+    <h4>Compilation &amp; Static Analysis <span class="badge badge-green">every save</span></h4>
+    <p><code>go build ./...</code> + <code>go vet ./...</code> + <code>golangci-lint run</code>. Catches type errors, unused imports, simple bugs. Run after every edit. Zero tolerance for warnings — fix immediately.</p>
+  </div>
+</div>
+<div class="test-layer">
+  <span class="test-num">L2</span>
+  <div>
+    <h4>Unit Tests <span class="badge badge-blue">every change</span></h4>
+    <p><code>go test ./...</code>. Tests individual functions in isolation. Mocked dependencies (no real CLI calls). Focus: config parsing, JSON response parsing, retry classification, subprocess arg building, flag resolution. These run in &lt;2 seconds.</p>
+    <pre>
+// Example: unit test for Codex JSONL parsing
+func TestParseCodexJSONL(t *testing.T) {
+    input := `{"type":"turn.started","turn_id":"t1"}
+{"type":"item.created","item":{"type":"message","content":[{"text":"hello"}]}}
+{"type":"turn.completed","turn_id":"t1"}`
+
+    resp, err := parseCodexOutput([]byte(input))
+    require.NoError(t, err)
+    assert.Equal(t, "hello", resp.Content)
+}</pre>
+  </div>
+</div>
+<div class="test-layer">
+  <span class="test-num">L3</span>
+  <div>
+    <h4>Smoke Tests (Binary Execution) <span class="badge badge-purple">every phase</span></h4>
+    <p>Build the binary, execute it, verify exit codes and output structure. No real CLIs needed — uses mock provider scripts that simulate agent behavior.</p>
+    <pre>
+# smoke_test.sh — run after every build
+set -euo pipefail
+
+BIN="./dootsabha"
+
+# Basic: help works
+$BIN help | grep -q "दूतसभा" || fail "help missing title"
+$BIN help | grep -q "council.*sabha" || fail "help missing bilingual"
+
+# JSON mode: valid JSON on stdout, logs on stderr
+output=$($BIN consult --agent mock --json "test" 2>/dev/null)
+echo "$output" | jq . > /dev/null || fail "invalid JSON output"
+
+# Piped mode: no color codes
+$BIN status 2>&1 | cat | grep -qP '\x1b\[' && fail "color codes in piped output"
+
+# Exit codes
+$BIN consult --agent nonexistent "test" 2>/dev/null; [ $? -ne 0 ] || fail "bad exit code"
+
+echo "✓ All smoke tests passed"</pre>
+  </div>
+</div>
+<div class="test-layer">
+  <span class="test-num">L4</span>
+  <div>
+    <h4>Integration Tests (Real CLIs) <span class="badge badge-gold">every phase</span></h4>
+    <p>Run against actual <code>claude</code>, <code>codex</code>, <code>gemini</code> CLIs. Validates real subprocess behavior, JSON parsing, auth detection, timeout handling. Requires CLIs installed and authenticated. Costs actual API tokens — keep prompts tiny.</p>
+    <pre>
+# integration_test.sh — run with real CLIs
+set -euo pipefail
+
+BIN="./dootsabha"
+PROMPT="Reply with exactly: PONG"
+
+echo "── Claude ──"
+result=$($BIN consult --agent claude --json "$PROMPT" 2>/dev/null)
+echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "claude: no PONG"
+echo "$result" | jq -e '.duration_ms > 0' > /dev/null || fail "claude: no duration"
+echo "$result" | jq -e '.model' > /dev/null || fail "claude: no model"
+
+echo "── Codex ──"
+result=$($BIN consult --agent codex --json "$PROMPT" 2>/dev/null)
+echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "codex: no PONG"
+
+echo "── Gemini ──"
+result=$($BIN consult --agent gemini --json "$PROMPT" 2>/dev/null)
+echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "gemini: no PONG"
+
+echo "── Status ──"
+$BIN status --json 2>/dev/null | jq -e '.providers | length == 3' > /dev/null
+
+echo "✓ All integration tests passed"</pre>
+  </div>
+</div>
+<div class="test-layer">
+  <span class="test-num">L5</span>
+  <div>
+    <h4>Acceptance Tests (End-to-End + Visual) <span class="badge badge-red">phase completion</span></h4>
+    <p>Full user-facing scenarios that exercise the entire pipeline, <strong>plus iTerm2-driver visual verification</strong>. The agent must run these, take screenshots via <code>iterm2-driver</code>, and visually inspect rendering quality — colors, alignment, Unicode, degradation.</p>
+    <pre>
+# Acceptance: full council session
+$ dootsabha council "Write a function that checks if a string is a palindrome"
+# Expected: See output from all 3 agents, peer reviews, synthesized answer
+# → Screenshot: verify stage headers, provider colors, progress bars, footer stats
+
+# Acceptance: graceful degradation
+$ dootsabha council --agents claude,nonexistent "test"
+# Expected: Warning about nonexistent agent, proceeds with claude only
+# → Screenshot: verify warning styling (amber), no broken layout
+
+# Acceptance: JSON piped to jq
+$ dootsabha council --json "palindrome check" 2>/dev/null | jq '.synthesis.content' | head -5
+# Expected: Clean JSON, no color codes, no spinner artifacts
+
+# Acceptance: timeout handling
+$ dootsabha consult --timeout 1s --json "write a novel"
+# Expected: Timeout error, non-zero exit code, structured error in JSON
+
+# Acceptance: piped output — NO ANSI escapes
+$ dootsabha status | cat > /tmp/status.txt && cat /tmp/status.txt
+# → Screenshot: verify no garbled escape codes, clean plain text
+
+# Acceptance: NO_COLOR
+$ NO_COLOR=1 dootsabha status
+# → Screenshot: verify styled layout WITHOUT colors (monochrome)
+
+# Acceptance: narrow terminal
+$ stty cols 50 && dootsabha status
+# → Screenshot: verify no line-wrap breakage, graceful compact layout
+
+# Acceptance: help output aesthetics
+$ dootsabha help
+# → Screenshot: verify bilingual names, section alignment, consistent style</pre>
+
+    <h4>iTerm2-Driver Visual Testing (<a href="https://github.com/indrasvat/claude-code-skills/tree/main/skills/iterm2-driver" style="color:var(--accent-cyan)">iterm2-driver SKILL</a>)</h4>
+    <p>The agent uses the <code>iterm2-driver</code> skill to programmatically:</p>
+    <ul class="checklist">
+      <li>Launch commands in iTerm2 and capture full-resolution screenshots</li>
+      <li>Verify color accuracy: provider dots (●) render in correct palette (amber/green/blue)</li>
+      <li>Verify Unicode rendering: ✓, ✗, ●, ═, ─, ║ all display correctly</li>
+      <li>Verify alignment: table columns aligned, no ragged edges</li>
+      <li>Verify spinner/progress: animated elements render correctly (capture mid-animation)</li>
+      <li>Verify degradation: same command under pipe / NO_COLOR / narrow terminal — compare screenshots</li>
+      <li>Verify dark/light theme: lipgloss adapts to terminal background</li>
+    </ul>
+    <p>See <a href="https://github.com/indrasvat/gh-ghent" style="color:var(--accent-cyan)">gh-ghent</a> for reference implementation of iTerm2-driver test patterns.</p>
+  </div>
+  </div>
+</div>
+</div>
+
+<h3>Testing Pyramid Summary</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Layer</th><th>What</th><th>Speed</th><th>Runs When</th><th>Mocks?</th><th>Costs $?</th></tr>
+<tr><td>L1</td><td>Compile + lint</td><td>&lt;5s</td><td>Every save</td><td>N/A</td><td>No</td></tr>
+<tr><td>L2</td><td>Unit tests</td><td>&lt;2s</td><td>Every change</td><td>Yes (all deps mocked)</td><td>No</td></tr>
+<tr><td>L3</td><td>Smoke tests</td><td>&lt;10s</td><td>Every build</td><td>Mock provider scripts</td><td>No</td></tr>
+<tr><td>L4</td><td>Integration tests</td><td>30-60s</td><td>Every phase</td><td>No (real CLIs)</td><td>~$0.05</td></tr>
+<tr><td>L5</td><td>Acceptance + visual</td><td>2-5min</td><td>Phase gate</td><td>No (real CLIs + iTerm2)</td><td>~$0.50</td></tr>
+</table>
+</div>
+
+<h3>Mock Provider for L3 Smoke Tests</h3>
+<p>A tiny script that mimics a coding agent's CLI behavior for fast, offline testing:</p>
+<pre>
+#!/usr/bin/env bash
+# mock-claude — simulates claude CLI for smoke tests
+# Install: chmod +x mock-claude && place on PATH or set in config
+
+# Parse expected flags
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -p) PROMPT="$2"; shift 2 ;;
+    --output-format) FORMAT="$2"; shift 2 ;;
+    --model) MODEL="$2"; shift 2 ;;
+    --dangerously-skip-permissions) shift ;;
+    --no-session-persistence) shift ;;
+    --max-turns) shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+if [ "$FORMAT" = "json" ]; then
+  cat &lt;&lt;EOF
+{"result":"Mock response to: $PROMPT","session_id":"mock_123","cost_usd":0.001,"model":"${MODEL:-sonnet-4-6}","duration_ms":150}
+EOF
+else
+  echo "Mock response to: $PROMPT"
+fi
+</pre>
+</section>
+
+<!-- ═══════════════════════════ TERMINAL UX ═══════════════════════════ -->
+<section id="terminal">
+<h2><span class="num">02</span> Terminal UX Standards</h2>
+
+<p>This is not optional polish — it's a core quality bar for the MVP. Every CLI output must be beautiful in a terminal and correct when piped.</p>
+
+<h3>Good Unix Citizenship</h3>
+<div class="card highlight">
+<div class="table-wrap">
+<table>
+<tr><th>Principle</th><th>Implementation</th><th>Validation</th></tr>
+<tr>
+  <td><strong>stdout = data, stderr = logs</strong></td>
+  <td>All structured output (JSON, results) goes to stdout. All status messages, spinners, progress, warnings go to stderr.</td>
+  <td><code>dootsabha consult --json "test" 2>/dev/null | jq .</code> must produce valid JSON</td>
+</tr>
+<tr>
+  <td><strong>Meaningful exit codes</strong></td>
+  <td>0=success, 1=general error, 2=usage error (bad flags), 3=provider error (CLI failed), 4=timeout, 5=partial result (some agents failed in council)</td>
+  <td>Test each exit code path explicitly</td>
+</tr>
+<tr>
+  <td><strong>NO_COLOR + pipe detection</strong></td>
+  <td>Respect <code>NO_COLOR</code> env var. Auto-detect if stdout is a TTY via <code>os.Stdout.Fd()</code> + <code>isatty</code>. No color/spinner/progress when piped.</td>
+  <td><code>dootsabha status | cat | grep -P '\x1b\['</code> must find nothing</td>
+</tr>
+<tr>
+  <td><strong>Stderr for human feedback</strong></td>
+  <td>Spinners, progress bars, "Invoking claude..." messages — all to stderr. Never pollute stdout with status noise.</td>
+  <td><code>dootsabha consult "test" > /dev/null</code> should show progress on terminal</td>
+</tr>
+<tr>
+  <td><strong>Ctrl+C graceful shutdown</strong></td>
+  <td>Catch SIGINT/SIGTERM. Kill child processes (process groups). Print summary of what completed. Clean non-zero exit.</td>
+  <td>Hit Ctrl+C mid-council: see "Interrupted. Claude completed, codex cancelled." Not a Go stack trace.</td>
+</tr>
+<tr>
+  <td><strong>Width-aware formatting</strong></td>
+  <td>Detect terminal width via <code>term.GetSize()</code>. Tables and wrapped text respect it. Degrade to simple output at &lt;60 cols.</td>
+  <td>Resize terminal to 40 cols, run <code>dootsabha status</code> — output must not wrap hideously</td>
+</tr>
+</table>
+</div>
+</div>
+
+<h3>Visual Design Language</h3>
+<div class="card">
+  <h4>Color Palette (lipgloss)</h4>
+<pre>
+// Provider colors — consistent throughout
+var (
+    ClaudeColor  = lipgloss.Color("#F59E0B")  // Amber/gold
+    CodexColor   = lipgloss.Color("#10B981")  // Emerald
+    GeminiColor  = lipgloss.Color("#3B82F6")  // Blue
+    ErrorColor   = lipgloss.Color("#EF4444")  // Red
+    SuccessColor = lipgloss.Color("#10B981")  // Green
+    WarnColor    = lipgloss.Color("#F59E0B")  // Amber
+    MutedColor   = lipgloss.Color("#64748B")  // Slate
+    AccentColor  = lipgloss.Color("#06B6D4")  // Cyan
+)
+</pre>
+
+  <h4>Output Components</h4>
+<pre>
+$ dootsabha status
+
+  दूतसभा · status                                              v0.1.0
+
+  PROVIDER   MODEL           STATUS    VERSION    LATENCY
+  ● claude   sonnet-4-6      ✓ ready   1.0.24     —
+  ● codex    gpt-5.3-codex   ✓ ready   0.9.3      —
+  ● gemini   gemini-3-pro    ✗ auth    0.18.1     —
+                              ↳ OAuth token expired — run: gemini auth login
+
+  Plugins: 3 providers · 1 strategy · 0 hooks
+  Extensions: bench, cost, tui
+</pre>
+
+<pre>
+$ dootsabha consult "explain goroutines briefly"
+
+  ● claude · sonnet-4-6                                    ⏱ 2.3s · $0.003
+
+  A goroutine is a lightweight thread of execution managed by the Go runtime.
+  Unlike OS threads, goroutines start with only ~2KB of stack space and are
+  multiplexed onto a small number of OS threads by Go's scheduler...
+
+  ─────────────────────────────────────────────────────────
+  tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
+</pre>
+
+<pre>
+$ dootsabha council "write a palindrome checker"
+
+  ═══ Stage 1: Dispatch ═══                              3 agents · parallel
+
+  ● claude  ██████████████████████████████████████████ 3.1s ✓
+  ● codex   ████████████████████████████████████       2.8s ✓
+  ● gemini  ████████████████████████████               2.2s ✓
+
+  ═══ Stage 2: Peer Review ═══
+
+  claude  reviewing codex + gemini ..................... ✓
+  codex   reviewing claude + gemini .................... ✓
+  gemini  reviewing claude + codex ..................... ✓
+
+  ═══ Stage 3: Synthesis ═══                             chair: claude
+
+  All three agents provided working implementations. The key differences...
+  [synthesized output here]
+
+  ─────────────────────────────────────────────────────────
+  total: 8.4s │ cost: $0.042 │ tokens: 3,847 in · 1,203 out
+  agents: claude ✓ · codex ✓ · gemini ✓
+</pre>
+</div>
+
+<h3>Graceful Degradation Matrix</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Context</th><th>TTY + Color</th><th>TTY + NO_COLOR</th><th>Piped (not TTY)</th><th>--json</th></tr>
+<tr>
+  <td>Provider indicator</td>
+  <td><span style="color:#F59E0B">●</span> claude</td>
+  <td>* claude</td>
+  <td>* claude</td>
+  <td><code>"provider":"claude"</code></td>
+</tr>
+<tr>
+  <td>Status healthy</td>
+  <td><span style="color:#10B981">✓ ready</span></td>
+  <td>OK ready</td>
+  <td>OK ready</td>
+  <td><code>"healthy":true</code></td>
+</tr>
+<tr>
+  <td>Status unhealthy</td>
+  <td><span style="color:#EF4444">✗ auth</span></td>
+  <td>FAIL auth</td>
+  <td>FAIL auth</td>
+  <td><code>"healthy":false</code></td>
+</tr>
+<tr>
+  <td>Progress</td>
+  <td>Animated spinner + bar</td>
+  <td>Static dots ...</td>
+  <td>Nothing (silence)</td>
+  <td>Nothing (silence)</td>
+</tr>
+<tr>
+  <td>Tables</td>
+  <td>lipgloss box-drawn borders</td>
+  <td>lipgloss, no color</td>
+  <td>Tab-separated values</td>
+  <td>JSON array</td>
+</tr>
+<tr>
+  <td>Footer stats</td>
+  <td>Styled separator + stats</td>
+  <td>Plain separator + stats</td>
+  <td>Omitted</td>
+  <td>JSON <code>"meta":{}</code></td>
+</tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>Implementation:</strong> Build a thin <code>internal/output/renderer.go</code> that takes a <code>RenderContext{TTY bool, Color bool, Width int, Format string}</code> and every output component renders through it. This is Phase 1 infrastructure, not afterthought polish.
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 0: SPIKES ═══════════════════════════ -->
+<section id="phase0">
+<h2><span class="num">P0</span> Phase 0 — Spikes &amp; Assumption Validation</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-red)"></span> <span style="color:var(--accent-red)">BEFORE ANY PRODUCTION CODE</span> · ~1.5 days · throwaway code only</p>
+
+<p>Every spike is a standalone, disposable script/program that proves a single assumption. If a spike fails, we redesign before writing production code. Spikes are committed to <code>_spikes/</code> for reference, never imported.</p>
+
+<div class="card danger">
+  <h4>Spike 0.1 — Codex CLI JSONL Parsing</h4>
+  <p><strong>Risk:</strong> Codex outputs JSONL events, not a single JSON object. We need to reliably extract the final response content from the event stream. This is the highest-risk parsing challenge.</p>
+  <p><strong>Throwaway script:</strong></p>
+<pre>
+// _spikes/codex_jsonl/main.go
+// Run: codex exec "Reply with exactly: PONG" --json --ephemeral --skip-git-repo-check 2>stderr.log | go run main.go
+// Prove: prints parsed content, model, all event types seen
+</pre>
+  <ul class="checklist">
+    <li class="critical">Capture raw JSONL from <code>codex exec --json</code> to a file</li>
+    <li>Document every event type observed (<code>turn.started</code>, <code>item.created</code>, <code>turn.completed</code>, etc.)</li>
+    <li>Identify which event(s) contain the final text response</li>
+    <li>Handle multi-line content, embedded newlines, Unicode</li>
+    <li>Handle error events gracefully</li>
+    <li class="critical">Write a <code>parseCodexOutput([]byte) (*Response, error)</code> that works on the captured data</li>
+  </ul>
+  <p><strong>Done when:</strong> <code>go run main.go &lt; captured_output.jsonl</code> prints the correct content.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.2 — Claude CLI JSON Output</h4>
+  <p><strong>Risk:</strong> Lower than Codex (single JSON object), but need to verify exact field names, nested structure, and edge cases (errors, empty responses).</p>
+  <ul class="checklist">
+    <li>Run <code>claude -p "PONG" --output-format json --dangerously-skip-permissions --no-session-persistence</code></li>
+    <li>Capture and document the full JSON schema</li>
+    <li>Test with an error case (invalid model name) — what does the JSON look like?</li>
+    <li>Test <code>cost_usd</code> field — is it always present? Is it accurate?</li>
+    <li>Write <code>parseClaudeOutput([]byte) (*Response, error)</code></li>
+  </ul>
+  <p><strong>Done when:</strong> Parser works on both success and error JSON.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.3 — Gemini CLI JSON Output</h4>
+  <p><strong>Risk:</strong> The <code>--yolo</code> bug (#13561), positional prompt syntax, and JSON schema need validation.</p>
+  <ul class="checklist">
+    <li>Run <code>gemini "PONG" --output-format json --model gemini-3-pro --approval-mode yolo</code></li>
+    <li>Confirm <code>--approval-mode yolo</code> works (not <code>--yolo</code>)</li>
+    <li>Capture and document JSON schema (<code>response</code>, <code>stats</code> fields)</li>
+    <li>Test error case (invalid model)</li>
+    <li>Write <code>parseGeminiOutput([]byte) (*Response, error)</code></li>
+  </ul>
+  <p><strong>Done when:</strong> Parser works. <code>--approval-mode yolo</code> confirmed working.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.4 — hashicorp/go-plugin gRPC Handshake</h4>
+  <p><strong>Risk:</strong> First-time go-plugin setup is fiddly. Proto compilation, handshake cookies, binary discovery, version negotiation — lots of moving parts.</p>
+  <ul class="checklist">
+    <li class="critical">Create a minimal host + plugin pair with a single gRPC method (<code>Ping() → "pong"</code>)</li>
+    <li>Proto file → <code>protoc</code> → generated Go code (document exact <code>protoc</code> invocation)</li>
+    <li>Plugin binary builds and runs standalone</li>
+    <li>Host discovers and loads plugin binary</li>
+    <li>gRPC call succeeds across the process boundary</li>
+    <li>Plugin crash → host recovers gracefully (no panic)</li>
+    <li>Measure overhead: how long does handshake + single call take? (&lt;100ms acceptable)</li>
+  </ul>
+  <p><strong>Done when:</strong> Host prints "pong" from plugin. Plugin crash test passes.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.5 — Subprocess Management Patterns</h4>
+  <p><strong>Risk:</strong> Context cancellation, process group cleanup, stdout/stderr splitting under concurrent execution.</p>
+  <ul class="checklist">
+    <li>Launch 3 concurrent subprocesses with <code>errgroup</code></li>
+    <li>Each sleeps for different durations</li>
+    <li>Cancel one via context timeout — verify it dies and others continue</li>
+    <li>Kill with SIGINT — verify all children get cleaned up (no orphans)</li>
+    <li>Verify stdout/stderr separation under concurrent writes</li>
+    <li>Verify <code>Setpgid: true</code> + process group kill works on macOS</li>
+  </ul>
+  <p><strong>Done when:</strong> <code>ps aux | grep spike</code> shows zero orphans after Ctrl+C.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.6 — Cobra Alias Behavior</h4>
+  <p><strong>Risk:</strong> Low, but need to confirm that cobra's <code>Aliases</code> field works the way we need for bilingual subcommands and that help output formats correctly.</p>
+  <ul class="checklist">
+    <li>Create a minimal cobra app with <code>council</code> command and <code>Aliases: []string{"sabha"}</code></li>
+    <li>Verify <code>app sabha</code> works identically to <code>app council</code></li>
+    <li>Verify help output shows both names</li>
+    <li>Verify flag aliases (<code>--agents</code> / <code>--dootas</code>) via <code>pflag</code></li>
+    <li>Test unknown-command fallback for extension discovery</li>
+  </ul>
+  <p><strong>Done when:</strong> Both names work. Help shows them. Unknown command triggers fallback handler.</p>
+</div>
+
+<div class="card danger">
+  <h4>Spike 0.7 — Terminal UX Foundations</h4>
+  <p><strong>Risk:</strong> lipgloss behavior under pipe, NO_COLOR, narrow terminals.</p>
+  <ul class="checklist">
+    <li>Build a tiny program with lipgloss styled table + spinner</li>
+    <li>Run in terminal — colors and spinner work</li>
+    <li>Pipe to <code>cat</code> — no ANSI codes, no spinner artifacts</li>
+    <li>Set <code>NO_COLOR=1</code> — styled but no colors</li>
+    <li>Set terminal to 40 columns — output doesn't break</li>
+    <li>Verify <code>lipgloss.HasDarkBackground()</code> detection</li>
+  </ul>
+  <p><strong>Done when:</strong> All 4 contexts produce clean, readable output.</p>
+</div>
+
+<div class="callout callout-info">
+  <strong>Phase 0 output:</strong> A <code>_spikes/</code> directory with 7 throwaway programs, each with a <code>README.md</code> documenting findings, captured output, and any surprises. This is the project's ground truth.
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 1: SINGLE AGENT ═══════════════════════════ -->
+<section id="phase1">
+<h2><span class="num">P1</span> Phase 1 — Single Agent, Beautiful Output</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-green)"></span> <span style="color:var(--accent-green)">FIRST WORKING BINARY</span> · ~2.5 days</p>
+
+<p>Goal: <code>dootsabha consult "question"</code> works against a single real CLI, with beautiful terminal output that degrades gracefully.</p>
+
+<h3>Build Order</h3>
+<div class="card phase">
+  <h4>P1.1 — Project Scaffold + Makefile + CLAUDE.md</h4>
+  <ul class="checklist">
+    <li><code>go mod init github.com/indrasvat/dootsabha</code> with Go 1.26+</li>
+    <li>Directory structure per architecture doc (<code>cmd/</code>, <code>internal/</code>, <code>plugins/</code>, <code>proto/</code>, <code>_spikes/</code>, <code>skill/</code>)</li>
+    <li class="critical"><strong>Comprehensive Makefile</strong> — the project's command center (see below)</li>
+    <li class="critical"><strong>CLAUDE.md</strong> — agent conventions, session bootstrap, project rules (see below)</li>
+    <li><code>golangci-lint</code> config (strict: govet, errcheck, staticcheck, gosimple, unused, gocritic)</li>
+    <li><code>.goreleaser.yml</code> stub for future release automation</li>
+  </ul>
+  <p><strong>Done:</strong> <code>make help</code> shows colorful target list. <code>make build</code> produces a binary. <code>make lint</code> passes. <code>./dootsabha</code> prints "not implemented".</p>
+</div>
+
+<div class="card highlight">
+  <h4>Makefile — Comprehensive, Colorful, Authoritative</h4>
+  <p>The Makefile is the <em>single source of truth</em> for all project operations. The project convention (enforced via CLAUDE.md) is: <strong>always prefer <code>make &lt;target&gt;</code> over raw commands.</strong> New commands discovered during development must be added back to the Makefile.</p>
+<pre>
+# ─────────────────────────────────────────────────────────
+# दूतसभा Makefile — The Council of Agents
+# ─────────────────────────────────────────────────────────
+
+# Colors
+C_GOLD   := \033[38;5;214m
+C_CYAN   := \033[38;5;45m
+C_GREEN  := \033[38;5;78m
+C_RED    := \033[38;5;196m
+C_MUTED  := \033[38;5;244m
+C_BOLD   := \033[1m
+C_RESET  := \033[0m
+
+.DEFAULT_GOAL := help
+
+## ─── Build ───────────────────────────────────────────────
+
+build:           ## Build core binary
+lint:            ## Run golangci-lint (zero tolerance)
+fmt:             ## Format code (gofmt + goimports)
+fix:             ## Run go fix — adopt Go 1.26+ idioms
+vet:             ## Run go vet
+tidy:            ## go mod tidy + verify
+generate:        ## Run go generate (proto, mocks, etc.)
+proto:           ## Compile .proto files → Go code
+
+## ─── Test ────────────────────────────────────────────────
+
+test:            ## Unit tests (L2) — fast, mocked
+test-race:       ## Unit tests with race detector
+smoke:           ## Smoke tests (L3) — binary + mock providers
+integration:     ## Integration tests (L4) — real CLIs
+acceptance:      ## Full acceptance suite (L5) — real CLIs + visual
+screenshot:      ## iTerm2-driver visual capture + comparison
+
+## ─── Plugins ─────────────────────────────────────────────
+
+plugins:         ## Build all plugin binaries
+plugins-install: ## Install plugins to ~/.dootsabha/plugins/
+
+## ─── All ─────────────────────────────────────────────────
+
+all:             ## Build core + all plugins
+install:         ## Install to ~/.dootsabha/ (core + plugins + default config)
+check:           ## Full pre-commit: fmt + fix + lint + vet + test + smoke
+ci:              ## CI pipeline: check + integration
+clean:           ## Remove build artifacts
+
+## ─── Dev ─────────────────────────────────────────────────
+
+run:             ## Build + run with args: make run ARGS="consult 'test'"
+dev:             ## Watch mode — rebuild on changes (requires entr)
+mock-providers:  ## Install mock provider scripts for L3 testing
+spike:           ## Run a spike: make spike NAME=codex_jsonl
+
+## ─── Help ────────────────────────────────────────────────
+
+help:            ## Show this help
+	@echo ""
+	@echo "  $(C_GOLD)$(C_BOLD)दूतसभा$(C_RESET)$(C_MUTED) — The Council of Agents$(C_RESET)"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
+	  awk 'BEGIN {FS = ":.*?## "; section=""} \
+	  /^## ─── / {gsub(/^## ─── |───.*/, "", $$0); section=$$0; \
+	    printf "\n  $(C_CYAN)$(C_BOLD)%s$(C_RESET)\n", section; next} \
+	  {printf "  $(C_GREEN)%-18s$(C_RESET) %s\n", $$1, $$2}'
+	@echo ""
+</pre>
+</div>
+
+<div class="card highlight">
+  <h4>CLAUDE.md — Agent Convention File</h4>
+  <p>Lives at project root. Every coding agent reads this first. It defines how to work on this project.</p>
+<pre>
+# दूतसभा — CLAUDE.md
+
+## Session Bootstrap
+1. Load the `cm` skill (episodic memory) — recall prior session learnings
+2. Load the `iterm2-driver` skill — required for visual CLI testing (L5)
+3. Read this file (CLAUDE.md) — project conventions
+4. Run `cm recall` for relevant memories from prior sessions
+
+## Project Conventions
+- **Go 1.26+** — use latest language features. Run `make fix` after changes.
+- **Always use `make` targets** — never raw go/golangci-lint/protoc commands.
+  If you discover a new useful command, add it to the Makefile first, then use it.
+- **Pre-commit**: `make check` (= fmt + fix + lint + vet + test + smoke)
+- **Test pyramid**: L1 (compile) → L2 (unit) → L3 (smoke) → L4 (integration) → L5 (acceptance+visual)
+- **Prove it works**: paste actual terminal output. For visual quality, use iTerm2 screenshots.
+- **Episodic memory**: after significant discoveries/gotchas, save to `cm`.
+
+## Code Style
+- Go 1.26+ idioms: range-over-func, enhanced loop vars, new stdlib APIs
+- Run `go fix` via `make fix` regularly — especially after dep updates
+- golangci-lint strict mode — zero warnings policy
+- slog for all logging, stderr only
+- lipgloss for all terminal rendering
+- Errors: wrap with context, classify transient vs permanent
+- Tests: testify for assertions, table-driven where possible
+
+## Make Targets (Quick Ref)
+- `make build`       — build core binary
+- `make all`         — build core + all plugins
+- `make check`       — full pre-commit (fmt+fix+lint+vet+test+smoke)
+- `make integration` — test against real CLIs
+- `make acceptance`  — full L5 + iTerm2 visual verification
+- `make help`        — see all targets
+
+## Architecture
+See `dootsabha-architecture.html` for the full blueprint.
+See `dootsabha-buildplan.html` for the phased build plan.
+</pre>
+</div>
+
+<div class="card phase">
+  <h4>P1.2 — Render Context &amp; Output Foundation</h4>
+  <ul class="checklist">
+    <li><code>internal/output/renderer.go</code> — <code>RenderContext{TTY, Color, Width, Format}</code></li>
+    <li>Auto-detection: TTY check, <code>NO_COLOR</code>, terminal width</li>
+    <li>lipgloss styles: provider colors, badges, tables, separators, footers</li>
+    <li>Spinner component (stderr-only, hidden when piped)</li>
+    <li>Error rendering: styled error with suggestion text</li>
+  </ul>
+  <p><strong>Done:</strong> <code>go test ./internal/output/...</code> passes. Manual verification in TTY, pipe, NO_COLOR, narrow terminal — all four produce clean output.</p>
+</div>
+
+<div class="card phase">
+  <h4>P1.3 — Config Manager</h4>
+  <ul class="checklist">
+    <li><code>internal/core/config.go</code> — viper: YAML → env → flags merge</li>
+    <li>Default config embedded in binary (<code>embed</code> package)</li>
+    <li>Config schema validation at load time</li>
+    <li><code>DOOTSABHA_*</code> env var prefix</li>
+    <li>Per-provider model/flag resolution</li>
+  </ul>
+  <p><strong>Done:</strong> Unit tests for merge precedence (flag beats env beats file beats default). <code>dootsabha config show</code> (stubbed) dumps resolved config.</p>
+</div>
+
+<div class="card phase">
+  <h4>P1.4 — Subprocess Runner</h4>
+  <ul class="checklist">
+    <li><code>internal/core/subprocess.go</code> — from Spike 0.5, productionized</li>
+    <li>Context-aware exec with timeout</li>
+    <li>stdout/stderr capture (separate buffers)</li>
+    <li>Process group management (<code>Setpgid</code>)</li>
+    <li>Structured result: <code>ExecResult{Stdout, Stderr, ExitCode, DurationMs}</code></li>
+    <li>SIGINT/SIGTERM handler that kills child processes</li>
+  </ul>
+  <p><strong>Done:</strong> Unit tests with mock commands. Spike 0.5 findings incorporated. Ctrl+C kills children — verified manually.</p>
+</div>
+
+<div class="card phase">
+  <h4>P1.5 — Claude Provider (Hardcoded, No Plugin Yet)</h4>
+  <ul class="checklist">
+    <li><code>internal/providers/claude.go</code> — direct implementation, not a plugin yet</li>
+    <li>Builds CLI args from config + request</li>
+    <li>Invokes subprocess runner</li>
+    <li>Parses JSON output (from Spike 0.2)</li>
+    <li>Health check: <code>claude --version</code>, auth test</li>
+    <li>Error classification (transient vs permanent)</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha consult "Reply with PONG"</code> returns PONG with styled output.</p>
+</div>
+
+<div class="card phase">
+  <h4>P1.6 — Codex + Gemini Providers (Hardcoded)</h4>
+  <ul class="checklist">
+    <li>Same pattern as Claude, with Codex JSONL parsing (Spike 0.1) and Gemini specifics (Spike 0.3)</li>
+    <li><code>--agent</code> / <code>--doota</code> flag selects provider</li>
+    <li>All three health checks work</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha consult --agent codex "PONG"</code> and <code>--agent gemini "PONG"</code> both work. <code>dootsabha status</code> shows all three with real health data.</p>
+</div>
+
+<div class="card phase">
+  <h4>P1.7 — Cobra CLI Wiring</h4>
+  <ul class="checklist">
+    <li>Root command with global flags (<code>--json</code>, <code>--verbose</code>, <code>--quiet</code>, <code>--timeout</code>, <code>--config</code>)</li>
+    <li><code>consult</code> / <code>paraamarsh</code> subcommand</li>
+    <li><code>status</code> / <code>sthiti</code> subcommand</li>
+    <li><code>config</code> / <code>vinyaas</code> subcommand (show only)</li>
+    <li>Help output with bilingual names</li>
+    <li>Unknown command handler (prep for extensions)</li>
+  </ul>
+  <p><strong>Done:</strong> Full L1-L4 test pass. Beautiful help output. <code>dootsabha sabha</code> shows "not yet implemented" (that's Phase 2).</p>
+</div>
+
+<div class="callout callout-tip">
+  <strong>Phase 1 milestone proof:</strong> The agent must show actual terminal output (+ iTerm2 screenshots for visual quality) of: (a) <code>make help</code> — colorful target list, (b) <code>dootsabha help</code> — bilingual names, aligned columns, (c) <code>dootsabha status</code> with real provider health — correct colors per provider, (d) <code>dootsabha consult "test"</code> with styled output — provider dot, timer, footer stats, (e) same command piped through <code>cat</code> showing clean plain text, (f) <code>dootsabha consult --json "test" | jq .</code> showing valid JSON. Run <code>make fix</code> before final commit.
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 2: COUNCIL ═══════════════════════════ -->
+<section id="phase2">
+<h2><span class="num">P2</span> Phase 2 — Council Pipeline &amp; Review Mode</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-blue)"></span> <span style="color:var(--accent-blue)">MULTI-AGENT ORCHESTRATION</span> · ~2.5 days</p>
+
+<p>Goal: The full 3-stage pipeline works. Parallel dispatch, peer review, synthesis. Plus review mode.</p>
+
+<div class="card phase">
+  <h4>P2.1 — Parallel Dispatch</h4>
+  <ul class="checklist">
+    <li><code>internal/core/engine.go</code> — session manager with state machine</li>
+    <li><code>errgroup</code> for parallel agent invocation</li>
+    <li>Progress rendering: concurrent progress bars (stderr) showing each agent</li>
+    <li>Graceful degradation: if one agent fails, continue with others, warn user</li>
+    <li>Timeout per agent (from config/flag), not global</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha council "test"</code> dispatches to 3 agents in parallel, shows progress, collects responses.</p>
+</div>
+
+<div class="card phase">
+  <h4>P2.2 — Peer Review Stage</h4>
+  <ul class="checklist">
+    <li>Each agent receives the other agents' outputs for review</li>
+    <li>Review prompt template: "Review the following responses. Identify strengths, weaknesses, errors. Be specific."</li>
+    <li>Parallel review dispatch (same errgroup pattern)</li>
+    <li>Review progress rendering</li>
+  </ul>
+  <p><strong>Done:</strong> All 3 agents produce reviews. Reviews reference specific content from the other agents' outputs.</p>
+</div>
+
+<div class="card phase">
+  <h4>P2.3 — Synthesis Stage</h4>
+  <ul class="checklist">
+    <li>Chair agent (default: claude, configurable via <code>--chair</code> / <code>--adhyaksha</code>) receives all outputs + all reviews</li>
+    <li>Synthesis prompt template: "You are the council chair. Synthesize the best answer from these agent outputs and peer reviews."</li>
+    <li>Single invocation, not parallel</li>
+    <li>Styled output: clear "Synthesis" header, attribution</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha council "palindrome function"</code> produces a coherent synthesized answer. Full 3-stage terminal output with styled stage headers.</p>
+</div>
+
+<div class="card phase">
+  <h4>P2.4 — Review Subcommand</h4>
+  <ul class="checklist">
+    <li><code>review</code> / <code>sameeksha</code> subcommand</li>
+    <li><code>--author</code>/<code>--kartaa</code> + <code>--reviewer</code>/<code>--pareekshak</code> flags</li>
+    <li>Two-step: invoke author, then invoke reviewer with author's output</li>
+    <li>Styled output showing both author output and review</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha review "optimize this query"</code> shows codex's output followed by claude's review.</p>
+</div>
+
+<div class="card phase">
+  <h4>P2.5 — Retry Logic + Error Classification</h4>
+  <ul class="checklist">
+    <li><code>internal/core/retry.go</code> — wraps <code>avast/retry-go</code></li>
+    <li>Transient: rate limit (429 in stderr), network timeout, OOM kill → retry (2 attempts, 1s/4s backoff)</li>
+    <li>Permanent: CLI not found, auth invalid, bad model → fail fast with actionable error</li>
+    <li>Partial result: council continues with remaining agents if one permanently fails</li>
+  </ul>
+  <p><strong>Done:</strong> Simulate failures (rename claude binary temporarily) — council gracefully degrades. Error messages include fix suggestions.</p>
+</div>
+
+<div class="card phase">
+  <h4>P2.6 — JSON Output for All Modes</h4>
+  <ul class="checklist">
+    <li>Council JSON: <code>{"dispatch":[...], "reviews":[...], "synthesis":{...}, "meta":{...}}</code></li>
+    <li>Review JSON: <code>{"author":{...}, "review":{...}, "meta":{...}}</code></li>
+    <li>Consistent <code>meta</code> block: duration, cost, tokens, providers used</li>
+    <li>All exit codes correct</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha council --json "test" | jq '.synthesis.content'</code> works. Full L4 integration pass.</p>
+</div>
+
+<div class="callout callout-tip">
+  <strong>Phase 2 milestone proof:</strong> Agent shows (with iTerm2 screenshots): (a) full council run with 3-stage output — verify stage headers, progress bars, colors, (b) same run with <code>--json | jq</code>, (c) council with one provider removed from PATH — graceful degradation warning in amber, (d) review mode output — author + reviewer sections, (e) Ctrl+C mid-council — clean shutdown message, no stack trace. Run <code>make fix</code> + <code>make check</code> before final commit.
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 3: PLUGINS ═══════════════════════════ -->
+<section id="phase3">
+<h2><span class="num">P3</span> Phase 3 — Plugin Architecture</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-purple)"></span> <span style="color:var(--accent-purple)">EXTENSIBILITY LAYER</span> · ~3 days</p>
+
+<p>Goal: Extract the hardcoded providers into go-plugin gRPC plugins. Extension discovery works. <code>dootsabha vistaarak list</code> shows everything.</p>
+
+<div class="card phase">
+  <h4>P3.1 — Proto Definitions + Code Generation</h4>
+  <ul class="checklist">
+    <li><code>proto/provider.proto</code> — Provider service with Invoke, HealthCheck, Capabilities RPCs</li>
+    <li><code>proto/strategy.proto</code> — Strategy service with Execute RPC</li>
+    <li><code>Makefile</code> target: <code>make proto</code> runs protoc with correct plugins</li>
+    <li>Generated code compiles cleanly</li>
+  </ul>
+  <p><strong>Done:</strong> <code>make proto</code> generates Go code. Code compiles.</p>
+</div>
+
+<div class="card phase">
+  <h4>P3.2 — Plugin Manager</h4>
+  <ul class="checklist">
+    <li><code>internal/plugin/manager.go</code> — discovery, loading, registry (from Spike 0.4)</li>
+    <li>Scan plugin directories for binaries matching naming convention</li>
+    <li>Handshake + gRPC connection setup</li>
+    <li>Health check all loaded plugins</li>
+    <li>Graceful handling of missing/crashed plugins</li>
+    <li>Plugin registry: lookup by name and type</li>
+  </ul>
+  <p><strong>Done:</strong> Manager loads a dummy plugin and calls its method. Plugin crash doesn't crash core.</p>
+</div>
+
+<div class="card phase">
+  <h4>P3.3 — Extract Provider Plugins</h4>
+  <ul class="checklist">
+    <li>Move <code>internal/providers/claude.go</code> → <code>plugins/claude/</code> as standalone binary</li>
+    <li>Same for codex and gemini</li>
+    <li>Core now loads providers via plugin manager, not direct import</li>
+    <li>All existing tests still pass (L1-L4) — zero behavioral change</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha consult "PONG"</code> works exactly as before, but providers are separate binaries. <code>ls ~/.dootsabha/plugins/</code> shows 3 provider binaries.</p>
+</div>
+
+<div class="card phase">
+  <h4>P3.4 — Council Strategy Plugin</h4>
+  <ul class="checklist">
+    <li>Move council orchestration logic into <code>plugins/council-strategy/</code></li>
+    <li>Strategy plugin receives provider references, executes the 3-stage pipeline</li>
+    <li>Core becomes the orchestrator of plugins, not the implementer of strategies</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha council "test"</code> works via strategy plugin. Full L4 pass.</p>
+</div>
+
+<div class="card phase">
+  <h4>P3.5 — Extension Discovery</h4>
+  <ul class="checklist">
+    <li><code>internal/plugin/extension.go</code> — scan $PATH + plugins dir for <code>dootsabha-*</code> binaries</li>
+    <li>Filter out known core subcommands and gRPC plugin binaries</li>
+    <li>Register discovered extensions in help output</li>
+    <li>Unknown command → check extensions → exec with forwarded args + Tier 1 env vars</li>
+    <li>Exit code forwarding</li>
+  </ul>
+  <p><strong>Done:</strong> Create a <code>dootsabha-hello</code> script, place on PATH. <code>dootsabha hello world</code> works. <code>dootsabha help</code> shows it under EXTENSIONS.</p>
+</div>
+
+<div class="card phase">
+  <h4>P3.6 — Plugin Subcommand</h4>
+  <ul class="checklist">
+    <li><code>vistaarak list</code> — shows all plugins (gRPC + extensions) with health, type, version</li>
+    <li><code>vistaarak inspect {name}</code> — detailed plugin info (capabilities, models, interface version)</li>
+    <li>Styled output consistent with status command</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha vistaarak list</code> shows 3 providers, 1 strategy, 1+ extensions. Styled beautifully.</p>
+</div>
+
+<div class="callout callout-tip">
+  <strong>Phase 3 milestone proof:</strong> Agent shows (with iTerm2 screenshots): (a) <code>dootsabha vistaarak list</code> — styled plugin/extension table, (b) full council still works (zero regression from plugin extraction), (c) a custom <code>dootsabha-hello</code> extension working and showing in help, (d) removing a provider plugin binary → graceful error in status and degraded council. Run <code>make fix</code> + <code>make check</code> before final commit. Save go-plugin learnings to <code>cm</code>.
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 4: HARDENING ═══════════════════════════ -->
+<section id="phase4">
+<h2><span class="num">P4</span> Phase 4 — Hardening &amp; Observability</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-gold)"></span> <span style="color:var(--accent-gold)">PRODUCTION READINESS</span> · ~2 days</p>
+
+<div class="card phase">
+  <h4>P4.1 — Structured Logging (slog)</h4>
+  <ul class="checklist">
+    <li>Replace any <code>fmt.Println</code> debug output with slog</li>
+    <li>JSON format by default, text with <code>--verbose</code></li>
+    <li>Log levels: <code>-v</code>=INFO, <code>-vv</code>=DEBUG, <code>-vvv</code>=TRACE</li>
+    <li>Every log line includes: provider, model, session_id, trace_id, duration_ms</li>
+    <li>Logs go to stderr only</li>
+  </ul>
+  <p><strong>Done:</strong> <code>dootsabha consult -vvv "test" 2>&1 >/dev/null</code> shows structured debug logs with all fields.</p>
+</div>
+
+<div class="card phase">
+  <h4>P4.2 — Metrics Collection (In-Process)</h4>
+  <ul class="checklist">
+    <li>Internal metrics collector (no Prometheus dep yet, just in-memory counters)</li>
+    <li>Track: invocation count, latency histogram, tokens, cost, retries, errors by type</li>
+    <li>Footer stats in terminal output (duration, cost, tokens)</li>
+    <li>Full metrics in JSON <code>meta</code> block</li>
+  </ul>
+  <p><strong>Done:</strong> Every command output includes accurate footer stats. JSON meta block has all metrics.</p>
+</div>
+
+<div class="card phase">
+  <h4>P4.3 — Edge Cases &amp; Error Paths</h4>
+  <ul class="checklist">
+    <li>CLI not installed → actionable error: "codex not found. Install: npm install -g @openai/codex"</li>
+    <li>Auth expired → "gemini auth expired. Run: gemini auth login"</li>
+    <li>Network timeout → retry with backoff, then degrade</li>
+    <li>Empty response → warn, don't crash</li>
+    <li>Binary response (non-UTF8) → safe handling</li>
+    <li>Config file missing → use embedded defaults, warn</li>
+    <li>Config file malformed → clear error with line number</li>
+    <li>Disk full (can't write context file) → skip Tier 2, proceed with Tier 1</li>
+  </ul>
+  <p><strong>Done:</strong> Each error path has a test (L2 or L3) and produces a helpful, styled error message.</p>
+</div>
+
+<div class="card phase">
+  <h4>P4.4 — Tier 2 Context File for Extensions</h4>
+  <ul class="checklist">
+    <li>Core writes JSON context file before extension exec</li>
+    <li>Includes: full config, provider registry, workspace context, terminal info</li>
+    <li>Temp file cleanup after extension exits (deferred)</li>
+    <li>Fallback: if write fails, log warning, proceed without</li>
+  </ul>
+  <p><strong>Done:</strong> Extension can <code>jq '.providers.claude.healthy' $DOOTSABHA_CONTEXT_FILE</code> and get <code>true</code>.</p>
+</div>
+
+<div class="card phase">
+  <h4>P4.5 — Full L5 Acceptance Suite</h4>
+  <ul class="checklist">
+    <li>Write comprehensive acceptance test script covering all subcommands</li>
+    <li>Council with all 3 agents</li>
+    <li>Council with 2 agents (one excluded)</li>
+    <li>Consult with each agent individually</li>
+    <li>Review mode</li>
+    <li>Status in all output modes</li>
+    <li>Config show</li>
+    <li>Plugin list</li>
+    <li>Extension invocation</li>
+    <li>Ctrl+C handling</li>
+    <li>All piped/JSON/NO_COLOR variants</li>
+    <li class="critical">iTerm2-driver visual tests: screenshots of every command in TTY, pipe, NO_COLOR, narrow terminal</li>
+    <li class="critical">Visual inspection: colors match design spec, alignment correct, Unicode symbols render, footer stats present</li>
+  </ul>
+  <p><strong>Done:</strong> Full L5 pass. Zero failures. Agent pastes complete output + iTerm2 screenshots. Run <code>make fix</code> + <code>make check</code> final pass.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════ PHASE 5: DOCUMENTATION & SKILL & SHIP ═══════════════════════════ -->
+<section id="phase5">
+<h2><span class="num">P5</span> Phase 5 — Documentation, SKILL &amp; Ship</h2>
+<p class="phase-marker"><span class="dot" style="background:var(--accent-cyan)"></span> <span style="color:var(--accent-cyan)">MVP RELEASE</span> · ~2 days</p>
+
+<div class="card phase">
+  <h4>P5.1 — README</h4>
+  <ul class="checklist">
+    <li>Hero section with name, tagline, one-liner install</li>
+    <li>Quick start: 3 commands (status → consult → council)</li>
+    <li>Feature overview with terminal screenshots (captured via iTerm2-driver)</li>
+    <li>Config reference</li>
+    <li>Plugin development guide (condensed from architecture doc)</li>
+    <li>Extension development guide (Tier 1/2/3 with examples)</li>
+  </ul>
+</div>
+
+<div class="card phase">
+  <h4>P5.2 — Default Config + Embedded Docs</h4>
+  <ul class="checklist">
+    <li>Fully commented default config.yaml</li>
+    <li><code>dootsabha config show --commented</code> dumps annotated config</li>
+    <li><code>dootsabha help &lt;command&gt;</code> — detailed per-command help with examples</li>
+  </ul>
+</div>
+
+<div class="card phase">
+  <h4>P5.3 — Claude Code SKILL for दूतसभा</h4>
+  <p>Since दूतसभा is a tool used by coding agents, it needs a first-class <a href="https://code.claude.com/docs/en/skills.md" style="color:var(--accent-cyan)">Claude Code SKILL</a> so that any agent can discover and use it effectively. This lives in <code>skill/</code> at the project root.</p>
+  <ul class="checklist">
+    <li class="critical"><code>skill/SKILL.md</code> — progressive disclosure, optimized for Claude Code context window</li>
+    <li><code>skill/metadata.json</code> — trigger words, categories, version</li>
+    <li><code>skill/examples/</code> — copy-pasteable usage patterns</li>
+  </ul>
+</div>
+
+<div class="card highlight">
+  <h4>SKILL.md — Design Principles</h4>
+  <p><strong>Progressive disclosure:</strong> The SKILL must be layered so that an agent that reads only the first 20 lines can use <code>dootsabha consult</code> correctly. Deeper reading unlocks council, review, extensions, plugins, advanced flags — each layer additive, never invalidating previous layers.</p>
+  <p><strong>Trigger-optimized:</strong> Metadata includes trigger words that fire when agents encounter scenarios where दूतसभा helps — multi-agent comparison, code review, consensus, benchmarking.</p>
+  <p><strong>Zero-ambiguity flag docs:</strong> Every flag includes its exact syntax, default, Sanskrit alias, and a concrete example. No agent should ever have to guess.</p>
+</div>
+
+<div class="card">
+  <h4>skill/ Directory Structure</h4>
+<pre>
+skill/
+├── SKILL.md                 # The main skill document (progressive disclosure)
+├── metadata.json            # Trigger words, version, categories
+└── examples/
+    ├── quick-start.md       # 3-command getting started
+    ├── council-patterns.md  # Common council usage patterns
+    ├── json-pipeline.md     # Machine-consumable output patterns
+    └── extension-dev.md     # Writing extensions for दूतसभा
+</pre>
+</div>
+
+<div class="card">
+  <h4>SKILL.md — Skeleton</h4>
+<pre>
+---
+name: dootsabha
+description: >
+  Orchestrate multiple AI coding agents (Claude Code, Codex CLI, Gemini CLI) 
+  for collaborative code review, synthesis, and multi-perspective problem solving.
+triggers:
+  - multi-agent
+  - code review by multiple agents
+  - compare agent outputs
+  - council of agents
+  - get second opinion on code
+  - benchmark agents
+  - cross-review
+  - synthesize answers
+categories:
+  - ai-tools
+  - code-review
+  - orchestration
+version: 0.1.0
+---
+
+# दूतसभा — The Council of Agents
+
+## Quick Start (read this first)
+
+```bash
+# Check which agents are available
+dootsabha status
+
+# Ask a single agent
+dootsabha consult "explain this error: connection refused on port 5432"
+
+# Full council: all agents discuss, peer-review, synthesize
+dootsabha council "refactor the auth middleware for better testability"
+
+# One agent reviews another's work
+dootsabha review "optimize the database queries in models/user.go"
+```
+
+## Core Subcommands
+
+| Command | Alias | What it does |
+|---------|-------|-------------|
+| `council` | `sabha` | All agents → peer review → synthesis |
+| `consult` | `paraamarsh` | Single agent query |
+| `review` | `sameeksha` | One agent reviews another |
+| `status` | `sthiti` | Health check all agents |
+
+## Machine-Consumable Output
+
+All commands support `--json`. Stdout is pure JSON data, stderr is logs.
+
+```bash
+# Pipe council output to jq
+result=$(dootsabha council --json "fix the failing tests" 2>/dev/null)
+echo "$result" | jq -r '.synthesis.content'
+
+# Check cost
+echo "$result" | jq '.meta.total_cost_usd'
+```
+
+## Key Flags
+
+| Flag | Alias | Default | Purpose |
+|------|-------|---------|---------|
+| `--agent` | `--doota` | claude | Provider for consult |
+| `--agents` | `--dootas` | claude,codex,gemini | Providers for council |
+| `--chair` | `--adhyaksha` | claude | Synthesis agent |
+| `--json` | — | false | JSON output mode |
+| `--timeout` | `--kaalseema` | 5m | Per-agent timeout |
+
+## When to Use दूतसभा
+
+- **Want multiple perspectives** on a design decision → `council`
+- **Want a code review** from a different AI → `review`
+- **Want the best single answer** → `consult` (just picks one agent)
+- **Building a CI pipeline** that needs structured output → `--json`
+- **Benchmarking agents** on your specific codebase → `dootsabha bench` (extension)
+
+## Advanced: Extensions
+
+दूतसभा is extensible. Any binary named `dootsabha-{name}` on $PATH 
+becomes `dootsabha {name}`. Extensions receive rich context via env 
+vars and a JSON context file. See `examples/extension-dev.md`.
+</pre>
+</div>
+
+<div class="card">
+  <h4>metadata.json</h4>
+<pre>
+{
+  "name": "dootsabha",
+  "version": "0.1.0",
+  "description": "Orchestrate AI coding agents for collaborative review and synthesis",
+  "triggers": [
+    "multi-agent", "multiple agents", "council", "compare agents",
+    "code review by ai", "second opinion", "cross-review",
+    "synthesize", "benchmark agents", "agent collaboration",
+    "claude and codex", "claude and gemini", "codex and gemini",
+    "dootsabha", "sabha", "council of agents"
+  ],
+  "categories": ["ai-tools", "code-review", "orchestration", "cli"],
+  "requires": {
+    "binaries": ["dootsabha"],
+    "optional_binaries": ["claude", "codex", "gemini"]
+  },
+  "author": "indrasvat",
+  "repository": "https://github.com/indrasvat/dootsabha"
+}
+</pre>
+</div>
+
+<div class="card phase">
+  <h4>P5.4 — Build &amp; Release</h4>
+  <ul class="checklist">
+    <li>Makefile: <code>make all</code> builds core + all plugins</li>
+    <li><code>make install</code> copies to <code>~/.dootsabha/</code></li>
+    <li>Goreleaser config for cross-platform binaries</li>
+    <li>GitHub Actions CI: lint → test → build → smoke test</li>
+    <li>Tag v0.1.0</li>
+  </ul>
+</div>
+
+<div class="card phase">
+  <h4>P5.5 — Final Acceptance</h4>
+  <ul class="checklist">
+    <li class="critical">Clean install on a fresh machine (or clean environment)</li>
+    <li class="critical">Full L5 acceptance suite passes (including iTerm2-driver visual verification)</li>
+    <li class="critical"><code>dootsabha help</code> output is beautiful and complete — screenshot proof</li>
+    <li class="critical">README quick start works copy-paste</li>
+    <li class="critical">SKILL.md tested: Claude Code can discover and use दूतसभा from skill alone</li>
+    <li>All <code>cm</code> learnings from the build captured and organized</li>
+  </ul>
+</div>
+</section>
+
+<!-- ═══════════════════════════ RISKS ═══════════════════════════ -->
+<section id="risks">
+<h2><span class="num">!!</span> Risk Register</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Risk</th><th>Impact</th><th>Likelihood</th><th>Mitigated By</th></tr>
+<tr>
+  <td>Codex JSONL format changes between versions</td>
+  <td><span class="badge badge-red">HIGH</span></td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td>Spike 0.1 captures exact format. Version-pinned parsing. Integration tests catch regressions.</td>
+</tr>
+<tr>
+  <td>go-plugin gRPC overhead too high for fast queries</td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td><span class="badge badge-green">LOW</span></td>
+  <td>Spike 0.4 measures overhead. If &gt;200ms, consider in-process providers with plugin opt-in.</td>
+</tr>
+<tr>
+  <td>Claude/Gemini JSON schema undocumented, changes silently</td>
+  <td><span class="badge badge-red">HIGH</span></td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td>Spikes 0.2/0.3 capture schemas. Lenient parsing (ignore unknown fields). Version checks in health.</td>
+</tr>
+<tr>
+  <td>macOS SIP interferes with process group management</td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td><span class="badge badge-green">LOW</span></td>
+  <td>Spike 0.5 validates on macOS specifically.</td>
+</tr>
+<tr>
+  <td>Council synthesis quality is poor (chair produces slop)</td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td>Prompt engineering in Phase 2. Iterate on synthesis prompt. Configurable via strategy plugin.</td>
+</tr>
+<tr>
+  <td>Gemini <code>--approval-mode yolo</code> bug persists/worsens</td>
+  <td><span class="badge badge-green">LOW</span></td>
+  <td><span class="badge badge-gold">MEDIUM</span></td>
+  <td>Spike 0.3 validates. Fallback: use <code>--yolo</code> if fixed, or <code>echo y | gemini</code> hack.</td>
+</tr>
+<tr>
+  <td>Token cost accumulation during development is high</td>
+  <td><span class="badge badge-green">LOW</span></td>
+  <td><span class="badge badge-red">HIGH</span></td>
+  <td>Mock providers for L2/L3. Tiny prompts ("Reply with PONG") for L4. L5 runs sparingly.</td>
+</tr>
+</table>
+</div>
+
+<h3>Phase Summary</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Phase</th><th>Duration</th><th>Deliverable</th><th>Key Gate</th></tr>
+<tr>
+  <td><span class="badge badge-red">P0</span></td>
+  <td>~1.5 days</td>
+  <td>7 spikes in <code>_spikes/</code> with findings</td>
+  <td>All assumptions validated or redesigned</td>
+</tr>
+<tr>
+  <td><span class="badge badge-green">P1</span></td>
+  <td>~2.5 days</td>
+  <td><code>dootsabha consult</code> + <code>status</code> + beautiful output</td>
+  <td>Single-agent query works against all 3 real CLIs</td>
+</tr>
+<tr>
+  <td><span class="badge badge-blue">P2</span></td>
+  <td>~2.5 days</td>
+  <td>Council pipeline + review mode</td>
+  <td>3-stage pipeline produces quality synthesized output</td>
+</tr>
+<tr>
+  <td><span class="badge badge-purple">P3</span></td>
+  <td>~3 days</td>
+  <td>Plugin architecture + extensions</td>
+  <td>Providers are plugins. Extensions discoverable. Zero regression.</td>
+</tr>
+<tr>
+  <td><span class="badge badge-gold">P4</span></td>
+  <td>~2 days</td>
+  <td>Hardening, observability, edge cases</td>
+  <td>Full L5 acceptance suite passes</td>
+</tr>
+<tr>
+  <td><span class="badge badge-cyan">P5</span></td>
+  <td>~2 days</td>
+  <td>Docs, SKILL, build, release</td>
+  <td>Clean install + quick start + SKILL works</td>
+</tr>
+<tr style="font-weight:700;">
+  <td></td>
+  <td>~14 days</td>
+  <td colspan="2"><strong>v0.1.0 shipped</strong></td>
+</tr>
+</table>
+</div>
+
+</section>
+
+</div><!-- .container -->
+</body>
+</html>
