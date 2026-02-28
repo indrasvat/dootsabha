@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.1 |
+| **Version** | 1.2 |
 | **Author** | indrasvat |
 | **Date** | 2026-02-28 |
 | **Status** | Draft |
@@ -228,7 +228,7 @@ dootsabha/
 | Component | File | Responsibility |
 |-----------|------|----------------|
 | **Config Manager** | `internal/core/config.go` | Viper: YAML + env + flags merge. Schema validation. Provider resolution. |
-| **Subprocess Runner** | `internal/core/subprocess.go` | os/exec with context, timeout, Setpgid, stdout/stderr splitting |
+| **Subprocess Runner** | `internal/core/subprocess.go` | os/exec with context, timeout, Setpgid, stdout/stderr splitting, orphan reaper (kill process group after grace period if parent pipe breaks) |
 | **Session Manager** | `internal/core/engine.go` | State machine: Init → Dispatch → Review → Synthesis → Output |
 | **Retry Logic** | `internal/core/retry.go` | Transient vs permanent classification. Exponential backoff. |
 | **Render Context** | `internal/output/renderer.go` | TTY detection, NO_COLOR, terminal width. All output flows through this. |
@@ -238,7 +238,7 @@ dootsabha/
 
 | Type | Interface | Transport | Discovery | Built-in |
 |------|-----------|-----------|-----------|----------|
-| **Provider** | `Provider` (Invoke, HealthCheck, Capabilities) | gRPC | plugins dir | claude, codex, gemini |
+| **Provider** | `Provider` (Invoke, Cancel, HealthCheck, Capabilities) | gRPC | plugins dir | claude, codex, gemini |
 | **Strategy** | `Strategy` (Execute) | gRPC | plugins dir | council, consult |
 | **Extension** | none (binary) | exec (stdin/out/err) | $PATH + plugins dir | none |
 | **Hook** | `Hook` (PreInvoke, PostInvoke, PreSynthesis, PostSession) | gRPC | plugins dir | none |
@@ -301,6 +301,7 @@ dootsabha/
 - [ ] FR-ROOT-04: `--json` applies globally to all subcommands
 - [ ] FR-ROOT-05: `--timeout` applies per-agent invocation; `--session-timeout` caps total session time
 - [ ] FR-ROOT-06: Retries consume the same per-agent timeout budget (no reset)
+- [ ] FR-ROOT-07: Handles SIGPIPE gracefully when piped to `head` (exit 0, no "broken pipe" error)
 
 ### 6.2 Council Command (`dootsabha council` / `sabha`)
 
@@ -323,11 +324,12 @@ dootsabha/
 - Round N dispatch prompt = original prompt + "Previous synthesis: {round N-1 synthesis}"
 - Stop conditions: (a) `--rounds` limit reached, (b) `--session-timeout` exceeded, (c) chair indicates convergence (synthesis matches previous)
 - Cost control: each round multiplies token usage ~linearly. Default is 1 round; >3 is not recommended.
+- Context cap: per-round context fed to next round is truncated to 32KB (same as peer review cap). For multi-round with many agents, consider structured summaries over raw output to prevent context window blowout.
 
 **Chair failure semantics:**
-- If chair fails during synthesis, fall back to the first healthy non-chair agent
+- If chair fails during synthesis, **re-invoke** the first healthy non-chair agent with synthesis prompt: "You are acting as synthesis chair. Synthesize these responses: {outputs + reviews}"
 - If all agents fail, exit code 1 (no synthesis possible)
-- Chair fallback is logged as a warning; JSON output includes `"chair_fallback": true`
+- Chair fallback is logged as a warning; JSON output includes `"chair_fallback": "codex"` (name of fallback agent)
 
 **Terminal output (TTY):**
 ```
@@ -522,6 +524,7 @@ Extensions: bench, cost, tui
 - [ ] FR-CFG-03: `--commented` includes inline documentation
 - [ ] FR-CFG-04: Config precedence: defaults < file < env (`DOOTSABHA_*`) < flags. Override chain testable via `config show --json`.
 - [ ] FR-CFG-05: Unknown config keys are silently ignored (forward-compatible)
+- [ ] FR-CFG-06: Keys matching `*token*`, `*key*`, `*secret*` are redacted in `config show` output unless `--reveal` flag is passed
 
 ### 6.7 Plugin Command (`dootsabha plugin` / `vistaarak`)
 
@@ -562,7 +565,7 @@ Extensions: bench, cost, tui
   - Default: unknown exit codes are treated as permanent (fail-safe)
 - **Partial results** in council → continue with remaining agents, exit code 5
 - **Plugin crash** → core recovers gracefully (process isolation via go-plugin)
-- **Ctrl+C** → clean shutdown: kill child processes (process groups), print summary, non-zero exit
+- **Ctrl+C** → clean shutdown: SIGTERM to process groups, 5s grace period, SIGKILL if still alive, print summary, non-zero exit. Reaper goroutine ensures no orphaned agent processes survive.
 
 ### 7.3 Compatibility
 
@@ -649,8 +652,9 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 | 0.5 | Subprocess management spike | errgroup, context cancellation, process group cleanup |
 | 0.6 | Cobra alias behavior spike | Bilingual names, flag aliases, unknown cmd handler |
 | 0.7 | Terminal UX foundations spike | lipgloss under pipe/NO_COLOR/narrow, spinner patterns |
+| 0.8 | PTY vs pipe subprocess spike | Verify CLI behavior (claude/codex/gemini) with plain pipes vs PTY. YOLO flags should prevent interactive prompts, but confirm JSON output is identical in pipe mode. If not, evaluate `creack/pty`. |
 
-**Output:** `_spikes/` directory with 7 throwaway programs + README.md documenting findings.
+**Output:** `_spikes/` directory with 8 throwaway programs + README.md documenting findings.
 **Gate:** All assumptions validated or architecture redesigned.
 
 ### Phase 1: Single Agent, Beautiful Output (~2.5 days)
@@ -799,6 +803,8 @@ fi
 | charmbracelet version conflicts | MEDIUM | MEDIUM | Pin lipgloss v1.1.0. Let `go mod tidy` resolve. From gh-ghent: always re-verify. |
 | Token cost during development | LOW | HIGH | Mock providers for L2/L3. Tiny prompts ("PONG") for L4. L5 runs sparingly. |
 | macOS SIP + process group mgmt | MEDIUM | LOW | Spike 0.5 validates on macOS specifically. |
+| CLIs need PTY, not pipe | MEDIUM | MEDIUM | Spike 0.8 verifies YOLO+JSON flags work via plain pipes. If not, add `creack/pty`. |
+| Orphaned agent processes on crash | HIGH | MEDIUM | Reaper goroutine + process group kill with grace period. Spike 0.5 validates. |
 
 ---
 
@@ -823,3 +829,4 @@ fi
 |------|---------|--------|
 | 2026-02-28 | 1.0 | Initial PRD — synthesized from architecture + build plan docs, verified against installed CLI versions |
 | 2026-02-28 | 1.1 | Codex review: exit-code precedence matrix, timeout model (agent + session), round state machine, chair fallback, prompt input contract frozen, PATH extension trust, JSON schema_version, retry classifiers, peer review caps, universal pipe checks, config precedence FRs, go fix scope corrected, --watch deferred |
+| 2026-02-28 | 1.2 | Gemini review: PTY vs pipe spike added, subprocess reaper pattern, chair fallback re-invocation fix, Provider.Cancel method, config key redaction, SIGPIPE handling, multi-round context cap, orphaned process risk |
