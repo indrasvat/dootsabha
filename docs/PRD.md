@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.0 |
+| **Version** | 1.1 |
 | **Author** | indrasvat |
 | **Date** | 2026-02-28 |
 | **Status** | Draft |
@@ -113,7 +113,7 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 | gRPC | google.golang.org/grpc + protobuf | latest | Required by go-plugin. Typed contracts via .proto. |
 | Logging | log/slog (stdlib) | — | Zero deps, structured, JSON+text handlers. |
 | Terminal styling | lipgloss | v1.1.0 | Colors, borders, padding, tables. Composable. |
-| Spinners/progress | charmbracelet/huh | v0.8.0 | Elegant spinners and progress. Pairs with lipgloss. |
+| Spinners/progress | charmbracelet/huh | v0.8.0 | Only `huh.NewSpinner()` API used (stderr-only). Not using huh forms/TUI. Pairs with lipgloss. |
 | Tables | lipgloss/table | (in lipgloss) | Built-in table rendering. |
 | Concurrency | x/sync/errgroup | v0.15.0 | Fan-out/fan-in with error propagation. |
 | Retry | avast/retry-go/v4 | v4.7.0 | Typed retry with exponential backoff. Context-aware. |
@@ -275,28 +275,32 @@ dootsabha/
 - `--json` — Structured JSON output (stdout=data, stderr=logs)
 - `--verbose` / `-v` — Increase log verbosity (-v, -vv, -vvv)
 - `--quiet` / `-q` — Suppress non-error output
-- `--timeout` / `--kaalseema` — Max time per agent invocation [default: 5m]
-- `--watch` / `--nireekshana` — Stream output in real-time
+- `--timeout` / `--kaalseema` — Max time per individual agent invocation [default: 5m]
+- `--session-timeout` / `--satra-seema` — Max total session time across all stages [default: 30m]
+- `--watch` / `--nireekshana` — Stream output in real-time (Phase 4+ — see Q8 in §12)
 - `--config` — Config file path [default: ~/.dootsabha/config.yaml]
 
 **Behavior:**
 1. With no subcommand: show help text with bilingual names
-2. Unknown command: check for `dootsabha-{name}` extension on PATH → exec if found → error if not
+2. Unknown command: check for `dootsabha-{name}` extension on PATH → show resolved binary path + prompt confirm on first run → exec if trusted → error if not found. Trusted extensions are cached in `~/.dootsabha/trusted-extensions.yaml`.
 
-**Exit codes:**
+**Exit codes (highest applicable wins):**
 - `0` — Success
 - `1` — General error
 - `2` — Usage error (bad flags, missing args)
 - `3` — Provider error (CLI failed, auth invalid)
-- `4` — Timeout
-- `5` — Partial result (some agents failed in council)
+- `4` — Timeout (at least one agent timed out)
+- `5` — Partial result (some agents failed in council but synthesis produced)
+
+**Precedence:** `2 > 4 > 3 > 5 > 1 > 0` — usage errors trump all (fail fast), timeouts next, then provider failures, then partial results. When multiple codes apply, the highest-precedence one is returned. Example: timeout + partial = exit 4.
 
 **Acceptance criteria:**
 - [ ] FR-ROOT-01: `dootsabha help` shows bilingual names (e.g., `council (sabha)`)
 - [ ] FR-ROOT-02: `dootsabha --version` prints version string
 - [ ] FR-ROOT-03: Unknown command checks for extension binary
 - [ ] FR-ROOT-04: `--json` applies globally to all subcommands
-- [ ] FR-ROOT-05: `--timeout` applies per-agent, not global session
+- [ ] FR-ROOT-05: `--timeout` applies per-agent invocation; `--session-timeout` caps total session time
+- [ ] FR-ROOT-06: Retries consume the same per-agent timeout budget (no reset)
 
 ### 6.2 Council Command (`dootsabha council` / `sabha`)
 
@@ -309,10 +313,21 @@ dootsabha/
 - `--parallel` / `--samantar` — Run agents concurrently [default: true]
 - All global flags
 
-**3-Stage Pipeline:**
+**3-Stage Pipeline (per round):**
 1. **Dispatch** — Send prompt to all agents in parallel (or sequential if `--parallel=false`)
 2. **Peer Review** — Each agent reviews the other agents' outputs
 3. **Synthesis** — Chair agent produces final unified answer from all outputs + reviews
+
+**Multi-round behavior (`--rounds > 1`):**
+- Each round feeds the previous round's synthesis back as additional context
+- Round N dispatch prompt = original prompt + "Previous synthesis: {round N-1 synthesis}"
+- Stop conditions: (a) `--rounds` limit reached, (b) `--session-timeout` exceeded, (c) chair indicates convergence (synthesis matches previous)
+- Cost control: each round multiplies token usage ~linearly. Default is 1 round; >3 is not recommended.
+
+**Chair failure semantics:**
+- If chair fails during synthesis, fall back to the first healthy non-chair agent
+- If all agents fail, exit code 1 (no synthesis possible)
+- Chair fallback is logged as a warning; JSON output includes `"chair_fallback": true`
 
 **Terminal output (TTY):**
 ```
@@ -355,6 +370,7 @@ agents: claude ✓ · codex ✓ · gemini ✓
     "content": "..."
   },
   "meta": {
+    "schema_version": 1,
     "session_id": "ds_x7k2m",
     "strategy": "council",
     "duration_ms": 8400,
@@ -376,12 +392,15 @@ agents: claude ✓ · codex ✓ · gemini ✓
 - [ ] FR-COU-02: Shows progress bars (stderr) during dispatch
 - [ ] FR-COU-03: Peer review stage — each agent reviews other agents' outputs
 - [ ] FR-COU-04: Synthesis — chair agent produces unified answer
-- [ ] FR-COU-05: `--json` produces valid JSON with all stages
+- [ ] FR-COU-05: `--json` produces valid JSON with `meta.schema_version` field; cost/token fields are `null` when provider doesn't report them
 - [ ] FR-COU-06: Graceful degradation when one agent fails
 - [ ] FR-COU-07: `--agents` overrides configured agent list
 - [ ] FR-COU-08: `--chair` overrides synthesis agent
 - [ ] FR-COU-09: Footer stats: total time, cost, tokens, agent status
+- [ ] FR-COU-09a: Piped output (`| cat`) has no ANSI codes, no spinner artifacts
 - [ ] FR-COU-10: `--parallel=false` runs agents sequentially
+- [ ] FR-COU-11: Max 5 agents in council (O(n²) peer review scaling). Error if exceeded.
+- [ ] FR-COU-12: Peer review input truncated to 32KB per agent output to cap context size
 
 ### 6.3 Consult Command (`dootsabha consult` / `paraamarsh`)
 
@@ -501,6 +520,8 @@ Extensions: bench, cost, tui
 - [ ] FR-CFG-01: Shows effective merged configuration
 - [ ] FR-CFG-02: `--json` outputs config as JSON
 - [ ] FR-CFG-03: `--commented` includes inline documentation
+- [ ] FR-CFG-04: Config precedence: defaults < file < env (`DOOTSABHA_*`) < flags. Override chain testable via `config show --json`.
+- [ ] FR-CFG-05: Unknown config keys are silently ignored (forward-compatible)
 
 ### 6.7 Plugin Command (`dootsabha plugin` / `vistaarak`)
 
@@ -532,15 +553,20 @@ Extensions: bench, cost, tui
 
 ### 7.2 Reliability
 
-- **Transient failures** (rate limit 429, network timeout, OOM) → retry 2x with exponential backoff (1s, 4s)
-- **Permanent failures** (CLI not found, auth invalid, bad model) → fail fast with actionable error
+- **Transient failures** → retry 2x with exponential backoff + jitter (1s±0.5s, 4s±1s), max elapsed = per-agent `--timeout`
+  - Matchers: exit code 1 + stderr contains "rate limit"/"429"/"timeout"/"EAGAIN"/"connection refused"
+  - Matchers: exit code 137 (OOM killed)
+- **Permanent failures** → fail fast with actionable error, never retry
+  - Matchers: exit code 127 (CLI not found), exit code 2 (usage error)
+  - Matchers: stderr contains "auth"/"token expired"/"permission denied"/"model not found"
+  - Default: unknown exit codes are treated as permanent (fail-safe)
 - **Partial results** in council → continue with remaining agents, exit code 5
 - **Plugin crash** → core recovers gracefully (process isolation via go-plugin)
 - **Ctrl+C** → clean shutdown: kill child processes (process groups), print summary, non-zero exit
 
 ### 7.3 Compatibility
 
-- Go 1.26+ (use latest idioms; run `go fix` regularly)
+- Go 1.26+ (use latest idioms: range-over-func, enhanced loop vars. Run `go fix` on toolchain upgrades only.)
 - macOS (darwin/arm64, darwin/amd64) — primary development platform
 - Linux (linux/amd64, linux/arm64) — CI and server use
 - Requires: `claude`, `codex`, and/or `gemini` CLIs installed (graceful degradation if missing)
@@ -727,7 +753,7 @@ make test         # L2: unit tests (fast, mocked)
 make smoke        # L3: binary + mock providers
 make integration  # L4: real CLIs
 make acceptance   # L5: full acceptance + visual
-make check        # Pre-commit: fmt + fix + lint + vet + test + smoke
+make check        # Pre-commit: fmt + lint + vet + test + smoke
 ```
 
 ### 10.3 Mock Provider for L3
@@ -756,7 +782,7 @@ fi
 
 - Agent MUST NOT claim a phase is done without showing actual terminal output
 - For visual quality (colors, alignment, theme), iTerm2-driver screenshots are proof
-- `make fix` (go fix) must run before every final commit
+- `make check` runs `gofumpt` + `go vet` + `golangci-lint` + `go test` + smoke before every commit. `go fix` runs only during Go toolchain migrations, not routinely.
 - Every phase must show: (a) help output, (b) command output, (c) JSON piped to jq, (d) piped through cat (no ANSI)
 
 ---
@@ -781,12 +807,13 @@ fi
 | # | Question | Status | Decision |
 |---|----------|--------|----------|
 | Q1 | Should `dootsabha` without subcommand show summary or help? | Open | Currently: help. Could default to status. |
-| Q2 | Prompt from stdin vs positional arg? | Open | Currently positional. Could also support `cat prompt.md \| dootsabha council` |
+| Q2 | Prompt from stdin vs positional arg? | Resolved | Positional arg primary. If no arg AND stdin is a pipe, read stdin. `--prompt-file` for file input. Precedence: `--prompt-file > arg > stdin`. |
 | Q3 | Should providers be hardcoded in MVP, plugins deferred to v0.2? | Open | Build plan has both in MVP (P1-P2 hardcoded → P3 plugins). Could ship P1-P2 as v0.1, plugins as v0.2. |
 | Q4 | Should we vendor proto-generated code? | Open | Vendoring avoids protoc dependency for contributors. But adds git bloat. |
 | Q5 | BubbleTea TUI extension (`dootsabha-tui`) — scope it for MVP? | Open | Build plan mentions it as future extension. Could be v0.2. |
 | Q6 | Gemini `-p` vs positional prompt — which is more reliable? | Resolved | Both work in v0.30.0. Positional is simpler. Use positional, fallback to `-p`. |
 | Q7 | Gemini `--yolo` vs `--approval-mode yolo`? | Resolved | Both work in v0.30.0. Use `--yolo` (simpler). Keep `--approval-mode yolo` as fallback. |
+| Q8 | `--watch` streaming — what does it look like? | Open | Deferred to Phase 4. Needs spec for TTY stream events, non-TTY line-buffered format, and `--json` NDJSON stream. |
 
 ---
 
@@ -795,3 +822,4 @@ fi
 | Date | Version | Change |
 |------|---------|--------|
 | 2026-02-28 | 1.0 | Initial PRD — synthesized from architecture + build plan docs, verified against installed CLI versions |
+| 2026-02-28 | 1.1 | Codex review: exit-code precedence matrix, timeout model (agent + session), round state machine, chair fallback, prompt input contract frozen, PATH extension trust, JSON schema_version, retry classifiers, peer review caps, universal pipe checks, config precedence FRs, go fix scope corrected, --watch deferred |
