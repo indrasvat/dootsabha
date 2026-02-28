@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.3 |
+| **Version** | 1.4 |
 | **Author** | indrasvat |
 | **Date** | 2026-02-28 |
 | **Status** | Draft |
@@ -11,21 +11,51 @@
 
 ---
 
+## How to Use This Document (Progressive Disclosure)
+
+> **Agents: do NOT read this entire file.** Read only the sections your task references.
+
+```
+Layer 1 — CLAUDE.md              ≤200 lines   Always read first. Build commands, pitfalls.
+Layer 2 — PROGRESS.md            ~50 lines    Current state: what's done, what's next.
+Layer 3 — Task file              ≤150 lines   Self-contained. Lists PRD §X.Y to read.
+Layer 4 — PRD §X.Y (this file)   per section  Read ONLY the §X.Y sections listed in your task.
+Layer 5 — Detail docs            as needed    Architecture, testing-strategy, build plan.
+```
+
+**Document hierarchy:**
+
+| Document | Purpose | When to Read |
+|----------|---------|-------------|
+| `CLAUDE.md` | Build commands, conventions, pitfalls, learnings | Every session start |
+| `docs/PROGRESS.md` | Phase/task completion state, session log | Every session start |
+| `docs/tasks/NNN-*.md` | Per-task spec: steps, files, verification | When working on that task |
+| `docs/PRD.md` (this) | Requirements, architecture, phases | Only §X.Y referenced by task |
+| `docs/testing-strategy.md` | Testing implementation details | Only §N referenced by task |
+| `docs/dootsabha-architecture.html` | Full interfaces, diagrams, sequences | Only when task references it |
+| `docs/dootsabha-buildplan.html` | Build philosophy, phase checklists | Only when task references it |
+
+**Per-task agent workflow:** `cm context` → CLAUDE.md → PROGRESS.md → task file → PRD §X.Y (only referenced sections)
+
+---
+
 ## Table of Contents
 
-1. [Vision & Philosophy](#1-vision--philosophy)
-2. [Problem Statement](#2-problem-statement)
-3. [Target Audience](#3-target-audience)
-4. [Technology Stack](#4-technology-stack)
-5. [Architecture](#5-architecture)
-6. [Functional Requirements](#6-functional-requirements)
-7. [Non-Functional Requirements](#7-non-functional-requirements)
-8. [Terminal UX Standards](#8-terminal-ux-standards)
-9. [Implementation Phases](#9-implementation-phases)
-10. [Testing Strategy](#10-testing-strategy) — §10.1 Pyramid, §10.2 Make Targets, §10.3 Mock Providers, §10.4 iTerm2-driver, §10.5 Gating Hooks, §10.6 L5 Agent Tests, §10.7 Anti-Hallucination Rules, §10.8 Task Checklist, §10.9 Session Protocol
-11. [Risk Assessment](#11-risk-assessment)
-12. [Open Questions](#12-open-questions)
-13. [Change Log](#13-change-log)
+| § | Section | Lines | Typical Task References |
+|---|---------|-------|------------------------|
+| 1 | [Vision & Philosophy](#1-vision--philosophy) | ~26 | Rarely (scaffolding only) |
+| 2 | [Problem Statement](#2-problem-statement) | ~23 | Rarely |
+| 3 | [Target Audience](#3-target-audience) | ~24 | Exit code / JSON tasks |
+| 4 | [Technology Stack](#4-technology-stack) | ~55 | Provider tasks, scaffolding |
+| 5 | [Architecture](#5-architecture) | ~108 | Most tasks (selectively) |
+| 6 | [Functional Requirements](#6-functional-requirements) | ~277 | Per-command: §6.1–§6.7 |
+| 7 | [Non-Functional Requirements](#7-non-functional-requirements) | ~41 | Retry, perf, security tasks |
+| 8 | [Terminal UX Standards](#8-terminal-ux-standards) | ~51 | Any output-visible task |
+| 9 | [Implementation Phases](#9-implementation-phases) | ~104 | Planning, dependency checks |
+| 10 | [Testing Strategy](#10-testing-strategy) | ~64 | All tasks (summary only) |
+| 11 | [Risk Assessment](#11-risk-assessment) | ~17 | Spike tasks |
+| 12 | [Open Questions](#12-open-questions) | ~15 | When blocked |
+| 13 | [Change Log](#13-change-log) | ~7 | Never |
 
 ---
 
@@ -269,6 +299,8 @@ dootsabha/
 
 ### 6.1 Root Command (`dootsabha`)
 
+> **Also read:** §8 (terminal UX), §4 (tech stack for cobra/viper)
+
 **Purpose:** Entry point; shows help.
 
 **Global flags (persistent, inherited by all subcommands):**
@@ -304,6 +336,8 @@ dootsabha/
 - [ ] FR-ROOT-07: Handles SIGPIPE gracefully when piped to `head` (exit 0, no "broken pipe" error)
 
 ### 6.2 Council Command (`dootsabha council` / `sabha`)
+
+> **Also read:** §5.2 (engine state machine), §7.2 (retry/degradation), §8 (UX)
 
 **Purpose:** All configured agents deliberate → peer review → synthesized answer.
 
@@ -406,6 +440,8 @@ agents: claude ✓ · codex ✓ · gemini ✓
 
 ### 6.3 Consult Command (`dootsabha consult` / `paraamarsh`)
 
+> **Also read:** §4.1 (CLI versions/flags), §5.2 (subprocess runner), §8 (UX)
+
 **Purpose:** Ask a single agent directly.
 
 **Flags:**
@@ -452,6 +488,8 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 
 ### 6.4 Review Command (`dootsabha review` / `sameeksha`)
 
+> **Also read:** §6.3 (consult, since review builds on it), §8 (UX)
+
 **Purpose:** One agent reviews another's output.
 
 **Flags:**
@@ -471,6 +509,8 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 - [ ] FR-REV-05: If author fails, reviewer is not invoked (fail-fast)
 
 ### 6.5 Status Command (`dootsabha status` / `sthiti`)
+
+> **Also read:** §5.3 (plugin types), §8.3 (degradation matrix)
 
 **Purpose:** Health check all providers, show versions & auth state.
 
@@ -512,6 +552,8 @@ Extensions: bench, cost, tui
 
 ### 6.6 Config Command (`dootsabha config` / `vinyaas`)
 
+> **Also read:** §5.2 (config manager), §7.4 (security/redaction)
+
 **Purpose:** View resolved configuration.
 
 **Subcommands:**
@@ -527,6 +569,8 @@ Extensions: bench, cost, tui
 - [ ] FR-CFG-06: Keys matching `*token*`, `*key*`, `*secret*` are redacted in `config show` output unless `--reveal` flag is passed
 
 ### 6.7 Plugin Command (`dootsabha plugin` / `vistaarak`)
+
+> **Also read:** §5.3 (plugin types), §5.4 (extension context protocol)
 
 **Purpose:** List and inspect plugins & extensions.
 
@@ -740,499 +784,65 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 
 ## 10. Testing Strategy
 
-> **Cardinal Rule:** Every feature MUST be verified by _actually running_ the binary and visually inspecting output via iTerm2-driver screenshots. Unit tests are necessary but NOT sufficient. If the binary hasn't been executed and its output visually inspected, the feature is NOT verified.
+> **Cardinal Rule:** Every feature MUST be verified by _actually running_ the binary and visually inspecting output via iTerm2-driver screenshots. Unit tests are necessary but NOT sufficient.
+>
+> **Full reference:** `docs/testing-strategy.md` — all implementation details, templates, scripts, hooks.
+> Task files reference specific sections as `testing-strategy.md §N`.
 
 ### 10.1 Five-Layer Testing Pyramid
 
-```
-                    ┌───────────┐
-                    │    L5     │  Agent workflow tests (3-5 tests)
-                   ┌┴───────────┴┐
-                   │     L4      │  Visual + integration, real CLIs (10-15 tests)
-                  ┌┴─────────────┴┐
-                  │      L3       │  Binary smoke tests, mock providers (20-30 tests)
-                 ┌┴───────────────┴┐
-                 │       L2        │  Unit tests (50-100 tests)
-                ┌┴─────────────────┴┐
-                │        L1         │  Compile + lint + vet (<5s)
-                └───────────────────┘
-```
-
-| Layer | What | Speed | Runs When | Mocks? | Costs $? |
-|-------|------|-------|-----------|--------|----------|
-| **L1** | Compile + lint + `go vet` + `gofumpt` check | <5s | Every save | N/A | No |
-| **L2** | Unit tests (`go test -race -shuffle=on ./...`) | <2s | Every change | Yes (all deps mocked) | No |
-| **L3** | Binary smoke (build + mock providers + exit codes) | <10s | Every build | Mock provider bash scripts | No |
-| **L4** | Integration + visual (real CLIs + iTerm2-driver screenshots) | 30-60s | Every task completion | No (real CLIs) | ~$0.05 |
-| **L5** | Acceptance + agent workflow (JSON validity, exit codes, perf, no ANSI) | 2-5min | Phase gate | No (real CLIs + iTerm2) | ~$0.50 |
+| Layer | What | Speed | Make Target | Mocks? | Costs $? |
+|-------|------|-------|-------------|--------|----------|
+| **L1** | Compile + lint + `go vet` + `gofumpt` | <5s | `make ci-fast` | N/A | No |
+| **L2** | Unit tests (`go test -race -shuffle=on`) | <2s | `make test` | Yes | No |
+| **L3** | Binary smoke (mock providers + exit codes) | <10s | `make test-binary` | Mock CLIs | No |
+| **L4** | Integration + visual (real CLIs + iTerm2-driver) | 30-60s | `make test-visual` | No | ~$0.05 |
+| **L5** | Agent workflow (JSON, exit codes, no ANSI, perf) | 2-5min | `make test-agent` | No | ~$0.50 |
 
 ### 10.2 Make Targets (Full Set)
 
-```makefile
-# ─── Build ──────────────────────────────────────────────────────
-make build          # Build binary to bin/dootsabha
-make install        # Build + symlink to ~/.local/bin/dootsabha
-make clean          # Remove build artifacts (bin/, coverage/)
-
-# ─── Test ───────────────────────────────────────────────────────
-make test           # L2: unit tests (go test -race -shuffle=on ./...)
-make test-race      # L2: verbose race detector
-make coverage       # L2: generate coverage report (coverage/coverage.html)
-make test-integration  # L2: integration tests (build tag: integration)
-make test-binary    # L3: binary smoke tests (scripts/test-binary.sh)
-make test-visual    # L4: iTerm2-driver visual tests (scripts/verify-visual-tests.sh)
-make test-agent     # L5: agent workflow tests (scripts/test-agent-workflow.sh)
-make test-all       # All levels: L2 → L3 → L4 → L5
-
-# ─── Lint & Format ─────────────────────────────────────────────
-make lint           # Run golangci-lint
-make lint-fix       # Auto-fix lint issues
-make fmt            # Format with gofumpt
-make vet            # Run go vet
-
-# ─── Dependencies ──────────────────────────────────────────────
-make tidy           # go mod tidy
-make verify         # go mod verify
-
-# ─── CI ─────────────────────────────────────────────────────────
-make ci             # Full: lint + test + vet (pre-push gate)
-make ci-fast        # Quick: fmt + vet + test (pre-commit)
-make check          # Pre-commit: fmt + lint + vet + test + smoke
-
-# ─── Tools ──────────────────────────────────────────────────────
-make tools          # Install dev tools (golangci-lint, gotestsum, lefthook)
-make hooks          # Install git hooks via lefthook
-make version        # Show version info (version, commit, date)
-make help           # Show all targets with descriptions
-```
-
-### 10.3 Mock Providers for L3
-
-Mock providers are tiny bash scripts that simulate CLI behavior for offline testing. One per provider, placed in `testdata/mock-providers/`:
-
-**`testdata/mock-providers/mock-claude`:**
-```bash
-#!/usr/bin/env bash
-# Simulates claude CLI for smoke tests — no API calls
-set -euo pipefail
-PROMPT="" FORMAT="" MODEL="sonnet-4-6" ERROR=""
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    -p) PROMPT="$2"; shift 2 ;;
-    --output-format) FORMAT="$2"; shift 2 ;;
-    --model) MODEL="$2"; shift 2 ;;
-    --dangerously-skip-permissions) shift ;;
-    --error) ERROR="$2"; shift 2 ;;  # test hook: force error
-    *) PROMPT="${PROMPT:-$1}"; shift ;;
-  esac
-done
-[[ -n "$ERROR" ]] && { echo "Error: $ERROR" >&2; exit 3; }
-if [ "$FORMAT" = "json" ]; then
-  echo '{"result":"Mock: '"$PROMPT"'","session_id":"mock_123","cost_usd":0.001,"model":"'"$MODEL"'","duration_ms":150}'
-else
-  echo "Mock response to: $PROMPT"
-fi
-```
-
-**`testdata/mock-providers/mock-codex`:** (emits JSONL event stream)
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-PROMPT=""
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    exec) shift ;;
-    --json) shift ;;
-    --sandbox) shift 2 ;;
-    --skip-git-repo-check) shift ;;
-    *) PROMPT="${PROMPT:-$1}"; shift ;;
-  esac
-done
-echo '{"type":"thread.started","thread_id":"mock-thread-1"}'
-echo '{"type":"turn.started"}'
-echo '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Mock: '"$PROMPT"'"}}'
-echo '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}'
-```
-
-**`testdata/mock-providers/mock-gemini`:**
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-PROMPT="" FORMAT=""
-while [[ $# -gt 0 ]]; do
-  case $1 in
-    --yolo) shift ;;
-    -p|--prompt) PROMPT="$2"; shift 2 ;;
-    --output-format) FORMAT="$2"; shift 2 ;;
-    *) PROMPT="${PROMPT:-$1}"; shift ;;
-  esac
-done
-if [ "$FORMAT" = "json" ]; then
-  echo '{"result":"Mock: '"$PROMPT"'","model":"gemini-3-pro","duration_ms":120}'
-else
-  echo "Mock response to: $PROMPT"
-fi
-```
-
-Mock providers are activated via config override: `DOOTSABHA_CLAUDE_BIN=testdata/mock-providers/mock-claude` etc.
-
-### 10.4 L4 Visual Verification: iTerm2-driver Automation
-
-> This is the critical differentiator. Unit tests cannot verify terminal rendering. Only screenshots prove visual correctness.
-
-#### 10.4.1 Canonical Script Template
-
-All iTerm2-driver scripts live in `.claude/automations/` and follow this exact template:
-
-```python
-# /// script
-# requires-python = ">=3.14"
-# dependencies = ["iterm2", "pyobjc", "pyobjc-framework-Quartz"]
-# ///
-"""
-L4 Visual Test: dootsabha {command}
-Tests: {list of numbered tests}
-Screenshots: {list of expected screenshot names}
-"""
-import asyncio, iterm2, subprocess, time, os, sys
-from datetime import datetime
-
-# ─── Result Tracking ────────────────────────────────────────────
-results = {
-    "passed": 0, "failed": 0, "unverified": 0,
-    "tests": [],
-    "screenshots": [],
-    "start_time": None, "end_time": None,
-}
-
-def log_result(test_name: str, status: str, details: str = "", screenshot: str = None):
-    """status: PASS, FAIL, UNVERIFIED"""
-    results["tests"].append({
-        "name": test_name, "status": status,
-        "details": details, "screenshot": screenshot,
-    })
-    results[{"PASS": "passed", "FAIL": "failed", "UNVERIFIED": "unverified"}[status]] += 1
-    icon = {"PASS": "✓", "FAIL": "✗", "UNVERIFIED": "?"}[status]
-    print(f"  {icon} {test_name}: {details}")
-
-# ─── Screenshot Capture ─────────────────────────────────────────
-SCREENSHOT_DIR = os.path.join(os.path.dirname(__file__), "..", "screenshots")
-
-def get_iterm2_window_id():
-    import Quartz
-    windows = Quartz.CGWindowListCopyWindowInfo(
-        Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
-    )
-    for w in windows:
-        if w.get("kCGWindowOwnerName") == "iTerm2":
-            return w.get("kCGWindowNumber")
-    return None
-
-def capture_screenshot(name: str) -> str:
-    os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(SCREENSHOT_DIR, f"{name}_{ts}.png")
-    wid = get_iterm2_window_id()
-    if wid:
-        subprocess.run(["screencapture", "-x", "-l", str(wid), filepath], check=True)
-    else:
-        subprocess.run(["screencapture", "-x", filepath], check=True)
-    results["screenshots"].append(filepath)
-    return filepath
-
-# ─── Screen Verification ────────────────────────────────────────
-async def verify_screen_contains(session, expected: str, description: str, timeout: float = 10.0) -> bool:
-    """Poll screen content until expected text appears or timeout."""
-    start = time.monotonic()
-    while (time.monotonic() - start) < timeout:
-        screen = await session.async_get_screen_contents()
-        for i in range(screen.number_of_lines):
-            if expected in screen.line(i).string:
-                return True
-        await asyncio.sleep(0.3)
-    return False
-
-async def get_all_screen_text(session) -> list[str]:
-    """Return all non-empty screen lines."""
-    screen = await session.async_get_screen_contents()
-    return [screen.line(i).string for i in range(screen.number_of_lines) if screen.line(i).string.strip()]
-
-async def dump_screen(session, label: str):
-    """Debug: print all screen lines with line numbers."""
-    lines = await get_all_screen_text(session)
-    print(f"\n--- SCREEN DUMP: {label} ---")
-    for i, line in enumerate(lines):
-        print(f"  {i:3d} | {line}")
-    print(f"--- END DUMP ---\n")
-
-# ─── Cleanup ────────────────────────────────────────────────────
-async def cleanup_session(session):
-    """Exit cleanly: Ctrl+C, then q, then wait."""
-    try:
-        await session.async_send_text("\x03")  # Ctrl+C
-        await asyncio.sleep(0.5)
-        await session.async_send_text("q")
-        await asyncio.sleep(0.5)
-    except Exception:
-        pass
-
-# ─── Summary ────────────────────────────────────────────────────
-def print_summary() -> int:
-    results["end_time"] = datetime.now().isoformat()
-    total = results["passed"] + results["failed"] + results["unverified"]
-    print(f"\n{'='*60}")
-    print(f"Results: {results['passed']}/{total} PASS, {results['failed']} FAIL, {results['unverified']} UNVERIFIED")
-    print(f"Screenshots: {len(results['screenshots'])} captured")
-    if results["failed"] > 0:
-        print("\nFailed tests:")
-        for t in results["tests"]:
-            if t["status"] == "FAIL":
-                print(f"  ✗ {t['name']}: {t['details']}")
-    return 1 if results["failed"] > 0 else 0
-```
-
-#### 10.4.2 Running L4 Tests
-
-```bash
-# Individual test
-uv run .claude/automations/test_dootsabha_consult.py
-
-# All visual tests (via Makefile target)
-make test-visual   # runs scripts/verify-visual-tests.sh
-```
-
-#### 10.4.3 Screenshot Naming Convention
-
-Format: `dootsabha_{command}_{state}_{timestamp}.png`
-
-Examples:
-- `dootsabha_consult_launch_20260301_143000.png`
-- `dootsabha_council_dispatch_20260301_143012.png`
-- `dootsabha_council_synthesis_20260301_143025.png`
-- `dootsabha_status_healthy_20260301_143030.png`
-- `dootsabha_status_degraded_20260301_143035.png`
-
-Screenshots saved to `.claude/screenshots/` (gitignored). Matched by prefix (timestamp optional).
-
-### 10.5 L4 Gating Hooks (Anti-Hallucination)
-
-> These hooks prevent agents from claiming work is done without proof. This is the single most important mechanism for preventing agent hallucinations.
-
-#### 10.5.1 Task Verification Script (`scripts/verify-visual-tests.sh`)
-
-Verifies L4 requirements for task completion. Called by both pre-task-done gate and pre-push hook.
-
-**Checks:**
-1. L4 test scripts referenced in task file "Files to Create" section exist on disk
-2. Expected screenshots (listed in L4 verification section) exist in `.claude/screenshots/`
-3. Task file contains `## Visual Test Results` section with actual review content (not just heading)
-
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-TASK_FILE="$1"
-ERRORS=()
-
-# 1. Check L4 scripts exist
-SCRIPTS=$(grep -oP '\.claude/automations/test_dootsabha_\w+\.py' "$TASK_FILE" || true)
-for script in $SCRIPTS; do
-  [[ -f "$script" ]] || ERRORS+=("L4 script missing: $script")
-done
-
-# 2. Check screenshots exist (match by prefix)
-SCREENSHOTS=$(grep -oP 'dootsabha_\w+\.png' "$TASK_FILE" || true)
-for shot in $SCREENSHOTS; do
-  prefix="${shot%.png}"
-  found=$(find .claude/screenshots -name "${prefix}*" 2>/dev/null | head -1)
-  [[ -n "$found" ]] || ERRORS+=("Screenshot missing: $shot")
-done
-
-# 3. Check Visual Test Results section exists with content
-if ! grep -q '^## Visual Test Results' "$TASK_FILE"; then
-  ERRORS+=("Missing '## Visual Test Results' section in task file")
-elif [[ $(sed -n '/^## Visual Test Results/,/^## /p' "$TASK_FILE" | wc -l) -lt 5 ]]; then
-  ERRORS+=("Visual Test Results section is too thin (needs actual findings)")
-fi
-
-if [[ ${#ERRORS[@]} -gt 0 ]]; then
-  echo "❌ L4 GATE FAILED for $(basename "$TASK_FILE"):"
-  for err in "${ERRORS[@]}"; do echo "  • $err"; done
-  exit 2
-fi
-echo "✓ L4 gate passed for $(basename "$TASK_FILE")"
-```
-
-#### 10.5.2 Pre-Task-Done Gate (`scripts/hooks/pre-task-done-gate.sh`)
-
-Claude Code PreToolUse hook that intercepts Edit/Write on task files. If status is being changed to DONE, runs L4 verification:
-
-```bash
-#!/usr/bin/env bash
-# Hook: PreToolUse (Edit, Write)
-# Blocks DONE status on task files if L4 requirements not met
-TOOL="$1"
-FILE="$2"
-
-# Only intercept task file edits
-[[ "$FILE" == *docs/tasks/*.md ]] || exit 0
-
-# Check if edit changes status to DONE
-if grep -qi 'Status:.*DONE' <<< "$3" 2>/dev/null; then
-  bash scripts/verify-visual-tests.sh "$FILE"
-fi
-```
-
-#### 10.5.3 Pre-Push Visual Gate (`scripts/hooks/pre-push-visual-gate.sh`)
-
-Claude Code PreToolUse hook that intercepts `git push`. Finds all IN PROGRESS tasks and verifies each has passed L4:
-
-```bash
-#!/usr/bin/env bash
-# Hook: PreToolUse (Bash) — matches git push
-ERRORS=()
-for task in docs/tasks/*.md; do
-  if grep -q 'Status:.*IN PROGRESS' "$task"; then
-    if ! bash scripts/verify-visual-tests.sh "$task" 2>/dev/null; then
-      ERRORS+=("$task")
-    fi
-  fi
-done
-if [[ ${#ERRORS[@]} -gt 0 ]]; then
-  echo "❌ PRE-PUSH GATE: L4 requirements unmet for:"
-  for task in "${ERRORS[@]}"; do echo "  • $task"; done
-  exit 2
-fi
-```
-
-### 10.6 L5 Agent Workflow Tests
-
-Tests that validate दूतसभा is consumable by other AI agents:
-
-```bash
-#!/usr/bin/env bash
-# scripts/test-agent-workflow.sh
-set -euo pipefail
-
-BINARY="bin/dootsabha"
-PASS=0 FAIL=0
-
-run_test() {
-  local name="$1" cmd="$2" check="$3"
-  if eval "$check"; then
-    printf "  ✓ %s\n" "$name"; ((PASS++))
-  else
-    printf "  ✗ %s\n" "$name"; ((FAIL++))
-  fi
-}
-
-# Workflow 1: JSON output is valid and parseable
-run_test "consult JSON valid" \
-  "$BINARY consult --json 'PONG'" \
-  "$BINARY consult --json 'PONG' 2>/dev/null | python3 -m json.tool >/dev/null 2>&1"
-
-# Workflow 2: Exit codes reflect state
-run_test "consult success exit 0" \
-  "" \
-  "$BINARY consult 'PONG' >/dev/null 2>&1; [ \$? -eq 0 ]"
-
-# Workflow 3: No ANSI in piped output
-run_test "consult no ANSI when piped" \
-  "" \
-  "! $BINARY consult 'PONG' 2>/dev/null | grep -qP '\x1b\['"
-
-# Workflow 4: JSON fields exist
-run_test "consult JSON has required fields" \
-  "" \
-  "$BINARY consult --json 'PONG' 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'content' in d and 'meta' in d\""
-
-# Workflow 5: Status JSON is valid
-run_test "status JSON valid" \
-  "" \
-  "$BINARY status --json 2>/dev/null | python3 -m json.tool >/dev/null 2>&1"
-
-# Workflow 6: Error produces structured JSON
-run_test "error produces JSON with exit 3" \
-  "" \
-  "$BINARY consult --json --agent nonexistent 'test' 2>/dev/null; [ \$? -eq 3 ]"
-
-# Workflow 7: Performance (<2s startup)
-run_test "startup under 2s" \
-  "" \
-  "timeout 2 $BINARY --version >/dev/null 2>&1"
-
-printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"
-[ "$FAIL" -eq 0 ]
-```
-
-### 10.7 Critical Testing Rules (Agent Anti-Hallucination)
-
-> These rules exist because agents WILL try to skip verification. Every rule here was learned from real failures.
-
-1. **NEVER claim a task is DONE without showing actual terminal output.** Terminal output is proof. Assertions are not proof.
-2. **Screenshots are mandatory for any output-visible change.** If a human would look at the terminal to verify, you need a screenshot.
-3. **`make ci` MUST pass before marking any task DONE.** No exceptions.
-4. **Every task file MUST have a `## Visual Test Results` section** with:
-   - L4 script name and pass/fail count
-   - Each screenshot reviewed with specific observations
-   - Any findings or deviations noted
-5. **Every phase must show:** (a) help output, (b) command output, (c) JSON piped to `jq`, (d) piped through `cat` (no ANSI).
-6. **L4 tests run against REAL CLIs** with tiny prompts ("PONG") to minimize cost. Never mock at L4.
-7. **`make check` before every commit:** `gofumpt` + `go vet` + `golangci-lint` + `go test` + smoke. `go fix` runs only during Go toolchain migrations.
-8. **Pre-push hook blocks** if any IN PROGRESS task fails L4 gate.
-9. **Pre-task-done gate blocks** if task status changes to DONE without L4 evidence.
-10. **Mock providers for L2/L3 only.** L4 and L5 use real CLIs. Token cost is controlled via tiny prompts.
-
-### 10.8 Task File Verification Checklist
-
-Every task file in `docs/tasks/` MUST include these two sections. This is a hard requirement — gating hooks enforce it.
-
-**Section 1: `## Verification`** — must contain ALL applicable levels:
-
-| Level | Required Content | Example |
-|-------|-----------------|---------|
-| **L1** | `make test` — expected: all pass | Always required |
-| **L2** | `make test-integration` — expected: all pass | If integration tests exist |
-| **L3** | `make build` + actual binary commands with expected output + `--json \| jq .` + `\| cat` (no ANSI) | Always required |
-| **L4** | `uv run .claude/automations/test_dootsabha_{command}.py` + list of expected screenshot names | Required for any output-visible change |
-| **L5** | `make test-agent` | Required for commands with `--json` output |
-
-**Section 2: `## Visual Test Results`** — must contain actual evidence (not a placeholder):
-
-| Field | Required? | Description |
-|-------|-----------|-------------|
-| L4 Script path | YES | `.claude/automations/test_dootsabha_{command}.py` |
-| Date | YES | `YYYY-MM-DD` |
-| Status | YES | `PASS (N/M)` or `FAIL (N/M)` |
-| Test result table | YES | Each test with PASS/FAIL + detail column |
-| Screenshots reviewed | YES | Each screenshot name + specific observation about what's visible |
-| Findings | YES | Deviations, learnings, or "No issues found" |
-
-**Minimum content:** The Visual Test Results section must be at least 5 lines long (enforced by gating hook). Empty or placeholder-only sections will be rejected.
-
-### 10.9 Session Protocol (Per-Task Execution)
-
-Agents MUST follow this protocol for every task:
+| Category | Targets |
+|----------|---------|
+| **Build** | `build`, `install`, `clean` |
+| **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-visual` (L4), `test-agent` (L5), `test-all` |
+| **Lint** | `lint`, `lint-fix`, `fmt`, `vet` |
+| **Deps** | `tidy`, `verify` |
+| **CI** | `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+lint+vet+test+smoke) |
+| **Tools** | `tools`, `hooks`, `version`, `help` |
+
+Full Makefile with build flags, gotestsum, colored output — implemented during task 1.1. See gh-ghent `Makefile` for reference template.
+
+### 10.3 Key Testing Infrastructure
+
+| Component | Location | Reference |
+|-----------|----------|-----------|
+| Mock providers (claude, codex, gemini) | `testdata/mock-providers/` | `testing-strategy.md §1` |
+| iTerm2-driver canonical template | `.claude/automations/` | `testing-strategy.md §2` |
+| L4 gating hooks (pre-task-done, pre-push) | `scripts/hooks/` | `testing-strategy.md §3` |
+| L5 agent workflow tests | `scripts/test-agent-workflow.sh` | `testing-strategy.md §4` |
+| Task verification checklist | (in task files) | `testing-strategy.md §6` |
+
+### 10.4 Anti-Hallucination Rules (Summary)
+
+> Full list: `testing-strategy.md §5` (10 rules). Top 5:
+
+1. **NEVER claim DONE without actual terminal output as proof.** Screenshots, not assertions.
+2. **`make ci` MUST pass before any task is marked DONE.**
+3. **Every task file MUST have `## Visual Test Results`** with screenshot reviews and findings.
+4. **Pre-push hook blocks** if IN PROGRESS tasks fail L4 gate.
+5. **Mock providers for L2/L3 only.** L4+ uses real CLIs with tiny prompts ("PONG").
+
+### 10.5 Session Protocol
+
+> Full protocol: `testing-strategy.md §7` (12 steps). Summary:
 
 ```
- 1. Read CLAUDE.md (conventions, build commands, pitfalls)
- 2. Read this task file
- 3. Change task status to IN PROGRESS
- 4. Read referenced PRD sections (§X.Y)
- 5. Read referenced research docs
- 6. Execute implementation steps
- 7. Run verification ladder (L1 → L2 → L3 → L4 → L5)
- 8. Fill in Visual Test Results section with evidence
- 9. Change task status to DONE
-10. Update docs/PROGRESS.md — mark task done + session notes
-11. Update CLAUDE.md Learnings section if new insights
-12. Commit with prescribed message
+Read CLAUDE.md → Read task → Mark IN PROGRESS → Read PRD §X.Y →
+Execute → Verify (L1→L5) → Fill Visual Test Results →
+Mark DONE → Update PROGRESS.md → Commit
 ```
 
-**Hard rules:**
-- Step 7 CANNOT be skipped — L4 is mandatory for any visible output change
-- Step 8 CANNOT be skipped — empty Visual Test Results = task is NOT done
-- If any L-level fails, task stays IN PROGRESS with failure details noted
-- Agent MUST run `cm context "<task description>" --json` at step 1 to pull relevant playbook rules
+**Hard rules:** L4 cannot be skipped. Visual Test Results cannot be empty. `cm context` runs at session start.
 
 ---
 
@@ -1275,4 +885,5 @@ Agents MUST follow this protocol for every task:
 | 2026-02-28 | 1.0 | Initial PRD — synthesized from architecture + build plan docs, verified against installed CLI versions |
 | 2026-02-28 | 1.1 | Codex review: exit-code precedence matrix, timeout model (agent + session), round state machine, chair fallback, prompt input contract frozen, PATH extension trust, JSON schema_version, retry classifiers, peer review caps, universal pipe checks, config precedence FRs, go fix scope corrected, --watch deferred |
 | 2026-02-28 | 1.2 | Gemini review: PTY vs pipe spike added, subprocess reaper pattern, chair fallback re-invocation fix, Provider.Cancel method, config key redaction, SIGPIPE handling, multi-round context cap, orphaned process risk |
-| 2026-02-28 | 1.3 | Comprehensive testing overhaul from gh-ghent patterns: full Makefile targets (20+), iTerm2-driver canonical template with helpers, L4 gating hooks (pre-task-done, pre-push), mock providers per CLI, L5 agent workflow tests, session protocol, task verification checklist, anti-hallucination rules |
+| 2026-02-28 | 1.3 | Testing overhaul: extracted testing-strategy.md (447 lines), PRD §10 is now a compact summary (64 lines) |
+| 2026-02-28 | 1.4 | Progressive disclosure structure: document hierarchy section, "Also read" cross-refs on all §6 commands, annotated ToC with line counts and typical references |
