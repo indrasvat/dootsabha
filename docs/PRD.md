@@ -803,14 +803,25 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 
 | Category | Targets |
 |----------|---------|
-| **Build** | `build`, `install`, `clean` |
+| **Build** | `build` (depends on `hooks`), `install`, `clean` |
 | **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-visual` (L4), `test-agent` (L5), `test-all` |
-| **Lint** | `lint`, `lint-fix`, `fmt`, `vet` |
+| **Lint** | `lint`, `lint-fix`, `fmt`, `vet`, `fix` (`go fix ./...`) |
 | **Deps** | `tidy`, `verify` |
-| **CI** | `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+lint+vet+test+smoke) |
-| **Tools** | `tools`, `hooks`, `version`, `help` |
+| **CI** | `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+fix+lint+vet+test+smoke) |
+| **Tools** | `tools`, `hooks` (idempotent), `version`, `help` |
 
-Full Makefile with build flags, gotestsum, colored output — implemented during task 1.1. See gh-ghent `Makefile` for reference template.
+**Critical: `make build` depends on `make hooks`.** This ensures git hooks are always installed when any agent or developer builds the binary. The `hooks` target is idempotent — safe to call every time.
+
+**`make hooks` behavior:** Check if lefthook is on PATH → install via `go install` if missing → run `lefthook install` → no-op if already installed. Must never fail the build if lefthook install is a no-op.
+
+**lefthook.yml hooks:**
+
+| Hook | What Runs | Speed | Purpose |
+|------|-----------|-------|---------|
+| `pre-commit` | `gofumpt -l -d .` (check only) + `go vet ./...` + `go fix ./...` (dry-run) | <3s | Catch formatting, vet issues, deprecated APIs before they accumulate |
+| `pre-push` | `make ci` (lint+test+vet) | <30s | Full quality gate before code leaves the machine |
+
+Full Makefile with build flags, gotestsum, colored output — implemented during task 1.1. See gh-ghent `Makefile` for reference template. Lefthook config and `make hooks` idempotency detailed in `testing-strategy.md §8`.
 
 ### 10.3 Key Testing Infrastructure
 
@@ -821,6 +832,7 @@ Full Makefile with build flags, gotestsum, colored output — implemented during
 | L4 gating hooks (pre-task-done, pre-push) | `scripts/hooks/` | `testing-strategy.md §3` |
 | L5 agent workflow tests | `scripts/test-agent-workflow.sh` | `testing-strategy.md §4` |
 | Task verification checklist | (in task files) | `testing-strategy.md §6` |
+| Git hooks (lefthook: pre-commit + pre-push) | `lefthook.yml` | `testing-strategy.md §8` |
 
 ### 10.4 Anti-Hallucination Rules (Summary)
 

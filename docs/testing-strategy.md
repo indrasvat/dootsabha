@@ -445,3 +445,110 @@ Agents MUST follow this protocol for every task:
 - Step 8 CANNOT be skipped — empty Visual Test Results = task is NOT done
 - If any L-level fails, task stays IN PROGRESS with failure details noted
 - Agent MUST run `cm context "<task description>" --json` at step 1 to pull relevant playbook rules
+
+---
+
+## §8 Git Hooks via Lefthook (Code Quality Gates)
+
+> Git hooks are the last line of defense. They run *your code* through automated checks before it leaves the local machine. Combined with §3 gating hooks (Claude Code level), they create a two-layer quality system: lefthook catches code issues, §3 hooks catch process issues.
+
+### §8.1 `lefthook.yml` Specification
+
+```yaml
+# lefthook.yml — Git hooks for code quality
+# pre-commit: fast checks (<3s) — catch problems early
+# pre-push: full CI (<30s) — quality gate before sharing
+
+pre-commit:
+  parallel: true
+  commands:
+    fmt-check:
+      run: gofumpt -l -d . | head -20
+      fail_text: "Code not formatted. Run: make fmt"
+    vet:
+      run: go vet ./...
+      fail_text: "go vet found issues."
+    fix-check:
+      run: |
+        # Check if go fix would change anything (dry run via diff)
+        TMPDIR=$(mktemp -d)
+        cp -r . "$TMPDIR/src" 2>/dev/null || true
+        cd "$TMPDIR/src" && go fix ./... 2>/dev/null
+        diff -rq . "$TMPDIR/src" --exclude=.git --exclude=bin --exclude=coverage >/dev/null 2>&1
+        EXIT=$?
+        rm -rf "$TMPDIR"
+        [ $EXIT -eq 0 ] || { echo "go fix has pending changes. Run: go fix ./..."; exit 1; }
+      fail_text: "go fix has pending changes."
+
+pre-push:
+  commands:
+    ci:
+      run: make ci
+      fail_text: "CI failed! Fix issues before pushing."
+```
+
+**Design rationale:**
+- **pre-commit is fast** (<3s, parallel): `gofumpt` check (not write), `go vet`, `go fix` dry-run. Doesn't lint (too slow for commit frequency).
+- **pre-push is thorough** (<30s): full `make ci` = lint + test + vet. This is the real gate.
+- **`go fix` is a dry-run** on pre-commit: it checks whether `go fix ./...` would change files, but doesn't modify them. Alerts the developer to run it manually. This catches deprecated API usage on Go toolchain upgrades without surprising edits.
+
+### §8.2 Idempotent `make hooks` Target
+
+```makefile
+.PHONY: hooks
+hooks: ## Install git hooks via lefthook (idempotent, safe to call repeatedly)
+	@if ! command -v lefthook >/dev/null 2>&1; then \
+		printf "$(COLOR_BLUE)>> Installing lefthook...$(COLOR_RESET)\n"; \
+		go install github.com/evilmartians/lefthook@latest; \
+	fi
+	@if [ ! -f .git/hooks/pre-commit ] || ! grep -q lefthook .git/hooks/pre-commit 2>/dev/null; then \
+		printf "$(COLOR_BLUE)>> Installing git hooks...$(COLOR_RESET)\n"; \
+		lefthook install; \
+	else \
+		printf "$(COLOR_GREEN)>> Hooks already installed$(COLOR_RESET)\n"; \
+	fi
+```
+
+**Key properties:**
+1. **Idempotent**: safe to call on every `make build` — no-ops if hooks already installed
+2. **Auto-installs lefthook**: if not on PATH, installs via `go install`
+3. **Checks actual hook content**: verifies the hook file exists AND contains lefthook (not just that a file exists)
+4. **Never fails the build**: if lefthook install fails (e.g., CI without git), the build continues
+
+### §8.3 `make build` Depends on `make hooks`
+
+```makefile
+.PHONY: build
+build: hooks ## Build binary (auto-installs hooks)
+	@mkdir -p $(BIN_DIR)
+	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY_NAME) ./cmd/dootsabha
+```
+
+**Why this matters:** Any agent that runs `make build` — even if it has never set up the repo — gets hooks installed automatically. This eliminates the "forgot to install hooks" failure mode. The dependency is visible in the Makefile, so agents can see it in `make help`.
+
+### §8.4 `make check` — Full Pre-Commit Equivalent
+
+For agents that want to manually run all pre-commit + pre-push checks without committing:
+
+```makefile
+.PHONY: check
+check: fmt vet fix lint test test-binary ## Full quality check (pre-commit + pre-push + smoke)
+	@printf "$(COLOR_GREEN)>> All checks passed$(COLOR_RESET)\n"
+
+.PHONY: fix
+fix: ## Run go fix ./... (applies changes)
+	@printf "$(COLOR_BLUE)>> Running go fix...$(COLOR_RESET)\n"
+	go fix ./...
+	@printf "$(COLOR_GREEN)>> go fix complete$(COLOR_RESET)\n"
+```
+
+`make check` is the "belt AND suspenders" target: fmt + vet + go fix + lint + test + binary smoke. Agents should run this before any commit (in addition to hooks catching it automatically).
+
+### §8.5 Two-Layer Quality System
+
+| Layer | Mechanism | What It Catches | When |
+|-------|-----------|----------------|------|
+| **Git hooks (lefthook)** | pre-commit, pre-push | Format, vet, go fix, lint, tests | Every commit/push |
+| **Claude Code hooks (§3)** | PreToolUse on Edit/Write/Bash | Task status violations, missing L4 evidence, missing screenshots | During agent execution |
+
+Both layers are independent — either alone is insufficient. Lefthook catches code problems; §3 hooks catch process problems. Together they prevent both "code doesn't compile" and "agent claimed DONE without running tests."
