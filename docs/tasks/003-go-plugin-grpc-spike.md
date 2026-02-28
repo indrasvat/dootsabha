@@ -92,5 +92,5 @@ spike(go-plugin): validate gRPC handshake latency and crash recovery
 5. Execute steps 1-4
 6. Run verification
 7. **Change status to `DONE`**
-8. Update `docs/PROGRESS.md`
+8. Update `docs/PROGRESS.md` — **if it doesn't exist, create it with a Phase 0 header and this spike's entry**
 9. Commit
