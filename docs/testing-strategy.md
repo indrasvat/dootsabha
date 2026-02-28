@@ -456,29 +456,14 @@ Agents MUST follow this protocol for every task:
 
 ```yaml
 # lefthook.yml — Git hooks for code quality
-# pre-commit: fast checks (<3s) — catch problems early
-# pre-push: full CI (<30s) — quality gate before sharing
+# pre-commit: fast checks (<3s) via make pre-commit
+# pre-push: full CI (<30s) via make ci
 
 pre-commit:
-  parallel: true
   commands:
-    fmt-check:
-      run: gofumpt -l -d . | head -20
-      fail_text: "Code not formatted. Run: make fmt"
-    vet:
-      run: go vet ./...
-      fail_text: "go vet found issues."
-    fix-check:
-      run: |
-        # Check if go fix would change anything (dry run via diff)
-        TMPDIR=$(mktemp -d)
-        cp -r . "$TMPDIR/src" 2>/dev/null || true
-        cd "$TMPDIR/src" && go fix ./... 2>/dev/null
-        diff -rq . "$TMPDIR/src" --exclude=.git --exclude=bin --exclude=coverage >/dev/null 2>&1
-        EXIT=$?
-        rm -rf "$TMPDIR"
-        [ $EXIT -eq 0 ] || { echo "go fix has pending changes. Run: go fix ./..."; exit 1; }
-      fail_text: "go fix has pending changes."
+    pre-commit:
+      run: make pre-commit
+      fail_text: "Pre-commit checks failed! Run 'make pre-commit' to see details."
 
 pre-push:
   commands:
@@ -488,9 +473,10 @@ pre-push:
 ```
 
 **Design rationale:**
-- **pre-commit is fast** (<3s, parallel): `gofumpt` check (not write), `go vet`, `go fix` dry-run. Doesn't lint (too slow for commit frequency).
-- **pre-push is thorough** (<30s): full `make ci` = lint + test + vet. This is the real gate.
-- **`go fix` is a dry-run** on pre-commit: it checks whether `go fix ./...` would change files, but doesn't modify them. Alerts the developer to run it manually. This catches deprecated API usage on Go toolchain upgrades without surprising edits.
+- **lefthook.yml is minimal** — delegates all logic to Makefile targets. One entry point per hook, no inline shell.
+- **`make pre-commit`** (<3s): `gofumpt` check (not write) + `go vet` + `go fix` dry-run. Fast enough for every commit. Doesn't lint (too slow for commit frequency).
+- **`make ci`** (<30s): lint + test + vet. The full quality gate before code leaves the machine.
+- **All commands live in the Makefile** — visible via `make help`, runnable standalone, testable in CI. Lefthook is just the trigger mechanism.
 
 ### §8.2 Idempotent `make hooks` Target
 
@@ -526,23 +512,53 @@ build: hooks ## Build binary (auto-installs hooks)
 
 **Why this matters:** Any agent that runs `make build` — even if it has never set up the repo — gets hooks installed automatically. This eliminates the "forgot to install hooks" failure mode. The dependency is visible in the Makefile, so agents can see it in `make help`.
 
-### §8.4 `make check` — Full Pre-Commit Equivalent
-
-For agents that want to manually run all pre-commit + pre-push checks without committing:
+### §8.4 `make pre-commit`, `make fix`, `make check`
 
 ```makefile
-.PHONY: check
-check: fmt vet fix lint test test-binary ## Full quality check (pre-commit + pre-push + smoke)
-	@printf "$(COLOR_GREEN)>> All checks passed$(COLOR_RESET)\n"
+.PHONY: pre-commit
+pre-commit: fmt-check vet fix-check ## Fast pre-commit gate (<3s): format + vet + go fix dry-run
+	@printf "$(COLOR_GREEN)>> Pre-commit passed$(COLOR_RESET)\n"
+
+.PHONY: fmt-check
+fmt-check: ## Check formatting without writing (gofumpt -l -d)
+	@printf "$(COLOR_BLUE)>> Checking format...$(COLOR_RESET)\n"
+	@UNFORMATTED=$$(gofumpt -l . 2>/dev/null); \
+	if [ -n "$$UNFORMATTED" ]; then \
+		printf "$(COLOR_RED)>> Unformatted files:$(COLOR_RESET)\n$$UNFORMATTED\n"; \
+		printf "Run: make fmt\n"; \
+		exit 1; \
+	fi
+	@printf "$(COLOR_GREEN)>> Format OK$(COLOR_RESET)\n"
 
 .PHONY: fix
 fix: ## Run go fix ./... (applies changes)
 	@printf "$(COLOR_BLUE)>> Running go fix...$(COLOR_RESET)\n"
 	go fix ./...
 	@printf "$(COLOR_GREEN)>> go fix complete$(COLOR_RESET)\n"
+
+.PHONY: fix-check
+fix-check: ## Check if go fix would change anything (dry-run, no writes)
+	@printf "$(COLOR_BLUE)>> Checking go fix...$(COLOR_RESET)\n"
+	@TMPDIR=$$(mktemp -d) && \
+	cp -r . "$$TMPDIR/src" 2>/dev/null && \
+	cd "$$TMPDIR/src" && go fix ./... 2>/dev/null && \
+	if ! diff -rq "$$TMPDIR/src" . --exclude=.git --exclude=bin --exclude=coverage >/dev/null 2>&1; then \
+		rm -rf "$$TMPDIR"; \
+		printf "$(COLOR_RED)>> go fix has pending changes. Run: make fix$(COLOR_RESET)\n"; \
+		exit 1; \
+	fi; \
+	rm -rf "$$TMPDIR"
+	@printf "$(COLOR_GREEN)>> go fix OK$(COLOR_RESET)\n"
+
+.PHONY: check
+check: fmt vet fix lint test test-binary ## Full quality suite (pre-commit + CI + smoke)
+	@printf "$(COLOR_GREEN)>> All checks passed$(COLOR_RESET)\n"
 ```
 
-`make check` is the "belt AND suspenders" target: fmt + vet + go fix + lint + test + binary smoke. Agents should run this before any commit (in addition to hooks catching it automatically).
+**Target hierarchy:**
+- `make pre-commit` — fast gate called by lefthook pre-commit hook: `fmt-check` + `vet` + `fix-check` (<3s)
+- `make ci` — standard CI gate called by lefthook pre-push hook: `lint` + `test` + `vet` (<30s)
+- `make check` — belt AND suspenders: `fmt` + `vet` + `fix` + `lint` + `test` + `test-binary`. Run manually when you want everything.
 
 ### §8.5 Two-Layer Quality System
 

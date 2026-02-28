@@ -805,20 +805,20 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 |----------|---------|
 | **Build** | `build` (depends on `hooks`), `install`, `clean` |
 | **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-visual` (L4), `test-agent` (L5), `test-all` |
-| **Lint** | `lint`, `lint-fix`, `fmt`, `vet`, `fix` (`go fix ./...`) |
+| **Lint** | `lint`, `lint-fix`, `fmt`, `fmt-check`, `vet`, `fix` (`go fix`), `fix-check` (dry-run) |
 | **Deps** | `tidy`, `verify` |
-| **CI** | `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+fix+lint+vet+test+smoke) |
+| **CI** | `pre-commit` (fmt-check+vet+fix-check), `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+fix+lint+vet+test+smoke) |
 | **Tools** | `tools`, `hooks` (idempotent), `version`, `help` |
 
 **Critical: `make build` depends on `make hooks`.** This ensures git hooks are always installed when any agent or developer builds the binary. The `hooks` target is idempotent — safe to call every time.
 
 **`make hooks` behavior:** Check if lefthook is on PATH → install via `go install` if missing → run `lefthook install` → no-op if already installed. Must never fail the build if lefthook install is a no-op.
 
-**lefthook.yml hooks:**
+**lefthook.yml hooks (all delegate to Makefile targets):**
 
-| Hook | What Runs | Speed | Purpose |
-|------|-----------|-------|---------|
-| `pre-commit` | `gofumpt -l -d .` (check only) + `go vet ./...` + `go fix ./...` (dry-run) | <3s | Catch formatting, vet issues, deprecated APIs before they accumulate |
+| Hook | Make Target | Speed | Purpose |
+|------|-------------|-------|---------|
+| `pre-commit` | `make pre-commit` (fmt-check+vet+fix-check) | <3s | Catch formatting, vet issues, deprecated APIs before they accumulate |
 | `pre-push` | `make ci` (lint+test+vet) | <30s | Full quality gate before code leaves the machine |
 
 Full Makefile with build flags, gotestsum, colored output — implemented during task 1.1. See gh-ghent `Makefile` for reference template. Lefthook config and `make hooks` idempotency detailed in `testing-strategy.md §8`.
