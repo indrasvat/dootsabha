@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.5 |
+| **Version** | 1.6 |
 | **Author** | indrasvat |
 | **Date** | 2026-02-28 |
 | **Status** | Draft |
@@ -143,7 +143,7 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 | gRPC | google.golang.org/grpc + protobuf | latest | Required by go-plugin. Typed contracts via .proto. |
 | Logging | log/slog (stdlib) | — | Zero deps, structured, JSON+text handlers. |
 | Terminal styling | lipgloss | v1.1.0 | Colors, borders, padding, tables. Composable. |
-| Spinners/progress | charmbracelet/huh | v0.8.0 | Only `huh.NewSpinner()` API used (stderr-only). Not using huh forms/TUI. Pairs with lipgloss. |
+| Spinners/progress | raw goroutine on stderr | — | **Spike 0.7 finding:** huh v0.8.0 removed `NewSpinner()`. Use a raw goroutine writing spinner frames to `os.Stderr`. Zero stdout pollution confirmed. |
 | Tables | lipgloss/table | (in lipgloss) | Built-in table rendering. |
 | Concurrency | x/sync/errgroup | v0.15.0 | Fan-out/fan-in with error propagation. |
 | Retry | avast/retry-go/v4 | v4.7.0 | Typed retry with exponential backoff. Context-aware. |
@@ -170,12 +170,25 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 ```
 Final content is in `item.completed` where `item.type == "agent_message"`. Token usage is in `turn.completed`.
 
+**Codex undocumented behaviors (Spike 0.1):**
+- `type:"error"` events emitted during WebSocket→HTTPS transport fallback — non-fatal, stream continues. Skip or warn.
+- `usage` in `turn.completed` has an undocumented `cached_input_tokens` field. Add to `Usage` struct.
+- `item.completed` can have `item.type == "error"` with `message` field instead of `text`. Handle gracefully.
+
 **Gemini flags (verified v0.30.0):**
 - Both `--yolo` (boolean shorthand) and `--approval-mode yolo` work
 - `-p`/`--prompt` flag is available for non-interactive mode (NOT deprecated)
 - Positional `gemini "prompt"` also works for non-interactive
 
-**Claude nested session gotcha:** `claude -p` cannot be run inside a Claude Code session (errors with "cannot launch inside another Claude Code session"). Must unset `CLAUDECODE` env var in subprocess.
+**Gemini dual-model architecture (Spike 0.3):**
+- Every invocation uses TWO models: `gemini-2.5-flash-lite` (role: `utility_router`) + `gemini-3-flash-preview` (role: `main`)
+- Response text is at top-level `response` field (no unwrapping needed)
+- `stats.models` is a string-keyed map; find primary model via `roles["main"]`
+- Token fields per model: `input`, `prompt`, `candidates`, `total`, `cached`, `thoughts`, `tool`
+- Wall-clock ~10s (MCP startup overhead); actual API latency ~1s (use `api.totalLatencyMs`)
+- Errors: no JSON error format — exit code != 0, empty stdout, plain text on stderr
+
+**Claude nested session gotcha (Spike 0.2):** `claude -p` cannot be run inside a Claude Code session. Must **remove** (not just empty) all `CLAUDECODE*` and `CLAUDE_CODE*` env vars from subprocess environment. Known vars: `CLAUDECODE=1`, `CLAUDE_CODE_ENTRYPOINT=cli`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Setting `CLAUDECODE=""` is NOT sufficient — the key must be absent entirely.
 
 ### 4.2 Charmbracelet Version Pin Strategy
 
@@ -183,7 +196,7 @@ From gh-ghent learnings: charmbracelet dependencies can create version conflicts
 - Pin lipgloss to v1.1.0 (stable release)
 - Let bubbletea/bubbles/huh resolve via `go mod tidy`
 - After any `go get` of charmbracelet packages, run `go mod tidy` and verify no downgrades
-- Note: huh is only for spinners/progress in दूतसभा (not full TUI), so simpler than gh-ghent's BubbleTea usage
+- Note: huh v0.8.0 removed `NewSpinner()` — use raw stderr goroutine for spinner (Spike 0.7). huh dep can be dropped unless forms are needed later.
 
 ---
 
@@ -287,10 +300,10 @@ dootsabha/
 |----------|-----------|-----------|
 | Hardcoded providers in P1-P2, plugins in P3 | Prove the core works before adding plugin complexity | Build plan P1.5-P1.6 |
 | lipgloss not BubbleTea for output | दूतसभा is a command-run-exit tool, not an interactive TUI | Architecture §9 |
-| huh for spinners (stderr only) | Need animated progress while agents run, but only on stderr | Architecture §9 |
+| Raw goroutine spinner (stderr only) | huh v0.8.0 removed NewSpinner() — raw goroutine writes frames to stderr (Spike 0.7) | Architecture §9 |
 | Subprocess per agent, not API | Wraps official CLIs — gets auth, model access, updates for free | Architecture §1 |
 | JSONL decoder for Codex | Codex outputs event stream, not single JSON object | Spike 0.1, §4.1 |
-| Unset CLAUDECODE in subprocess env | Claude Code refuses to run inside another Claude Code session | §4.1 verified gotcha |
+| Remove CLAUDECODE*/CLAUDE_CODE* env vars entirely | Setting empty is NOT enough — key must be absent (Spike 0.2) | §4.1 verified gotcha |
 | `errgroup` for parallel dispatch | Context cancellation + error propagation. Proven in gh-ghent. | Architecture §9 |
 
 ---
@@ -622,7 +635,7 @@ Extensions: bench, cost, tui
 
 - No credential storage — inherits auth from underlying CLIs
 - No network calls except via subprocess (claude/codex/gemini do the calling)
-- Unset `CLAUDECODE` env var when spawning claude subprocess (prevents nested session error)
+- Remove all `CLAUDECODE*` and `CLAUDE_CODE*` env vars when spawning claude subprocess (Spike 0.2 — key must be absent, not empty)
 - Config file permissions: warn if world-readable (may contain preferences)
 
 ---
@@ -866,11 +879,11 @@ Mark DONE → Update PROGRESS.md → Commit
 | go-plugin gRPC overhead too high | MEDIUM | LOW | Spike 0.4 measures. If >200ms, use in-process providers with plugin opt-in. |
 | Claude/Gemini JSON schema undocumented | HIGH | MEDIUM | Spikes 0.2/0.3 capture schemas. Lenient parsing (ignore unknown fields). |
 | Council synthesis quality is poor | MEDIUM | MEDIUM | Prompt engineering in P2. Iterate. Configurable via strategy plugin. |
-| Claude nested session error | HIGH | HIGH | Unset `CLAUDECODE` env var in subprocess. Validated in Spike 0.2. |
+| Claude nested session error | HIGH | HIGH | Remove all `CLAUDECODE*`/`CLAUDE_CODE*` env vars entirely (not empty). Validated in Spike 0.2. |
 | charmbracelet version conflicts | MEDIUM | MEDIUM | Pin lipgloss v1.1.0. Let `go mod tidy` resolve. From gh-ghent: always re-verify. |
 | Token cost during development | LOW | HIGH | Mock providers for L2/L3. Tiny prompts ("PONG") for L4. L5 runs sparingly. |
 | macOS SIP + process group mgmt | MEDIUM | LOW | Spike 0.5 validates on macOS specifically. |
-| CLIs need PTY, not pipe | MEDIUM | MEDIUM | Spike 0.8 verifies YOLO+JSON flags work via plain pipes. If not, add `creack/pty`. |
+| CLIs need PTY, not pipe | ~~MEDIUM~~ RESOLVED | — | Spike 0.8 confirmed: all 3 CLIs work via plain `os/exec` pipe with YOLO+JSON flags. `creack/pty` NOT needed. |
 | Orphaned agent processes on crash | HIGH | MEDIUM | Reaper goroutine + process group kill with grace period. Spike 0.5 validates. |
 
 ---
@@ -900,3 +913,4 @@ Mark DONE → Update PROGRESS.md → Commit
 | 2026-02-28 | 1.3 | Testing overhaul: extracted testing-strategy.md (447 lines), PRD §10 is now a compact summary (64 lines) |
 | 2026-02-28 | 1.4 | Progressive disclosure structure: document hierarchy section, "Also read" cross-refs on all §6 commands, annotated ToC with line counts and typical references |
 | 2026-02-28 | 1.5 | Task files + git hooks: 37 numbered task files (docs/tasks/, P0-P5), lefthook spec delegating to Makefile (pre-commit→`make pre-commit`, pre-push→`make ci`), new targets (pre-commit, fmt-check, fix-check), `make build` depends on `hooks`, two-layer quality system (testing-strategy.md §8) |
+| 2026-02-28 | 1.6 | Phase 0 spike findings integrated: (1) huh v0.8.0 has no `NewSpinner()` — replaced with raw stderr goroutine pattern, (2) `CLAUDECODE*`/`CLAUDE_CODE*` env vars must be removed entirely (not emptied), (3) Codex `type:"error"` events are non-fatal transport fallback, `cached_input_tokens` field added, (4) Gemini dual-model architecture documented (utility_router + main), API latency vs wall-clock, (5) PTY risk resolved — `creack/pty` NOT needed |
