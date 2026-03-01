@@ -48,7 +48,7 @@ Layer 5 — Detail docs            as needed    Architecture, testing-strategy, 
 | 3 | [Target Audience](#3-target-audience) | ~24 | Exit code / JSON tasks |
 | 4 | [Technology Stack](#4-technology-stack) | ~55 | Provider tasks, scaffolding |
 | 5 | [Architecture](#5-architecture) | ~108 | Most tasks (selectively) |
-| 6 | [Functional Requirements](#6-functional-requirements) | ~277 | Per-command: §6.1–§6.7 |
+| 6 | [Functional Requirements](#6-functional-requirements) | ~340 | Per-command: §6.1–§6.8 |
 | 7 | [Non-Functional Requirements](#7-non-functional-requirements) | ~41 | Retry, perf, security tasks |
 | 8 | [Terminal UX Standards](#8-terminal-ux-standards) | ~51 | Any output-visible task |
 | 9 | [Implementation Phases](#9-implementation-phases) | ~104 | Planning, dependency checks |
@@ -596,6 +596,51 @@ Extensions: bench, cost, tui
 - [ ] FR-PLG-02: Shows health status per plugin
 - [ ] FR-PLG-03: `inspect` shows capabilities, models, interface version
 - [ ] FR-PLG-04: `--json` for machine consumption
+
+### 6.8 Refine Command (`dootsabha refine` / `sanshodhan`)
+
+> **Also read:** §6.4 (review, since refine extends the review loop), §8 (UX)
+
+**Purpose:** Sequential review + incorporation pipeline. The author generates content, each reviewer reviews in turn, and the author incorporates feedback after each review — producing progressively refined versions. Inspired by Karpathy's [llm-council](https://github.com/karpathy/llm-council) anonymized review pattern.
+
+**Flags:**
+- `--author` / `--kartaa` — Agent that produces and refines content [default: claude]
+- `--reviewers` / `--pareekshak` — Ordered comma-separated reviewer list [default: codex,gemini]
+- `--anonymous` / `--gupt` — Anonymize prompts: reviewers don't know who wrote it, author doesn't know who reviewed [default: true]
+- All global flags
+
+**Sequential pipeline (N = number of reviewers):**
+1. Author generates v1 from user prompt
+2. Reviewer[0] reviews v1 → feedback
+3. Author incorporates feedback → v2
+4. Reviewer[1] reviews v2 → feedback
+5. Author incorporates feedback → v3
+...
+Output: v{N+1} — the final refined version. Total LLM calls: 1 + (2 × N).
+
+**Prompts (anonymous mode, default):**
+- Review: "Review the following content. Identify strengths, weaknesses, factual errors, and areas for improvement. Be specific and actionable.\n\n{content}"
+- Incorporate: "You previously wrote the following content:\n\n{current_version}\n\nA reviewer provided this feedback:\n\n{review}\n\nProduce an improved version that incorporates the valid feedback. Output only the improved content, not commentary."
+
+**Prompts (named mode, --anonymous=false):**
+- Review: "Review the following output from {author}. Identify strengths, weaknesses, factual errors, and areas for improvement. Be specific and actionable.\n\n{content}"
+- Incorporate: "You previously wrote:\n\n{current_version}\n\n{reviewer} provided this feedback:\n\n{review}\n\nProduce an improved version that incorporates the valid feedback. Output only the improved content, not commentary."
+
+**Failure handling:**
+- Author fails on v1 → exit immediately, exit code 3
+- Reviewer[i] fails → skip, continue to next reviewer (or output current version if last), exit code 5
+- Author fails on incorporation → output previous version with warning, exit code 5
+- All reviewers fail → output v1 (author's original) with warning, exit code 5
+- Timeout → exit code 4
+
+**Acceptance criteria:**
+- [ ] FR-REF-01: Sequential pipeline works: author v1 → review → incorporate → review → incorporate → vN
+- [ ] FR-REF-02: Styled TTY output shows version progression with timing per step
+- [ ] FR-REF-03: `--json` includes versions array, final, and meta sections
+- [ ] FR-REF-04: `--author` and `--reviewers` override defaults
+- [ ] FR-REF-05: `--anonymous` controls whether prompts include provider names
+- [ ] FR-REF-06: Failed reviewer is skipped, pipeline continues with remaining reviewers
+- [ ] FR-REF-07: Author failure on v1 is fail-fast (no reviewers invoked)
 
 ---
 

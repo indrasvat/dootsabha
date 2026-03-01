@@ -47,6 +47,7 @@ All 4 items addressed in PRD v1.6.
 | 2.2 | Peer Review Stage (32KB truncation, cross-review) | DONE | council-builder |
 | 2.3 | Synthesis Stage (chair + fallback + multi-round) | DONE | council-builder |
 | 2.4 | Review Command (author + reviewer pipeline) | DONE | review-builder |
+| 2.6 | Refine Command (sequential review + incorporation) | PENDING | — |
 
 ### What Works End-to-End
 - `dootsabha council "prompt"` — 3-stage pipeline: dispatch → peer review → synthesis

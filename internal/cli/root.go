@@ -103,4 +103,6 @@ func init() {
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newReviewCmd())
+	rootCmd.AddCommand(newRefineCmd())
+	rootCmd.AddCommand(newPingCmd())
 }
