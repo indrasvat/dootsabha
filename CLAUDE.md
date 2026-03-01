@@ -88,6 +88,10 @@ bypassing SIGTERM→grace→SIGKILL sequence. Manage lifecycle manually.
 ### cobra.ArbitraryArgs for extension discovery (Spike 0.5)
 Root command MUST have `Args: cobra.ArbitraryArgs` or `RunE` is never called for unknown commands.
 
+## Shell Command Conventions
+- Do NOT append `2>&1` to commands by default. Only use stderr redirect when you specifically need to capture or suppress stderr. No dootsabha command needs it.
+- Run `make`, `go`, and `dootsabha` commands without output redirection unless there is a concrete reason.
+
 ## Coding Conventions
 - Go 1.26 idioms — no bare returns, always wrap errors with `fmt.Errorf("...: %w", err)`
 - All output through `internal/output.Renderer` — never `fmt.Print` directly in commands
