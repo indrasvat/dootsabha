@@ -134,7 +134,7 @@ func providerColor(name string) lipgloss.Color {
 
 // renderConsultResult formats a ProviderResult to stdout.
 //
-// TTY + color: provider dot + name header, content body, muted footer.
+// TTY + color: provider dot + name header, content body, separator + footer.
 // TTY + NO_COLOR: same layout, no ANSI.
 // Piped: content only, no decoration.
 func renderConsultResult(rc *output.RenderContext, provName string, result *providers.ProviderResult) {
@@ -147,14 +147,17 @@ func renderConsultResult(rc *output.RenderContext, provName string, result *prov
 	fmt.Fprintln(os.Stdout, result.Content) //nolint:errcheck
 
 	if rc.IsTTY {
-		footer := fmt.Sprintf("  %.1fs", result.Duration.Seconds())
+		// Footer separator.
+		fmt.Fprintln(os.Stdout, output.ContentSeparator(rc)) //nolint:errcheck
+
+		// Footer metrics.
+		parts := []string{fmt.Sprintf("%.1fs", result.Duration.Seconds())}
 		if result.CostUSD > 0 {
-			footer += fmt.Sprintf("  $%.4f", result.CostUSD)
+			parts = append(parts, fmt.Sprintf("$%.4f", result.CostUSD))
 		}
 		if result.Model != "" {
-			footer += fmt.Sprintf("  %s", result.Model)
+			parts = append(parts, result.Model)
 		}
-		muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, footer)) //nolint:errcheck
+		fmt.Fprintln(os.Stdout, output.FooterMetrics(rc, parts...)) //nolint:errcheck
 	}
 }

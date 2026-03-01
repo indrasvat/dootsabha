@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/indrasvat/dootsabha/internal/core"
@@ -118,7 +117,9 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 
 			// Render header (TTY only, not JSON).
 			if rc.IsTTY && !rc.IsJSON() {
-				renderRefineHeader(rc, author, reviewerNames)
+				info := fmt.Sprintf("author: %s · reviewers: %s", author, strings.Join(reviewerNames, ", "))
+				fmt.Fprintln(os.Stdout, output.CommandHeader(rc, "Refine", info)) //nolint:errcheck
+				fmt.Fprintln(os.Stdout)                                           //nolint:errcheck
 			}
 
 			totalStart := time.Now()
@@ -130,12 +131,12 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 
 			// Step 1: Author generates v1.
 			if rc.IsTTY && !rc.IsJSON() {
-				stderrRefineStep(author, "v1", true)
+				stderrRefineStep(rc, author, "v1", true)
 			}
 			v1Result, err := authorProv.Invoke(ctx, prompt, invokeOpts)
 			if err != nil {
 				if rc.IsTTY && !rc.IsJSON() {
-					stderrRefineStep(author, "v1", false)
+					stderrRefineStep(rc, author, "v1", false)
 				}
 				if errors.Is(err, context.DeadlineExceeded) {
 					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
@@ -143,7 +144,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				return &ExitError{Code: 3, Message: fmt.Sprintf("author (%s) failed on v1: %s", author, err)}
 			}
 			if rc.IsTTY && !rc.IsJSON() {
-				stderrRefineDone(author, "v1", v1Result.Duration)
+				stderrRefineDone(rc, author, "v1", v1Result.Duration)
 			}
 
 			currentContent := v1Result.Content
@@ -162,7 +163,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 					providerStatus[revName] = "error"
 					partial = true
 					if rc.IsTTY && !rc.IsJSON() {
-						stderrRefineSkip(revName, revErr)
+						stderrRefineSkip(rc, revName, revErr)
 					}
 					continue
 				}
@@ -170,14 +171,14 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				// Review step.
 				reviewPrompt := buildReviewPrompt(currentContent, author, anonymous)
 				if rc.IsTTY && !rc.IsJSON() {
-					stderrRefineStep(revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
+					stderrRefineStep(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
 				}
 				reviewResult, revErr := revProv.Invoke(ctx, reviewPrompt, invokeOpts)
 				if revErr != nil {
 					providerStatus[revName] = "error"
 					partial = true
 					if rc.IsTTY && !rc.IsJSON() {
-						stderrRefineSkip(revName, revErr)
+						stderrRefineSkip(rc, revName, revErr)
 					}
 					if errors.Is(revErr, context.DeadlineExceeded) {
 						// On timeout, output what we have.
@@ -186,7 +187,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 					continue
 				}
 				if rc.IsTTY && !rc.IsJSON() {
-					stderrRefineDone(revName, fmt.Sprintf("reviewing v%d", currentVersion), reviewResult.Duration)
+					stderrRefineDone(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), reviewResult.Duration)
 				}
 				providerStatus[revName] = "ok"
 				totalCost += reviewResult.CostUSD
@@ -197,14 +198,15 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				incorporatePrompt := buildIncorporatePrompt(currentContent, reviewResult.Content, revName, anonymous)
 				if rc.IsTTY && !rc.IsJSON() {
 					nextVersion := currentVersion + 1
-					stderrRefineStep(author, fmt.Sprintf("incorporating → v%d", nextVersion), true)
+					stderrRefineStep(rc, author, fmt.Sprintf("incorporating → v%d", nextVersion), true)
 				}
 				incResult, incErr := authorProv.Invoke(ctx, incorporatePrompt, invokeOpts)
 				if incErr != nil {
 					// Author failed to incorporate — keep current version.
 					partial = true
 					if rc.IsTTY && !rc.IsJSON() {
-						fmt.Fprintf(os.Stderr, "\r\033[K  %s incorporating failed, keeping v%d\n", author, currentVersion) //nolint:errcheck
+						dot := output.ProviderDot(rc, providerColor(author))
+						fmt.Fprintf(os.Stderr, "\r\033[K  %s %-8s incorporating failed, keeping v%d\n", dot, author, currentVersion) //nolint:errcheck
 					}
 					// Still record the review in versions.
 					versions = append(versions, toRefineVersionJSON(
@@ -223,7 +225,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				totalOut += incResult.TokensOut
 
 				if rc.IsTTY && !rc.IsJSON() {
-					stderrRefineDone(author, fmt.Sprintf("incorporating → v%d", currentVersion), incResult.Duration)
+					stderrRefineDone(rc, author, fmt.Sprintf("incorporating → v%d", currentVersion), incResult.Duration)
 				}
 
 				// Record version with review info.
@@ -322,48 +324,56 @@ func buildIncorporatePrompt(currentContent, review, reviewerName string, anonymo
 
 // --- TTY rendering ---
 
-func renderRefineHeader(rc *output.RenderContext, authorName string, reviewerNames []string) {
-	border := lipgloss.NewStyle().Foreground(output.AccentColor)
-	header := "═══ Refine ═══"
-	muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-	info := fmt.Sprintf("author: %s · reviewers: %s", authorName, strings.Join(reviewerNames, ", "))
-	fmt.Fprintf(os.Stdout, "%s  %s\n\n", output.Styled(rc, border, header), output.Styled(rc, muted, info)) //nolint:errcheck
-}
-
-func stderrRefineStep(provider, label string, started bool) {
-	if started {
-		fmt.Fprintf(os.Stderr, "  %-8s %s ...\r", provider, label) //nolint:errcheck
+func stderrRefineStep(rc *output.RenderContext, provider, label string, started bool) {
+	if !started {
+		return
 	}
+	dot := output.ProviderDot(rc, providerColor(provider))
+	fmt.Fprintf(os.Stderr, "  %s %-8s %s ...\r", dot, provider, label) //nolint:errcheck
 }
 
-func stderrRefineDone(provider, label string, d time.Duration) {
-	fmt.Fprintf(os.Stderr, "\r\033[K  %-8s %-40s %5.1fs ✓\n", provider, label, d.Seconds()) //nolint:errcheck
+func stderrRefineDone(rc *output.RenderContext, provider, label string, d time.Duration) {
+	dot := output.ProviderDot(rc, providerColor(provider))
+	check := output.StatusOK(rc)
+	fmt.Fprintf(os.Stderr, "\r\033[K  %s %-8s %-36s %5.1fs %s\n", dot, provider, label, d.Seconds(), check) //nolint:errcheck
 }
 
-func stderrRefineSkip(provider string, err error) {
-	fmt.Fprintf(os.Stderr, "\r\033[K  %-8s skipped: %s\n", provider, err) //nolint:errcheck
+func stderrRefineSkip(rc *output.RenderContext, provider string, err error) {
+	dot := output.ProviderDot(rc, providerColor(provider))
+	fmt.Fprintf(os.Stderr, "\r\033[K  %s %-8s skipped: %s\n", dot, provider, err) //nolint:errcheck
 }
 
 func renderRefineTTY(rc *output.RenderContext, finalContent string, finalVersion, reviewCount int, authorName string, totalDuration time.Duration, totalCost float64, totalIn, totalOut int) {
+	// Content separator (between progress and content).
+	if sep := output.ContentSeparator(rc); sep != "" {
+		fmt.Fprintln(os.Stdout)      //nolint:errcheck
+		fmt.Fprintln(os.Stdout, sep) //nolint:errcheck
+	}
+
 	// Final content.
 	fmt.Fprintf(os.Stdout, "\n%s\n", finalContent) //nolint:errcheck
 
 	if rc.IsTTY {
-		sep := strings.Repeat("─", min(rc.Width, 60))
-		muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, sep)) //nolint:errcheck
+		// Footer separator.
+		fmt.Fprintln(os.Stdout, output.ContentSeparator(rc)) //nolint:errcheck
 
-		footer := fmt.Sprintf("total: %.1fs", totalDuration.Seconds())
+		// Metrics.
+		parts := []string{fmt.Sprintf("%.1fs", totalDuration.Seconds())}
 		if totalCost > 0 {
-			footer += fmt.Sprintf(" │ cost: $%.3f", totalCost)
+			parts = append(parts, fmt.Sprintf("$%.3f", totalCost))
 		}
 		if totalIn > 0 || totalOut > 0 {
-			footer += fmt.Sprintf(" │ tokens: %s in · %s out", fmtTokens(totalIn), fmtTokens(totalOut))
+			parts = append(parts, fmt.Sprintf("%s in · %s out", fmtTokens(totalIn), fmtTokens(totalOut)))
 		}
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, footer)) //nolint:errcheck
+		fmt.Fprintln(os.Stdout, output.FooterMetrics(rc, parts...)) //nolint:errcheck
 
-		footer2 := fmt.Sprintf("versions: %d │ reviews: %d │ author: %s ✓", finalVersion, reviewCount, authorName)
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, footer2)) //nolint:errcheck
+		// Version/review summary.
+		parts2 := []string{
+			fmt.Sprintf("versions: %d", finalVersion),
+			fmt.Sprintf("reviews: %d", reviewCount),
+			fmt.Sprintf("author: %s ✓", authorName),
+		}
+		fmt.Fprintln(os.Stdout, output.FooterMetrics(rc, parts2...)) //nolint:errcheck
 	}
 }
 

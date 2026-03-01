@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/indrasvat/dootsabha/internal/core"
@@ -106,6 +104,13 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			invokeOpts := providers.InvokeOptions{
 				Model:   model,
 				Timeout: timeout,
+			}
+
+			// Render header (TTY only, not JSON).
+			if rc.IsTTY && !rc.IsJSON() {
+				info := fmt.Sprintf("author: %s · reviewer: %s", author, reviewer)
+				fmt.Fprintln(os.Stdout, output.CommandHeader(rc, "Review", info)) //nolint:errcheck
+				fmt.Fprintln(os.Stdout)                                           //nolint:errcheck
 			}
 
 			// Step 1: Invoke author.
@@ -231,43 +236,41 @@ func renderReviewJSON(authorResult, reviewerResult *providers.ProviderResult, au
 	return nil
 }
 
-// renderReviewSection renders a single agent's output section.
+// renderReviewSection renders a single agent's output section with a SectionDivider.
 func renderReviewSection(rc *output.RenderContext, provName, role string, result *providers.ProviderResult) {
 	if rc.IsTTY {
-		dot := output.ProviderDot(rc, providerColor(provName))
-		fmt.Fprintf(os.Stdout, "%s %s   %s\n\n", dot, provName, role) //nolint:errcheck
+		fmt.Fprintln(os.Stdout, output.SectionDivider(rc, fmt.Sprintf("%s: %s", role, provName), "")) //nolint:errcheck
+		fmt.Fprintln(os.Stdout)                                                                       //nolint:errcheck
 	}
 	fmt.Fprintln(os.Stdout, result.Content) //nolint:errcheck
 }
 
 // renderReviewTTY renders the full review pipeline output to the terminal.
 func renderReviewTTY(rc *output.RenderContext, authorName, reviewerName string, authorResult, reviewerResult *providers.ProviderResult, totalDuration time.Duration) {
-	renderReviewSection(rc, authorName, "(author)", authorResult)
+	renderReviewSection(rc, authorName, "Author", authorResult)
 
 	if rc.IsTTY {
 		fmt.Fprintln(os.Stdout) //nolint:errcheck
 	}
 
-	renderReviewSection(rc, reviewerName, "(reviewer)", reviewerResult)
+	renderReviewSection(rc, reviewerName, "Review", reviewerResult)
 
 	if rc.IsTTY {
-		// Footer with separator and totals.
-		sep := strings.Repeat("─", min(rc.Width, 60))
-		muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, sep)) //nolint:errcheck
+		// Footer.
+		fmt.Fprintln(os.Stdout, output.ContentSeparator(rc)) //nolint:errcheck
 
 		totalCost := authorResult.CostUSD + reviewerResult.CostUSD
 		totalIn := authorResult.TokensIn + reviewerResult.TokensIn
 		totalOut := authorResult.TokensOut + reviewerResult.TokensOut
 
-		footer := fmt.Sprintf("total: %.1fs", totalDuration.Seconds())
+		parts := []string{fmt.Sprintf("%.1fs", totalDuration.Seconds())}
 		if totalCost > 0 {
-			footer += fmt.Sprintf(" │ cost: $%.3f", totalCost)
+			parts = append(parts, fmt.Sprintf("$%.3f", totalCost))
 		}
 		if totalIn > 0 || totalOut > 0 {
-			footer += fmt.Sprintf(" │ tokens: %s in · %s out", fmtTokens(totalIn), fmtTokens(totalOut))
+			parts = append(parts, fmt.Sprintf("%s in · %s out", fmtTokens(totalIn), fmtTokens(totalOut)))
 		}
-		fmt.Fprintln(os.Stdout, output.Styled(rc, muted, footer)) //nolint:errcheck
+		fmt.Fprintln(os.Stdout, output.FooterMetrics(rc, parts...)) //nolint:errcheck
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
@@ -115,6 +114,13 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			// Progress rendering on stderr (TTY only).
 			stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd())
 
+			// Render command header.
+			if rc.IsTTY && !rc.IsJSON() {
+				info := fmt.Sprintf("agents: %s · chair: %s", strings.Join(agentNames, ", "), cfg.Council.Chair)
+				fmt.Fprintln(os.Stdout, output.CommandHeader(rc, "Council", info)) //nolint:errcheck
+				fmt.Fprintln(os.Stdout)                                            //nolint:errcheck
+			}
+
 			// Run council pipeline.
 			var allDispatches []core.DispatchResult
 			var allReviews []core.ReviewResult
@@ -123,11 +129,15 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			for round := 1; round <= cfg.Council.Rounds; round++ {
 				// Stage 1: Dispatch
+				dispatchInfo := fmt.Sprintf("%d agents", len(agentNames))
+				if parallel {
+					dispatchInfo += " · parallel"
+				}
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
-					renderStageHeader(rc, 1, "Dispatch", fmt.Sprintf("%d agents", len(agentNames)), parallel)
+					fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Dispatch", dispatchInfo)) //nolint:errcheck
 				}
 				if stderrIsTTY && !quiet {
-					eng.SetProgress(stderrProgress("dispatch"))
+					eng.SetProgress(stderrProgress("dispatch", rc.HasColor))
 				}
 
 				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, core.InvokeOptions{Timeout: timeout})
@@ -152,10 +162,11 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				var reviews []core.ReviewResult
 				if successes >= 2 {
 					if stderrIsTTY && !quiet && !rc.IsJSON() {
-						renderStageHeader(rc, 2, "Peer Review", "", false)
+						fmt.Fprintln(os.Stdout)                                               //nolint:errcheck
+						fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Peer Review", "")) //nolint:errcheck
 					}
 					if stderrIsTTY && !quiet {
-						eng.SetProgress(stderrProgress("review"))
+						eng.SetProgress(stderrProgress("review", rc.HasColor))
 					}
 					reviews, err = eng.PeerReview(ctx, dispatches, core.InvokeOptions{Timeout: timeout})
 					if err != nil {
@@ -166,7 +177,8 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 				// Stage 3: Synthesis
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
-					renderStageHeader(rc, 3, "Synthesis", fmt.Sprintf("chair: %s", cfg.Council.Chair), false)
+					fmt.Fprintln(os.Stdout)                                                                                      //nolint:errcheck
+					fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Synthesis", fmt.Sprintf("chair: %s", cfg.Council.Chair))) //nolint:errcheck
 				}
 				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, core.InvokeOptions{Timeout: timeout})
 				if err != nil {
@@ -241,41 +253,28 @@ func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.Inv
 	}, nil
 }
 
-// renderStageHeader writes a stage header to stdout.
-func renderStageHeader(rc *output.RenderContext, stage int, name, info string, isParallel bool) {
-	border := lipgloss.NewStyle().Foreground(output.AccentColor)
-	header := fmt.Sprintf("═══ Stage %d: %s ═══", stage, name)
-
-	line := output.Styled(rc, border, header)
-	if info != "" {
-		muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-		detail := info
-		if isParallel {
-			detail += " · parallel"
-		}
-		line += "  " + output.Styled(rc, muted, detail)
-	}
-	fmt.Fprintln(os.Stdout, line) //nolint:errcheck
-}
-
-// stderrProgress returns a ProgressFunc that renders agent status to stderr.
+// stderrProgress returns a ProgressFunc that renders agent status to stderr with provider dots.
 // The stage parameter controls the label: "dispatch"=no label, "review"=shows "reviewing".
-func stderrProgress(stage string) core.ProgressFunc {
+func stderrProgress(stage string, hasColor bool) core.ProgressFunc {
 	var mu sync.Mutex
+	rc := &output.RenderContext{IsTTY: true, HasColor: hasColor, Width: 60}
 	return func(provider string, event core.ProgressEvent) {
 		mu.Lock()
 		defer mu.Unlock()
+		dot := output.ProviderDot(rc, providerColor(provider))
 		label := provider
 		if stage == "review" {
 			label = provider + " reviewing"
 		}
 		switch event {
 		case core.ProgressStarted:
-			fmt.Fprintf(os.Stderr, "  %s ...\r", label) //nolint:errcheck
+			fmt.Fprintf(os.Stderr, "  %s %s ...\r", dot, label) //nolint:errcheck
 		case core.ProgressDone:
-			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✓\n", label) //nolint:errcheck
+			check := output.StatusOK(rc)
+			fmt.Fprintf(os.Stderr, "\r\033[K  %s %s %s\n", dot, label, check) //nolint:errcheck
 		case core.ProgressFailed:
-			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✗\n", label) //nolint:errcheck
+			cross := output.StatusFail(rc)
+			fmt.Fprintf(os.Stderr, "\r\033[K  %s %s %s\n", dot, label, cross) //nolint:errcheck
 		}
 	}
 }
@@ -398,16 +397,10 @@ func renderCouncilJSON(dispatches []core.DispatchResult, reviews []core.ReviewRe
 // --- TTY output ---
 
 func renderCouncilTTY(rc *output.RenderContext, dispatches []core.DispatchResult, reviews []core.ReviewResult, synth *core.SynthesisResult) {
-	// Dispatch results.
-	for _, d := range dispatches {
-		dot := output.ProviderDot(rc, providerColor(d.Provider))
-		status := output.StatusOK(rc)
-		if d.Error != nil {
-			status = output.StatusFail(rc)
-		}
-		muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-		dur := fmt.Sprintf("%.1fs", d.Duration.Seconds())
-		fmt.Fprintf(os.Stdout, "%s %-8s %s %s\n", dot, d.Provider, output.Styled(rc, muted, dur), status) //nolint:errcheck
+	// Content separator (between progress stages and content).
+	if sep := output.ContentSeparator(rc); sep != "" {
+		fmt.Fprintln(os.Stdout)      //nolint:errcheck
+		fmt.Fprintln(os.Stdout, sep) //nolint:errcheck
 	}
 
 	// Synthesis content.
@@ -418,8 +411,9 @@ func renderCouncilTTY(rc *output.RenderContext, dispatches []core.DispatchResult
 
 	// Footer.
 	fmt.Fprintln(os.Stdout) //nolint:errcheck
-	sep := lipgloss.NewStyle().Foreground(output.MutedColor)
-	fmt.Fprintln(os.Stdout, output.Styled(rc, sep, strings.Repeat("─", 56))) //nolint:errcheck
+	if sep := output.ContentSeparator(rc); sep != "" {
+		fmt.Fprintln(os.Stdout, sep) //nolint:errcheck
+	}
 
 	var totalDuration time.Duration
 	var totalCost float64
@@ -443,20 +437,25 @@ func renderCouncilTTY(rc *output.RenderContext, dispatches []core.DispatchResult
 		totalOut += synth.TokensOut
 	}
 
-	muted := lipgloss.NewStyle().Foreground(output.MutedColor)
-	footer := fmt.Sprintf("total: %.1fs │ cost: $%.3f │ tokens: %d in · %d out",
-		totalDuration.Seconds(), totalCost, totalIn, totalOut)
-	fmt.Fprintln(os.Stdout, output.Styled(rc, muted, footer)) //nolint:errcheck
+	// Metrics line.
+	parts := []string{fmt.Sprintf("%.1fs", totalDuration.Seconds())}
+	if totalCost > 0 {
+		parts = append(parts, fmt.Sprintf("$%.3f", totalCost))
+	}
+	if totalIn > 0 || totalOut > 0 {
+		parts = append(parts, fmt.Sprintf("%s in · %s out", fmtTokens(totalIn), fmtTokens(totalOut)))
+	}
+	fmt.Fprintln(os.Stdout, output.FooterMetrics(rc, parts...)) //nolint:errcheck
 
-	// Agent status line.
+	// Agent status line with provider dots.
 	var agentParts []string
 	for _, d := range dispatches {
+		dot := output.ProviderDot(rc, providerColor(d.Provider))
 		s := output.StatusOK(rc)
 		if d.Error != nil {
 			s = output.StatusFail(rc)
 		}
-		agentParts = append(agentParts, fmt.Sprintf("%s %s", d.Provider, s))
+		agentParts = append(agentParts, fmt.Sprintf("%s %s %s", dot, d.Provider, s))
 	}
-	agentsLine := "agents: " + strings.Join(agentParts, " · ")
-	fmt.Fprintln(os.Stdout, output.Styled(rc, muted, agentsLine)) //nolint:errcheck
+	fmt.Fprintln(os.Stdout, "  "+strings.Join(agentParts, " · ")) //nolint:errcheck
 }
