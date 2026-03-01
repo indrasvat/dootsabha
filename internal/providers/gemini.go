@@ -142,7 +142,7 @@ func (p *GeminiProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "gemini",
-		Model:  "",
+		Model:  "gemini-2.5-flash",
 		Flags:  []string{"--yolo"},
 	}
 }

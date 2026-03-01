@@ -212,7 +212,7 @@ func TestClaudeProviderInvokeDoubleJSON(t *testing.T) {
 }
 
 func TestClaudeProviderHealthCheck(t *testing.T) {
-	runner := &mockRunner{stdout: []byte("claude 2.1.63\n")}
+	runner := &mockRunner{stdout: []byte("2.1.63 (Claude Code)\n")}
 	p := providers.NewClaudeProvider(defaultConfig(t), runner)
 
 	status, err := p.HealthCheck(context.Background())
@@ -246,6 +246,35 @@ func TestClaudeProviderHealthCheckBinaryMissing(t *testing.T) {
 	}
 	if status.Error == "" {
 		t.Error("expected non-empty Error field")
+	}
+}
+
+// TestVersionParsing verifies parseVersion (indirectly via HealthCheck) handles
+// all 3 real CLI output formats correctly.
+func TestVersionParsing(t *testing.T) {
+	tests := []struct {
+		name    string
+		stdout  string
+		wantVer string
+	}{
+		{"claude format", "2.1.63 (Claude Code)\n", "2.1.63"},
+		{"codex format", "codex-cli 0.106.0\n", "0.106.0"},
+		{"gemini format", "0.30.0\n", "0.30.0"},
+		{"bare version", "1.2.3\n", "1.2.3"},
+		{"no digit token", "foobar\n", "foobar"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := &mockRunner{stdout: []byte(tt.stdout)}
+			p := providers.NewClaudeProvider(defaultConfig(t), runner)
+			status, err := p.HealthCheck(context.Background())
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if status.CLIVersion != tt.wantVer {
+				t.Errorf("CLIVersion = %q, want %q", status.CLIVersion, tt.wantVer)
+			}
+		})
 	}
 }
 

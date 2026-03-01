@@ -160,12 +160,16 @@ func parseClaudeJSON(data []byte) (*claudeResponse, error) {
 	return &resp, nil
 }
 
-// parseVersion extracts the version string from "claude X.Y.Z" output.
-// Returns the last whitespace-delimited token, or the full string on failure.
+// parseVersion extracts the semver-like version from CLI --version output.
+// Scans for the first token starting with a digit and strips surrounding parens.
+//
+// Real outputs: "2.1.63 (Claude Code)" → "2.1.63",
+// "codex-cli 0.106.0" → "0.106.0", "0.30.0" → "0.30.0".
 func parseVersion(output string) string {
-	parts := strings.Fields(output)
-	if len(parts) >= 2 {
-		return parts[len(parts)-1]
+	for tok := range strings.FieldsSeq(output) {
+		if len(tok) > 0 && tok[0] >= '0' && tok[0] <= '9' {
+			return strings.Trim(tok, "()")
+		}
 	}
 	return output
 }

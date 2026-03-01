@@ -129,10 +129,11 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 // Piped: tab-separated rows, no ANSI.
 func renderStatusTable(rc *output.RenderContext, rows []healthRow) {
 	tbl := output.NewTable(rc).
-		Headers("", "PROVIDER", "VERSION", "MODEL", "AUTH", "STATUS")
+		Headers("PROVIDER", "VERSION", "MODEL", "AUTH", "STATUS")
 
 	for _, r := range rows {
 		dot := output.ProviderDot(rc, providerColor(r.Name))
+		name := dot + " " + r.Name
 
 		status := output.StatusOK(rc)
 		if !r.Healthy {
@@ -142,7 +143,7 @@ func renderStatusTable(rc *output.RenderContext, rows []healthRow) {
 			}
 		}
 
-		tbl.Row(dot, r.Name, r.Version, r.Model, r.Auth, status)
+		tbl.Row(name, r.Version, r.Model, r.Auth, status)
 	}
 
 	tbl.Render(os.Stdout)

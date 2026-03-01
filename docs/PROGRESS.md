@@ -28,6 +28,7 @@ All 4 items addressed in PRD v1.6.
 | 1.5 | Claude Provider (Hardcoded) | DONE | tarneja (Wave 3) |
 | 1.6 | Codex + Gemini Providers | DONE | ahuja (Wave 4) |
 | 1.7 | CLI Wiring (consult/status/config) | DONE | asrani (Wave 5) |
+| 1.8 | Status Bugfix (version, dot column, models) | DONE | — |
 
 ### What Works End-to-End
 - `dootsabha consult --agent claude/codex/gemini "prompt"` — invokes real CLIs, parses JSON/JSONL
