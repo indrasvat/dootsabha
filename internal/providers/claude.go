@@ -140,8 +140,8 @@ func (p *ClaudeProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "claude",
-		Model:  "claude-sonnet-4-6",
-		Flags:  []string{"--dangerously-skip-permissions"},
+		Model:  "sonnet-4-6",
+		Flags:  []string{"--dangerously-skip-permissions", "--no-session-persistence"},
 	}
 }
 

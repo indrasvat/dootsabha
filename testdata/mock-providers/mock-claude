@@ -8,6 +8,7 @@ while [[ $# -gt 0 ]]; do
     --output-format) FORMAT="$2"; shift 2 ;;
     --model) MODEL="$2"; shift 2 ;;
     --dangerously-skip-permissions) shift ;;
+    --no-session-persistence) shift ;;
     --error) ERROR="$2"; shift 2 ;;  # test hook: force error
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac

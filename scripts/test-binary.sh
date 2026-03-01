@@ -74,7 +74,7 @@ fi
 
 # Test 8: mock-gemini works
 if [[ -x "$MOCK_DIR/mock-gemini" ]]; then
-  RESULT=$("$MOCK_DIR/mock-gemini" --yolo --output-format json "PONG" 2>&1)
+  RESULT=$("$MOCK_DIR/mock-gemini" --approval-mode yolo --output-format json "PONG" 2>&1)
   if echo "$RESULT" | grep -q '"result"'; then
     pass "mock-gemini produces JSON"
   else

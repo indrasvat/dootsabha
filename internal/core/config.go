@@ -57,14 +57,14 @@ func LoadConfig(cfgFile string) (*Config, error) {
 // setDefaults sets default values for all known configuration keys.
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.claude.binary", "claude")
-	v.SetDefault("providers.claude.model", "claude-sonnet-4-6")
-	v.SetDefault("providers.claude.flags", []string{"--dangerously-skip-permissions"})
+	v.SetDefault("providers.claude.model", "sonnet-4-6")
+	v.SetDefault("providers.claude.flags", []string{"--dangerously-skip-permissions", "--no-session-persistence"})
 	v.SetDefault("providers.codex.binary", "codex")
 	v.SetDefault("providers.codex.model", "gpt-5.3-codex")
-	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--skip-git-repo-check"})
+	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
 	v.SetDefault("providers.gemini.binary", "gemini")
 	v.SetDefault("providers.gemini.model", "gemini-3-pro")
-	v.SetDefault("providers.gemini.flags", []string{"--yolo"})
+	v.SetDefault("providers.gemini.flags", []string{"--approval-mode", "yolo"})
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)
 	v.SetDefault("council.rounds", 1)

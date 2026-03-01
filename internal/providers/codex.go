@@ -52,7 +52,7 @@ type codexUsage struct {
 	OutputTokens      int `json:"output_tokens"`
 }
 
-// Invoke runs `codex exec --json --sandbox danger-full-access --skip-git-repo-check <prompt>`
+// Invoke runs `codex exec --json --sandbox danger-full-access --ephemeral --skip-git-repo-check <prompt>`
 // and returns the parsed response from the JSONL event stream.
 func (p *CodexProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
@@ -123,7 +123,7 @@ func (p *CodexProvider) providerConfig() core.ProviderConfig {
 	return core.ProviderConfig{
 		Binary: "codex",
 		Model:  "gpt-5.3-codex",
-		Flags:  []string{"--sandbox", "danger-full-access", "--skip-git-repo-check"},
+		Flags:  []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"},
 	}
 }
 

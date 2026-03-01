@@ -7,7 +7,9 @@ while [[ $# -gt 0 ]]; do
     exec) shift ;;
     --json) shift ;;
     --sandbox) shift 2 ;;
+    --ephemeral) shift ;;
     --skip-git-repo-check) shift ;;
+    -c) shift 2 ;;  # config overrides like model_reasoning_effort=medium
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done

@@ -1,25 +1,30 @@
 # दूतसभा default configuration
 # Override via ~/.config/dootsabha/config.yaml or DOOTSABHA_* env vars
-# Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-6
+# Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=opus-4-6
 
 providers:
   claude:
     binary: claude
-    model: claude-sonnet-4-6
+    model: sonnet-4-6
     flags:
       - --dangerously-skip-permissions
+      - --no-session-persistence
   codex:
     binary: codex
     model: gpt-5.3-codex
     flags:
       - --sandbox
       - danger-full-access
+      - --ephemeral
       - --skip-git-repo-check
+      - -c
+      - model_reasoning_effort=medium
   gemini:
     binary: gemini
     model: gemini-3-pro
     flags:
-      - --yolo
+      - --approval-mode
+      - yolo
 
 council:
   chair: claude

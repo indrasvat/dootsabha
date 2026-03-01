@@ -24,7 +24,7 @@ func NewGeminiProvider(cfg *core.Config, runner Runner) *GeminiProvider {
 // Name returns the provider identifier.
 func (p *GeminiProvider) Name() string { return "gemini" }
 
-// geminiResponse is the JSON envelope from `gemini --yolo --output-format json`.
+// geminiResponse is the JSON envelope from `gemini --approval-mode yolo --output-format json`.
 // All fields verified against gemini 0.30.0 (Spike 0.3).
 type geminiResponse struct {
 	SessionID string      `json:"session_id"`
@@ -57,7 +57,7 @@ type geminiTokenUsage struct {
 	Tool       int `json:"tool"`
 }
 
-// Invoke runs `gemini --yolo --output-format json <prompt>` and returns the
+// Invoke runs `gemini --approval-mode yolo --output-format json <prompt>` and returns the
 // parsed response. Prompt is passed as a positional argument (Spike 0.3 §2).
 func (p *GeminiProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
@@ -143,7 +143,7 @@ func (p *GeminiProvider) providerConfig() core.ProviderConfig {
 	return core.ProviderConfig{
 		Binary: "gemini",
 		Model:  "gemini-3-pro",
-		Flags:  []string{"--yolo"},
+		Flags:  []string{"--approval-mode", "yolo"},
 	}
 }
 
