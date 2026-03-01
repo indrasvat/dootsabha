@@ -99,6 +99,8 @@ func init() {
 	f.StringVar(&configFile, "config", "", "Path to config file (YAML)")
 
 	rootCmd.AddCommand(newConsultCmd())
+	rootCmd.AddCommand(newCouncilCmd())
 	rootCmd.AddCommand(newStatusCmd())
 	rootCmd.AddCommand(newConfigCmd())
+	rootCmd.AddCommand(newReviewCmd())
 }

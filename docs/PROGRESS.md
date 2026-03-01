@@ -39,6 +39,28 @@ All 4 items addressed in PRD v1.6.
 - `make ci` — 0 lint issues, all tests pass
 - `make test-binary` — 8/8 L3 smoke tests
 
-## Phase 2: Council Pipeline
+## Phase 2: Council Pipeline (All Complete)
 
-Not started.
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 2.1 | Parallel Dispatch (errgroup + progress) | DONE | council-builder |
+| 2.2 | Peer Review Stage (32KB truncation, cross-review) | DONE | council-builder |
+| 2.3 | Synthesis Stage (chair + fallback + multi-round) | DONE | council-builder |
+| 2.4 | Review Command (author + reviewer pipeline) | DONE | review-builder |
+
+### What Works End-to-End
+- `dootsabha council "prompt"` — 3-stage pipeline: dispatch → peer review → synthesis
+- `dootsabha council "prompt" --json` — JSON with dispatch/reviews/synthesis/meta
+- `dootsabha council "prompt" --parallel=false` — sequential dispatch mode
+- `dootsabha council "prompt" --agents claude,codex --chair codex` — agent/chair override
+- `dootsabha council "prompt" --rounds 2` — multi-round with context chaining
+- `dootsabha review "prompt" --author codex --reviewer claude` — 2-step pipeline
+- `dootsabha review "prompt" --json` — JSON with author/review/meta
+- Bilingual aliases: sabha/सभा (council), sameeksha/समीक्षा (review)
+- Bilingual flags: --dootas, --adhyaksha, --chakra, --samantar, --kartaa, --pareekshak
+- Max 5 agents enforced, 32KB truncation for peer review + synthesis
+- Chair failure → fallback to first healthy non-chair agent
+- Exit code 5 for partial results (some agents failed)
+- Progress rendering on stderr (TTY only)
+- `make ci` — 0 lint issues, all tests pass
+- `make test-binary` — 8/8 L3 smoke tests

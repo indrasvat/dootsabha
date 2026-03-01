@@ -1,6 +1,6 @@
 # Task 2.4: Review Subcommand (Author + Reviewer)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 1 complete

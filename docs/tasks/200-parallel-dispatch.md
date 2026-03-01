@@ -1,6 +1,6 @@
 # Task 2.1: Parallel Dispatch (errgroup + progress)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 1 complete (all providers and CLI wiring)
