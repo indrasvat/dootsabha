@@ -1,6 +1,6 @@
 # Task 1.6: Codex + Gemini Providers (Hardcoded)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 1.5 (claude provider — establishes patterns)

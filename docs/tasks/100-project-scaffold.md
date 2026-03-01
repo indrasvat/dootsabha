@@ -1,6 +1,6 @@
 # Task 1.1: Project Scaffold + Makefile + Gating Hooks
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 0 complete (all spikes validated assumptions)

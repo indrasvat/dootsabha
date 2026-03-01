@@ -15,11 +15,28 @@
 
 ### Critical PRD Updates Needed
 
-1. **huh spinner** — PRD §8 references `huh.NewSpinner()` which doesn't exist in v0.8.0. Replace with raw stderr goroutine pattern.
-2. **CLAUDECODE env stripping** — PRD §4.1 should document that CLAUDECODE* vars must be removed from subprocess env, not just unset.
-3. **Codex error events** — PRD §4.1 should note that `type:"error"` JSONL lines are non-fatal transport fallback notices.
-4. **Gemini dual-model** — PRD §4.1 should document the utility_router + main model architecture in stats.
+All 4 items addressed in PRD v1.6.
 
-## Phase 1: Foundation
+## Phase 1: Foundation (All Complete)
+
+| Task | Description | Status | Agent (Jaane Bhi Do Yaaro) |
+|------|-------------|--------|---------------------------|
+| 1.1 | Project Scaffold + Makefile + Gating Hooks | DONE | vinod (Wave 1) |
+| 1.2 | Render Context & Output Foundation | DONE | sudhir (Wave 2) |
+| 1.3 | Config Manager (Viper) | DONE | shobha (Wave 2) |
+| 1.4 | Subprocess Runner | DONE | dmello (Wave 2) |
+| 1.5 | Claude Provider (Hardcoded) | DONE | tarneja (Wave 3) |
+| 1.6 | Codex + Gemini Providers | DONE | ahuja (Wave 4) |
+| 1.7 | CLI Wiring (consult/status/config) | DONE | asrani (Wave 5) |
+
+### What Works End-to-End
+- `dootsabha consult --agent claude/codex/gemini "prompt"` — invokes real CLIs, parses JSON/JSONL
+- `dootsabha status` — health table with provider dots (TTY/pipe/JSON modes)
+- `dootsabha config show` — merged config with key redaction
+- Bilingual aliases: paraamarsh, sthiti, vinyaas + Devanagari
+- `make ci` — 0 lint issues, all tests pass
+- `make test-binary` — 8/8 L3 smoke tests
+
+## Phase 2: Council Pipeline
 
 Not started.

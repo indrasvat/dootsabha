@@ -1,6 +1,6 @@
 # Task 1.3: Config Manager (Viper)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 1.1 (project scaffold)

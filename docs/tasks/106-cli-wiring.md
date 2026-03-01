@@ -1,6 +1,6 @@
 # Task 1.7: Cobra CLI Wiring (root, consult, status, config)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 1.5 (claude provider), Task 1.6 (codex + gemini providers)

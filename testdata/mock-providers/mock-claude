@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Simulates claude CLI for smoke tests — no API calls
+set -euo pipefail
+PROMPT="" FORMAT="" MODEL="sonnet-4-6" ERROR=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -p) PROMPT="$2"; shift 2 ;;
+    --output-format) FORMAT="$2"; shift 2 ;;
+    --model) MODEL="$2"; shift 2 ;;
+    --dangerously-skip-permissions) shift ;;
+    --error) ERROR="$2"; shift 2 ;;  # test hook: force error
+    *) PROMPT="${PROMPT:-$1}"; shift ;;
+  esac
+done
+[[ -n "$ERROR" ]] && { echo "Error: $ERROR" >&2; exit 3; }
+if [ "$FORMAT" = "json" ]; then
+  echo '{"result":"Mock: '"$PROMPT"'","session_id":"mock_123","cost_usd":0.001,"model":"'"$MODEL"'","duration_ms":150}'
+else
+  echo "Mock response to: $PROMPT"
+fi

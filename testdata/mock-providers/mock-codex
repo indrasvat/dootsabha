@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Simulates codex CLI for smoke tests — no API calls (emits JSONL event stream)
+set -euo pipefail
+PROMPT=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    exec) shift ;;
+    --json) shift ;;
+    --sandbox) shift 2 ;;
+    --skip-git-repo-check) shift ;;
+    *) PROMPT="${PROMPT:-$1}"; shift ;;
+  esac
+done
+echo '{"type":"thread.started","thread_id":"mock-thread-1"}'
+echo '{"type":"turn.started"}'
+echo '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"Mock: '"$PROMPT"'"}}'
+echo '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}'

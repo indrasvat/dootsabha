@@ -1,6 +1,6 @@
 # Task 1.2: Render Context & Output Foundation
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 1.1 (project scaffold)

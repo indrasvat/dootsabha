@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Build release binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+          cache: true
+
+      - name: Build
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          COMMIT="${GITHUB_SHA::8}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          BINARY="dootsabha-${GOOS}-${GOARCH}"
+          mkdir -p dist
+          go build \
+            -ldflags "-X github.com/indrasvat/dootsabha/internal/version.Version=${VERSION} -X github.com/indrasvat/dootsabha/internal/version.Commit=${COMMIT} -X github.com/indrasvat/dootsabha/internal/version.Date=${DATE}" \
+            -o "dist/${BINARY}" \
+            ./cmd/dootsabha
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dootsabha-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: dist/

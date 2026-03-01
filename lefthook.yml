@@ -1,0 +1,15 @@
+# lefthook.yml — Git hooks for code quality
+# pre-commit: fast checks (<3s) via make pre-commit
+# pre-push: full CI (<30s) via make ci
+
+pre-commit:
+  commands:
+    pre-commit:
+      run: make pre-commit
+      fail_text: "Pre-commit checks failed! Run 'make pre-commit' to see details."
+
+pre-push:
+  commands:
+    ci:
+      run: make ci
+      fail_text: "CI failed! Fix issues before pushing."

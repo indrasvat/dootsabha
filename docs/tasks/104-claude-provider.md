@@ -1,6 +1,6 @@
 # Task 1.5: Claude Provider (Hardcoded)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 1.2 (render context), Task 1.3 (config manager), Task 1.4 (subprocess runner)
