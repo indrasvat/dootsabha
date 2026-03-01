@@ -122,7 +122,7 @@ func (p *CodexProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "codex",
-		Model:  "o4-mini",
+		Model:  "gpt-5.3-codex",
 		Flags:  []string{"--sandbox", "danger-full-access", "--skip-git-repo-check"},
 	}
 }

@@ -44,7 +44,7 @@ Three visual/data bugs in `dootsabha status`:
 - 5 columns instead of 6
 
 ### Step 3: Set default models
-- Viper defaults: codex → "o4-mini", gemini → "gemini-2.5-flash"
+- Viper defaults: codex → "gpt-5.3-codex", gemini → "gemini-3-pro"
 - Provider fallbacks: same values
 - configs/default.yaml: match
 
@@ -93,7 +93,7 @@ fix(status): version parsing, dot column merge, default provider models
 
 - parseVersion: find first digit-starting token, strip parens
 - Merge colored dot into PROVIDER column (5 cols, not 6)
-- Set codex default model to o4-mini, gemini to gemini-2.5-flash
+- Set codex default model to gpt-5.3-codex, gemini to gemini-3-pro
 - Update test mock to match real claude --version output
 ```
 
@@ -120,7 +120,7 @@ fix(status): version parsing, dot column merge, default provider models
 | version_correctness | PASS | Found semver versions: 2.1.63, 0.106.0, 0.30.0 |
 | dot_merged | UNVERIFIED | Lipgloss box-drawing chars prevented automated column detection; screenshot confirms dot is in PROVIDER column |
 | screenshot_healthy | PASS | `dootsabha_status_healthy.png` captured |
-| models_populated | PASS | All models present: claude-sonnet-4-6, o4-mini, gemini-2.5-flash |
+| models_populated | PASS | All models present: claude-sonnet-4-6, gpt-5.3-codex, gemini-3-pro |
 | table_layout | PASS | All providers and columns present |
 | no_ansi_piped | PASS | No ANSI codes in piped output |
 | json_valid | PASS | Valid JSON with correct providers, versions, models |

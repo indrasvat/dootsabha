@@ -10,14 +10,14 @@ providers:
       - --dangerously-skip-permissions
   codex:
     binary: codex
-    model: o4-mini
+    model: gpt-5.3-codex
     flags:
       - --sandbox
       - danger-full-access
       - --skip-git-repo-check
   gemini:
     binary: gemini
-    model: gemini-2.5-flash
+    model: gemini-3-pro
     flags:
       - --yolo
 
