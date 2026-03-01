@@ -57,7 +57,7 @@ cd _spikes/claude-json && go run main.go
 
 ### L3: Real CLI output
 ```bash
-claude -p "Say PONG" --output-format json --dangerously-skip-permissions 2>/dev/null | python3 -m json.tool
+claude -p "Say PONG" --output-format json --dangerously-skip-permissions | python3 -m json.tool
 ```
 
 ## Completion Criteria

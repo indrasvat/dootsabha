@@ -648,7 +648,7 @@ Extensions: bench, cost, tui
 
 | Principle | Implementation | Validation |
 |-----------|---------------|------------|
-| **stdout = data, stderr = logs** | All JSON/results on stdout. Spinners, progress, warnings on stderr. | `dootsabha consult --json "test" 2>/dev/null \| jq .` must be valid JSON |
+| **stdout = data, stderr = logs** | All JSON/results on stdout. Spinners, progress, warnings on stderr. | `dootsabha consult --json "test" \| jq .` must be valid JSON |
 | **Meaningful exit codes** | 0=success, 1=error, 2=usage, 3=provider, 4=timeout, 5=partial | Test each path explicitly |
 | **NO_COLOR + pipe detection** | Respect `NO_COLOR` env. Auto-detect TTY via `os.Stdout.Fd()`. No color/spinner when piped. | `dootsabha status \| cat \| grep -P '\\x1b\\['` finds nothing |
 | **Ctrl+C graceful shutdown** | Catch SIGINT/SIGTERM. Kill child process groups. Print summary. | Hit Ctrl+C mid-council: clean message, no stack trace |

@@ -1012,7 +1012,7 @@ for provider in $PROVIDERS; do
   echo "── $provider ──"
   for i in $(seq 1 "$ROUNDS"); do
     # Tier 3: callback into core to invoke agents
-    result=$("$DS" consult --agent "$provider" --json "$PROMPT" 2>/dev/null)
+    result=$("$DS" consult --agent "$provider" --json "$PROMPT")
     cost=$(echo "$result" | jq -r '.cost_usd // 0')
     ms=$(echo "$result" | jq -r '.duration_ms')
     tokens=$(echo "$result" | jq -r '.tokens_out // 0')
@@ -1967,7 +1967,7 @@ fi
 # Tier 3: callback (invoke agents via core)
 if [ -n "$1" ]; then
   echo "Asking claude: $1"
-  "$DOOTSABHA_BIN" consult --agent claude --json "$1" 2>/dev/null | jq -r '.content'
+  "$DOOTSABHA_BIN" consult --agent claude --json "$1" | jq -r '.content'
 fi
 </pre>
 
@@ -2112,7 +2112,7 @@ dootsabha review "optimize the database queries in pkg/store"
 dootsabha consult --agent claude --model opus-4-6 "complex architecture decision"
 
 # JSON output for agent consumption
-dootsabha council --json "implement retry logic" 2>/dev/null | jq .
+dootsabha council --json "implement retry logic" | jq .
 
 # Override council members
 dootsabha council --agents claude,codex "only need two opinions"
@@ -2128,7 +2128,7 @@ result=$(dootsabha council --json "fix failing tests" 2>/tmp/ds.log)
 echo "$result" | jq -r '.synthesis.content'
 
 # With timeout
-dootsabha consult --timeout 2m --json "quick question" 2>/dev/null
+dootsabha consult --timeout 2m --json "quick question"
 
 # Pipe prompt from file
 cat prompt.md | dootsabha council --json

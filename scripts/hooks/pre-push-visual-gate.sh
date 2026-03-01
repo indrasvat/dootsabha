@@ -4,7 +4,7 @@ ERRORS=()
 for task in docs/tasks/*.md; do
   [[ -f "$task" ]] || continue
   if grep -q 'Status:.*IN PROGRESS' "$task"; then
-    if ! bash scripts/verify-visual-tests.sh "$task" 2>/dev/null; then
+    if ! bash scripts/verify-visual-tests.sh "$task"; then
       ERRORS+=("$task")
     fi
   fi

@@ -379,14 +379,14 @@ $BIN help | grep -q "दूतसभा" || fail "help missing title"
 $BIN help | grep -q "council.*sabha" || fail "help missing bilingual"
 
 # JSON mode: valid JSON on stdout, logs on stderr
-output=$($BIN consult --agent mock --json "test" 2>/dev/null)
+output=$($BIN consult --agent mock --json "test")
 echo "$output" | jq . > /dev/null || fail "invalid JSON output"
 
 # Piped mode: no color codes
 $BIN status 2>&1 | cat | grep -qP '\x1b\[' && fail "color codes in piped output"
 
 # Exit codes
-$BIN consult --agent nonexistent "test" 2>/dev/null; [ $? -ne 0 ] || fail "bad exit code"
+$BIN consult --agent nonexistent "test"; [ $? -ne 0 ] || fail "bad exit code"
 
 echo "✓ All smoke tests passed"</pre>
   </div>
@@ -404,21 +404,21 @@ BIN="./dootsabha"
 PROMPT="Reply with exactly: PONG"
 
 echo "── Claude ──"
-result=$($BIN consult --agent claude --json "$PROMPT" 2>/dev/null)
+result=$($BIN consult --agent claude --json "$PROMPT")
 echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "claude: no PONG"
 echo "$result" | jq -e '.duration_ms > 0' > /dev/null || fail "claude: no duration"
 echo "$result" | jq -e '.model' > /dev/null || fail "claude: no model"
 
 echo "── Codex ──"
-result=$($BIN consult --agent codex --json "$PROMPT" 2>/dev/null)
+result=$($BIN consult --agent codex --json "$PROMPT")
 echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "codex: no PONG"
 
 echo "── Gemini ──"
-result=$($BIN consult --agent gemini --json "$PROMPT" 2>/dev/null)
+result=$($BIN consult --agent gemini --json "$PROMPT")
 echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "gemini: no PONG"
 
 echo "── Status ──"
-$BIN status --json 2>/dev/null | jq -e '.providers | length == 3' > /dev/null
+$BIN status --json | jq -e '.providers | length == 3' > /dev/null
 
 echo "✓ All integration tests passed"</pre>
   </div>
@@ -440,7 +440,7 @@ $ dootsabha council --agents claude,nonexistent "test"
 # → Screenshot: verify warning styling (amber), no broken layout
 
 # Acceptance: JSON piped to jq
-$ dootsabha council --json "palindrome check" 2>/dev/null | jq '.synthesis.content' | head -5
+$ dootsabha council --json "palindrome check" | jq '.synthesis.content' | head -5
 # Expected: Clean JSON, no color codes, no spinner artifacts
 
 # Acceptance: timeout handling
@@ -536,7 +536,7 @@ fi
 <tr>
   <td><strong>stdout = data, stderr = logs</strong></td>
   <td>All structured output (JSON, results) goes to stdout. All status messages, spinners, progress, warnings go to stderr.</td>
-  <td><code>dootsabha consult --json "test" 2>/dev/null | jq .</code> must produce valid JSON</td>
+  <td><code>dootsabha consult --json "test" | jq .</code> must produce valid JSON</td>
 </tr>
 <tr>
   <td><strong>Meaningful exit codes</strong></td>
@@ -1371,7 +1371,7 @@ All commands support `--json`. Stdout is pure JSON data, stderr is logs.
 
 ```bash
 # Pipe council output to jq
-result=$(dootsabha council --json "fix the failing tests" 2>/dev/null)
+result=$(dootsabha council --json "fix the failing tests")
 echo "$result" | jq -r '.synthesis.content'
 
 # Check cost

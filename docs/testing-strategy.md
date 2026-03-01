@@ -296,7 +296,7 @@ Claude Code PreToolUse hook that intercepts `git push`. Finds all IN PROGRESS ta
 ERRORS=()
 for task in docs/tasks/*.md; do
   if grep -q 'Status:.*IN PROGRESS' "$task"; then
-    if ! bash scripts/verify-visual-tests.sh "$task" 2>/dev/null; then
+    if ! bash scripts/verify-visual-tests.sh "$task"; then
       ERRORS+=("$task")
     fi
   fi
@@ -334,7 +334,7 @@ run_test() {
 # Workflow 1: JSON output is valid and parseable
 run_test "consult JSON valid" \
   "$BINARY consult --json 'PONG'" \
-  "$BINARY consult --json 'PONG' 2>/dev/null | python3 -m json.tool >/dev/null 2>&1"
+  "$BINARY consult --json 'PONG' | python3 -m json.tool >/dev/null 2>&1"
 
 # Workflow 2: Exit codes reflect state
 run_test "consult success exit 0" \
@@ -344,22 +344,22 @@ run_test "consult success exit 0" \
 # Workflow 3: No ANSI in piped output
 run_test "consult no ANSI when piped" \
   "" \
-  "! $BINARY consult 'PONG' 2>/dev/null | grep -qP '\x1b\['"
+  "! $BINARY consult 'PONG' | grep -qP '\x1b\['"
 
 # Workflow 4: JSON fields exist
 run_test "consult JSON has required fields" \
   "" \
-  "$BINARY consult --json 'PONG' 2>/dev/null | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'content' in d and 'meta' in d\""
+  "$BINARY consult --json 'PONG' | python3 -c \"import json,sys; d=json.load(sys.stdin); assert 'content' in d and 'meta' in d\""
 
 # Workflow 5: Status JSON is valid
 run_test "status JSON valid" \
   "" \
-  "$BINARY status --json 2>/dev/null | python3 -m json.tool >/dev/null 2>&1"
+  "$BINARY status --json | python3 -m json.tool >/dev/null 2>&1"
 
 # Workflow 6: Error produces structured JSON
 run_test "error produces JSON with exit 3" \
   "" \
-  "$BINARY consult --json --agent nonexistent 'test' 2>/dev/null; [ \$? -eq 3 ]"
+  "$BINARY consult --json --agent nonexistent 'test'; [ \$? -eq 3 ]"
 
 # Workflow 7: Performance (<2s startup)
 run_test "startup under 2s" \

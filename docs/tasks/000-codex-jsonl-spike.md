@@ -33,7 +33,7 @@ Codex CLI outputs a JSONL event stream, not a single JSON object. We must reliab
 2. Read PRD §11 (Codex JSONL risk)
 
 ### Step 3: Write spike program
-- Run `codex exec --json "Say PONG" 2>/dev/null` and capture stdout
+- Run `codex exec --json "Say PONG"` and capture stdout
 - Parse JSONL line-by-line with `json.Decoder`
 - Extract final content from `item.completed` where `item.type == "agent_message"`
 - Extract token usage from `turn.completed`
@@ -59,7 +59,7 @@ cd _spikes/codex-jsonl && go run main.go
 
 ### L3: Real CLI output
 ```bash
-codex exec --json "Say PONG" 2>/dev/null | head -20
+codex exec --json "Say PONG" | head -20
 # Compare against spike's parsed output
 ```
 

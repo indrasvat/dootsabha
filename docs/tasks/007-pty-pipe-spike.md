@@ -60,9 +60,9 @@ cd _spikes/pty-pipe && go run main.go
 ### L3: Direct CLI test
 ```bash
 # Each should produce valid JSON without hanging
-claude -p "PONG" --output-format json --dangerously-skip-permissions 2>/dev/null | python3 -m json.tool
-codex exec --json --sandbox danger-full-access "PONG" 2>/dev/null | tail -1 | python3 -m json.tool
-gemini --yolo --output-format json "PONG" 2>/dev/null | python3 -m json.tool
+claude -p "PONG" --output-format json --dangerously-skip-permissions | python3 -m json.tool
+codex exec --json --sandbox danger-full-access "PONG" | tail -1 | python3 -m json.tool
+gemini --yolo --output-format json "PONG" | python3 -m json.tool
 ```
 
 ## Completion Criteria

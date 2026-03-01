@@ -59,7 +59,7 @@ make test
 ### L3: Real CLI (tiny prompt)
 ```bash
 make build
-./bin/dootsabha consult --agent claude "Say PONG" 2>/dev/null
+./bin/dootsabha consult --agent claude "Say PONG"
 # Should show styled output with provider dot
 ```
 

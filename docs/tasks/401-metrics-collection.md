@@ -56,7 +56,7 @@ make test
 ### L3: Footer stats
 ```bash
 make build
-./bin/dootsabha council "PONG" 2>/dev/null  # Check footer shows real stats
+./bin/dootsabha council "PONG"  # Check footer shows real stats
 ./bin/dootsabha council "PONG" --json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['meta'])"
 ```
 

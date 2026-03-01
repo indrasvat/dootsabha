@@ -69,7 +69,7 @@ make build
 ./bin/dootsabha config show --json | python3 -m json.tool
 # No ANSI in any output
 for cmd in consult council review status; do
-  ./bin/dootsabha $cmd --json "PONG" 2>/dev/null | grep -cP '\x1b\[' | grep -q '^0$'
+  ./bin/dootsabha $cmd --json "PONG" | grep -cP '\x1b\[' | grep -q '^0$'
 done
 ```
 

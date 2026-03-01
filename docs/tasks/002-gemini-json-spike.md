@@ -56,7 +56,7 @@ cd _spikes/gemini-json && go run main.go
 
 ### L3: Real CLI output
 ```bash
-gemini --yolo --output-format json "Say PONG" 2>/dev/null | python3 -m json.tool
+gemini --yolo --output-format json "Say PONG" | python3 -m json.tool
 ```
 
 ## Completion Criteria

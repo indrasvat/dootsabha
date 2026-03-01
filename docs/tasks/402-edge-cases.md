@@ -72,7 +72,7 @@ make build
 ./bin/dootsabha consult --agent nonexistent "test"; echo "exit: $?"  # exit 3
 ./bin/dootsabha consult --timeout 1ms "test"; echo "exit: $?"       # exit 4
 ./bin/dootsabha council "test" | head -1; echo "exit: $?"           # SIGPIPE → 0
-./bin/dootsabha --badFlag 2>/dev/null; echo "exit: $?"              # exit 2
+./bin/dootsabha --badFlag; echo "exit: $?"                          # exit 2
 ```
 
 ### L4: Visual
