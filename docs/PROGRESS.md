@@ -47,7 +47,7 @@ All 4 items addressed in PRD v1.6.
 | 2.2 | Peer Review Stage (32KB truncation, cross-review) | DONE | council-builder |
 | 2.3 | Synthesis Stage (chair + fallback + multi-round) | DONE | council-builder |
 | 2.4 | Review Command (author + reviewer pipeline) | DONE | review-builder |
-| 2.6 | Refine Command (sequential review + incorporation) | PENDING | — |
+| 2.6 | Refine Command (sequential review + incorporation) | DONE | — |
 
 ### What Works End-to-End
 - `dootsabha council "prompt"` — 3-stage pipeline: dispatch → peer review → synthesis
@@ -57,8 +57,11 @@ All 4 items addressed in PRD v1.6.
 - `dootsabha council "prompt" --rounds 2` — multi-round with context chaining
 - `dootsabha review "prompt" --author codex --reviewer claude` — 2-step pipeline
 - `dootsabha review "prompt" --json` — JSON with author/review/meta
-- Bilingual aliases: sabha/सभा (council), sameeksha/समीक्षा (review)
-- Bilingual flags: --dootas, --adhyaksha, --chakra, --samantar, --kartaa, --pareekshak
+- `dootsabha refine "prompt" --author claude --reviewers codex,gemini` — sequential review + incorporate
+- `dootsabha refine "prompt" --json` — JSON with versions/final/meta
+- Bilingual aliases: sabha/सभा (council), sameeksha/समीक्षा (review), sanshodhan/संशोधन (refine)
+- Bilingual flags: --dootas, --adhyaksha, --chakra, --samantar, --kartaa, --pareekshak, --gupt
+- Anonymous review mode (default) — Karpathy llm-council pattern
 - Max 5 agents enforced, 32KB truncation for peer review + synthesis
 - Chair failure → fallback to first healthy non-chair agent
 - Exit code 5 for partial results (some agents failed)
