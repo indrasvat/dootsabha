@@ -95,6 +95,15 @@ Root command MUST have `Args: cobra.ArbitraryArgs` or `RunE` is never called for
 - TTY detection: `isatty.IsTerminal(os.Stdout.Fd())`
 - No `huh` dependency — drop it unless forms are needed
 
+## L4 Script Convention (iTerm2-driver)
+All `.claude/automations/test_*.py` scripts MUST follow the canonical pattern:
+- `try/except/finally` wrapping all test logic in `main()`
+- `created_sessions = [session]` — track every session, append new ones
+- 4-level `cleanup_session()`: Ctrl+C → "q" → "exit\n" → `session.async_close()`
+- `finally` iterates `created_sessions` and cleans up all of them (tabs closed, not left open)
+- Entry point: `if __name__ == "__main__": exit_code = iterm2.run_until_complete(main); exit(...)`
+- `main()` returns exit code from `print_summary()` — never call `sys.exit()` inside main
+
 ## Anti-Hallucination Rules
 1. Never claim DONE without terminal output as proof
 2. `make ci` MUST pass before marking DONE

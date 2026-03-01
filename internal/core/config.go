@@ -57,7 +57,7 @@ func LoadConfig(cfgFile string) (*Config, error) {
 // setDefaults sets default values for all known configuration keys.
 func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.claude.binary", "claude")
-	v.SetDefault("providers.claude.model", "sonnet-4-6")
+	v.SetDefault("providers.claude.model", "claude-sonnet-4-6")
 	v.SetDefault("providers.claude.flags", []string{"--dangerously-skip-permissions", "--no-session-persistence"})
 	v.SetDefault("providers.codex.binary", "codex")
 	v.SetDefault("providers.codex.model", "gpt-5.3-codex")

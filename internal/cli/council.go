@@ -112,11 +112,8 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
-			// Set up progress rendering on stderr (TTY only).
+			// Progress rendering on stderr (TTY only).
 			stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd())
-			if stderrIsTTY && !quiet {
-				eng.SetProgress(stderrProgress())
-			}
 
 			// Run council pipeline.
 			var allDispatches []core.DispatchResult
@@ -128,6 +125,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				// Stage 1: Dispatch
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
 					renderStageHeader(rc, 1, "Dispatch", fmt.Sprintf("%d agents", len(agentNames)), parallel)
+				}
+				if stderrIsTTY && !quiet {
+					eng.SetProgress(stderrProgress("dispatch"))
 				}
 
 				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, core.InvokeOptions{Timeout: timeout})
@@ -153,6 +153,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				if successes >= 2 {
 					if stderrIsTTY && !quiet && !rc.IsJSON() {
 						renderStageHeader(rc, 2, "Peer Review", "", false)
+					}
+					if stderrIsTTY && !quiet {
+						eng.SetProgress(stderrProgress("review"))
 					}
 					reviews, err = eng.PeerReview(ctx, dispatches, core.InvokeOptions{Timeout: timeout})
 					if err != nil {
@@ -256,18 +259,23 @@ func renderStageHeader(rc *output.RenderContext, stage int, name, info string, i
 }
 
 // stderrProgress returns a ProgressFunc that renders agent status to stderr.
-func stderrProgress() core.ProgressFunc {
+// The stage parameter controls the label: "dispatch"=no label, "review"=shows "reviewing".
+func stderrProgress(stage string) core.ProgressFunc {
 	var mu sync.Mutex
 	return func(provider string, event core.ProgressEvent) {
 		mu.Lock()
 		defer mu.Unlock()
+		label := provider
+		if stage == "review" {
+			label = provider + " reviewing"
+		}
 		switch event {
 		case core.ProgressStarted:
-			fmt.Fprintf(os.Stderr, "  %s ...\r", provider) //nolint:errcheck
+			fmt.Fprintf(os.Stderr, "  %s ...\r", label) //nolint:errcheck
 		case core.ProgressDone:
-			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✓\n", provider) //nolint:errcheck
+			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✓\n", label) //nolint:errcheck
 		case core.ProgressFailed:
-			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✗\n", provider) //nolint:errcheck
+			fmt.Fprintf(os.Stderr, "\r\033[K  %s ✗\n", label) //nolint:errcheck
 		}
 	}
 }

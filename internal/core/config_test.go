@@ -49,8 +49,8 @@ func TestConfigDefaults(t *testing.T) {
 	if claude.Binary != "claude" {
 		t.Errorf("claude.Binary: got %q, want %q", claude.Binary, "claude")
 	}
-	if claude.Model != "sonnet-4-6" {
-		t.Errorf("claude.Model: got %q, want %q", claude.Model, "sonnet-4-6")
+	if claude.Model != "claude-sonnet-4-6" {
+		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-sonnet-4-6")
 	}
 	if len(claude.Flags) == 0 {
 		t.Error("claude.Flags: want at least one flag")
@@ -285,7 +285,7 @@ providers:
 
 func TestConfigMergeOrder(t *testing.T) {
 	// Verify precedence: env > file > default
-	// Default: providers.claude.model = "sonnet-4-6"
+	// Default: providers.claude.model = "claude-sonnet-4-6"
 	// File: providers.claude.model = "claude-haiku-4-5"
 	// Env:  DOOTSABHA_PROVIDERS_CLAUDE_MODEL = "opus-4-6"
 	// Result should be "opus-4-6"
