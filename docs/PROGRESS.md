@@ -48,6 +48,7 @@ All 4 items addressed in PRD v1.6.
 | 2.3 | Synthesis Stage (chair + fallback + multi-round) | DONE | council-builder |
 | 2.4 | Review Command (author + reviewer pipeline) | DONE | review-builder |
 | 2.6 | Refine Command (sequential review + incorporation) | DONE | — |
+| 207 | Output Polish — Professional CLI Rendering | DONE | — |
 
 ### What Works End-to-End
 - `dootsabha council "prompt"` — 3-stage pipeline: dispatch → peer review → synthesis
@@ -66,5 +67,8 @@ All 4 items addressed in PRD v1.6.
 - Chair failure → fallback to first healthy non-chair agent
 - Exit code 5 for partial results (some agents failed)
 - Progress rendering on stderr (TTY only)
+- Professional CLI rendering: rounded header boxes, `──` section dividers, provider-colored dots, content separators, pipe-delimited footers
+- Graceful degradation: TTY+color → TTY+NO_COLOR → piped (no ANSI, no box chars)
 - `make ci` — 0 lint issues, all tests pass
 - `make test-binary` — 8/8 L3 smoke tests
+- L4 visual tests: 14/14 pass with 4 screenshots (refine, council, review, consult)
