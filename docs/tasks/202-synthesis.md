@@ -19,6 +19,7 @@ Council Stage 3: the chair agent synthesizes all dispatch outputs + peer reviews
 ## Files to Create
 - `internal/core/synthesis.go` — Synthesis logic with chair fallback
 - `internal/core/synthesis_test.go` — Unit tests
+- `.claude/automations/test_dootsabha_council.py` — L4 visual tests (tests 8–13 verify synthesis + cross-cutting)
 
 ## Files to Modify
 - `internal/core/engine.go` — Add synthesis stage, multi-round support
@@ -66,6 +67,13 @@ make build
 ./bin/dootsabha council "PONG" --rounds 2
 ```
 
+### L4: Visual verification
+```bash
+uv run .claude/automations/test_dootsabha_council.py
+```
+Expected: tests 8–13 pass (synthesis_header, synthesis_content, synthesis_footer, screenshot_synthesis, no_ansi_piped, json_valid).
+Screenshots: `dootsabha_council_synthesis_{ts}.png`, `dootsabha_council_piped_{ts}.png`
+
 ## Completion Criteria
 
 1. Chair agent produces synthesized answer
@@ -74,6 +82,24 @@ make build
 4. JSON output matches §6.2 schema
 5. Footer stats: total time, cost, tokens, agent status
 6. `make ci` passes
+
+## Visual Test Results
+
+**L4 Script:** `.claude/automations/test_dootsabha_council.py`
+**Date:** —
+**Status:** PENDING (awaiting Phase 2 implementation)
+
+| Test | Result | Details |
+|------|--------|---------|
+| synthesis_header | — | |
+| synthesis_content | — | |
+| synthesis_footer | — | |
+| screenshot_synthesis | — | |
+| no_ansi_piped | — | |
+| json_valid | — | |
+
+**Screenshots:** (pending implementation)
+**Findings:** (pending implementation)
 
 ## Commit
 

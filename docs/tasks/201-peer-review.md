@@ -19,6 +19,7 @@ Council Stage 2: each agent reviews the other agents' outputs. Must truncate inp
 ## Files to Create
 - `internal/core/review.go` — Peer review logic
 - `internal/core/review_test.go` — Unit tests
+- `.claude/automations/test_dootsabha_council.py` — L4 visual tests (tests 5–7 verify peer review)
 
 ## Files to Modify
 - `internal/core/engine.go` — Add peer review stage to pipeline
@@ -63,6 +64,13 @@ make build
 # Should show all 3 stages
 ```
 
+### L4: Visual verification
+```bash
+uv run .claude/automations/test_dootsabha_council.py
+```
+Expected: tests 5–7 pass (review_header, review_agents_reviewing, screenshot_review).
+Screenshots: `dootsabha_council_review_{ts}.png`
+
 ## Completion Criteria
 
 1. Each agent reviews other agents' outputs
@@ -70,6 +78,21 @@ make build
 3. Skips peer review with <2 agents
 4. Reviews run in parallel
 5. `make ci` passes
+
+## Visual Test Results
+
+**L4 Script:** `.claude/automations/test_dootsabha_council.py`
+**Date:** —
+**Status:** PENDING (awaiting Phase 2 implementation)
+
+| Test | Result | Details |
+|------|--------|---------|
+| review_header | — | |
+| review_agents_reviewing | — | |
+| screenshot_review | — | |
+
+**Screenshots:** (pending implementation)
+**Findings:** (pending implementation)
 
 ## Commit
 

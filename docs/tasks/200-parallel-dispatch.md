@@ -20,6 +20,7 @@ The council command's Stage 1 dispatches prompts to all configured agents in par
 ## Files to Create
 - `internal/core/engine.go` — Session manager with dispatch stage
 - `internal/core/engine_test.go` — Unit tests with mock providers
+- `.claude/automations/test_dootsabha_council.py` — L4 visual tests (tests 1–4 verify dispatch)
 
 ## Files to Modify
 - `internal/cli/root.go` — Add `council` subcommand registration
@@ -66,6 +67,13 @@ make build
 ./bin/dootsabha council "Say PONG" --agents claude,codex,gemini
 ```
 
+### L4: Visual verification
+```bash
+uv run .claude/automations/test_dootsabha_council.py
+```
+Expected: tests 1–4 pass (dispatch_header, dispatch_agents_shown, dispatch_completion, screenshot_dispatch).
+Screenshots: `dootsabha_council_dispatch_{ts}.png`
+
 ## Completion Criteria
 
 1. Parallel dispatch with errgroup works
@@ -73,6 +81,22 @@ make build
 3. Partial failure → remaining agents continue
 4. Max 5 agents enforced
 5. `make ci` passes
+
+## Visual Test Results
+
+**L4 Script:** `.claude/automations/test_dootsabha_council.py`
+**Date:** —
+**Status:** PENDING (awaiting Phase 2 implementation)
+
+| Test | Result | Details |
+|------|--------|---------|
+| dispatch_header | — | |
+| dispatch_agents_shown | — | |
+| dispatch_completion | — | |
+| screenshot_dispatch | — | |
+
+**Screenshots:** (pending implementation)
+**Findings:** (pending implementation)
 
 ## Commit
 

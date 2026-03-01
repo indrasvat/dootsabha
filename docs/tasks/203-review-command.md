@@ -19,6 +19,7 @@ The review command (`dootsabha review` / `sameeksha`) is a 2-step pipeline: auth
 ## Files to Create
 - `internal/cli/review.go` — Review command implementation
 - `internal/cli/review_test.go` — Unit tests
+- `.claude/automations/test_dootsabha_review.py` — L4 visual tests (all 8 tests verify review command)
 
 ## Execution Steps
 
@@ -59,6 +60,13 @@ make build
 ./bin/dootsabha review "PONG" --json | python3 -m json.tool
 ```
 
+### L4: Visual verification
+```bash
+uv run .claude/automations/test_dootsabha_review.py
+```
+Expected: all 8 tests pass (author_section, reviewer_section, both_agents_labeled, screenshot_review, author_failure_failfast, screenshot_failfast, no_ansi_piped, json_valid).
+Screenshots: `dootsabha_review_output_{ts}.png`, `dootsabha_review_failfast_{ts}.png`, `dootsabha_review_piped_{ts}.png`
+
 ## Completion Criteria
 
 1. Two-step pipeline works (author → reviewer)
@@ -66,6 +74,26 @@ make build
 3. Author failure = fail fast
 4. JSON output correct
 5. `make ci` passes
+
+## Visual Test Results
+
+**L4 Script:** `.claude/automations/test_dootsabha_review.py`
+**Date:** —
+**Status:** PENDING (awaiting Phase 2 implementation)
+
+| Test | Result | Details |
+|------|--------|---------|
+| author_section | — | |
+| reviewer_section | — | |
+| both_agents_labeled | — | |
+| screenshot_review | — | |
+| author_failure_failfast | — | |
+| screenshot_failfast | — | |
+| no_ansi_piped | — | |
+| json_valid | — | |
+
+**Screenshots:** (pending implementation)
+**Findings:** (pending implementation)
 
 ## Commit
 
