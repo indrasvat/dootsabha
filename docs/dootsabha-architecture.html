@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>दूतसभा — Architecture & Design Blueprint</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: #1a2234;
+  --bg-code: #0d1321;
+  --border-subtle: #1e2d4a;
+  --border-accent: #f59e0b;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-gold: #f59e0b;
+  --accent-amber: #d97706;
+  --accent-orange: #ea580c;
+  --accent-blue: #3b82f6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-purple: #8b5cf6;
+  --accent-red: #ef4444;
+  --accent-rose: #f43f5e;
+  --sanskrit-gold: #fbbf24;
+  --glow-gold: rgba(245, 158, 11, 0.15);
+  --glow-blue: rgba(59, 130, 246, 0.1);
+  --radius: 10px;
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.7;
+  min-height: 100vh;
+}
+/* ── NAV ── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(10,14,23,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 0;
+}
+nav .nav-inner {
+  max-width: 1200px; margin: 0 auto; padding: 0 24px;
+  display: flex; align-items: center; gap: 24px;
+  overflow-x: auto; scrollbar-width: none;
+}
+nav .nav-inner::-webkit-scrollbar { display: none; }
+nav .brand {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 1.1rem;
+  color: var(--accent-gold);
+  white-space: nowrap;
+  text-decoration: none;
+}
+nav a {
+  color: var(--text-secondary);
+  text-decoration: none; font-size: 0.82rem;
+  font-weight: 500; white-space: nowrap;
+  transition: color 0.2s;
+}
+nav a:hover, nav a.active { color: var(--accent-gold); }
+
+/* ── LAYOUT ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
+.hero {
+  padding: 72px 0 48px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 56px;
+  position: relative;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 600px; height: 300px;
+  background: radial-gradient(ellipse, var(--glow-gold), transparent 70%);
+  pointer-events: none; opacity: 0.4;
+}
+.hero h1 {
+  font-family: 'Crimson Pro', serif;
+  font-size: 3.2rem; font-weight: 700;
+  color: var(--accent-gold);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+.hero .subtitle {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1rem; color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.hero .tagline {
+  font-size: 1.15rem; color: var(--text-secondary);
+  max-width: 680px; margin: 0 auto;
+  font-style: italic;
+}
+.version-badge {
+  display: inline-block; margin-top: 16px;
+  padding: 4px 14px; border-radius: 20px;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.3);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem; color: var(--accent-gold);
+}
+
+/* ── SECTIONS ── */
+section { margin-bottom: 56px; }
+section > h2 {
+  font-family: 'Crimson Pro', serif;
+  font-size: 1.9rem; font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border-subtle);
+  display: flex; align-items: center; gap: 12px;
+}
+section > h2 .num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem; color: var(--accent-gold);
+  background: rgba(245,158,11,0.1);
+  padding: 3px 10px; border-radius: 6px;
+}
+h3 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.25rem; font-weight: 600;
+  color: var(--accent-cyan);
+  margin: 28px 0 14px;
+}
+h4 {
+  font-size: 1.05rem; font-weight: 600;
+  color: var(--text-primary);
+  margin: 20px 0 10px;
+}
+p { margin-bottom: 14px; color: var(--text-secondary); }
+strong { color: var(--text-primary); font-weight: 600; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-card);
+}
+.card.highlight {
+  border-left: 3px solid var(--accent-gold);
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+}
+.card h4 { margin-top: 0; }
+
+/* ── TABLES ── */
+.table-wrap {
+  overflow-x: auto; margin: 16px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-subtle);
+}
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: 0.88rem;
+}
+th {
+  background: var(--bg-secondary);
+  color: var(--accent-gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem; font-weight: 600;
+  text-align: left; padding: 12px 16px;
+  border-bottom: 2px solid var(--border-subtle);
+  white-space: nowrap;
+}
+td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(59,130,246,0.04); }
+td code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  background: var(--bg-code);
+  padding: 2px 7px; border-radius: 4px;
+  color: var(--accent-cyan);
+  white-space: nowrap;
+}
+
+/* ── CODE ── */
+pre {
+  background: var(--bg-code);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  overflow-x: auto;
+  margin: 14px 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+}
+.inline-code {
+  background: var(--bg-code);
+  padding: 2px 7px; border-radius: 4px;
+  color: var(--accent-cyan);
+  font-size: 0.85rem;
+}
+
+/* ── MERMAID ── */
+.mermaid-wrap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+  margin: 20px 0;
+  overflow-x: auto;
+  text-align: center;
+}
+.mermaid-wrap .caption {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem; color: var(--text-muted);
+  margin-top: 12px;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+/* ── BADGES ── */
+.badge {
+  display: inline-block;
+  padding: 2px 10px; border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.badge-gold { background: rgba(245,158,11,0.15); color: var(--accent-gold); }
+.badge-blue { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+.badge-green { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.badge-purple { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+.badge-red { background: rgba(239,68,68,0.15); color: var(--accent-red); }
+.badge-cyan { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+
+/* ── PROVIDER HEADERS ── */
+.provider-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; margin-bottom: 8px;
+}
+.provider-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.provider-dot.claude { background: var(--accent-gold); }
+.provider-dot.codex { background: var(--accent-green); }
+.provider-dot.gemini { background: var(--accent-blue); }
+
+/* ── CALLOUT ── */
+.callout {
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin: 16px 0;
+  font-size: 0.9rem;
+}
+.callout-info {
+  background: rgba(59,130,246,0.08);
+  border-left: 3px solid var(--accent-blue);
+}
+.callout-warn {
+  background: rgba(245,158,11,0.08);
+  border-left: 3px solid var(--accent-gold);
+}
+.callout-tip {
+  background: rgba(16,185,129,0.08);
+  border-left: 3px solid var(--accent-green);
+}
+.callout-danger {
+  background: rgba(239,68,68,0.08);
+  border-left: 3px solid var(--accent-red);
+}
+.callout strong { display: block; margin-bottom: 4px; }
+
+/* ── TOC ── */
+.toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px; margin: 24px 0;
+}
+.toc a {
+  display: block;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.88rem;
+  transition: all 0.2s;
+}
+.toc a:hover {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  background: rgba(245,158,11,0.05);
+}
+.toc a .toc-num {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent-gold); font-size: 0.78rem;
+  margin-right: 6px;
+}
+
+/* ── BILINGUAL FLAG ── */
+.flag-pair {
+  display: flex; align-items: center; gap: 6px;
+}
+.flag-en { color: var(--accent-cyan); }
+.flag-sa { color: var(--sanskrit-gold); font-style: italic; }
+.flag-sep { color: var(--text-muted); font-size: 0.8rem; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2.2rem; }
+  .card-grid { grid-template-columns: 1fr; }
+  .toc { grid-template-columns: 1fr; }
+  nav .nav-inner { gap: 16px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="brand">दूतसभा</a>
+    <a href="#arch">Architecture</a>
+    <a href="#plugins">Plugins</a>
+    <a href="#subcmds">Commands</a>
+    <a href="#flags">Flags</a>
+    <a href="#providers">Providers</a>
+    <a href="#lifecycle">Lifecycle</a>
+    <a href="#sequences">Sequences</a>
+    <a href="#observability">Observability</a>
+    <a href="#libs">Libraries</a>
+    <a href="#dev-guide">Dev Guide</a>
+  </div>
+</nav>
+
+<div class="container">
+
+<!-- ═══════════════════════════════ HERO ═══════════════════════════════ -->
+<div class="hero">
+  <h1>दूतसभा</h1>
+  <div class="subtitle">dūtasabhā — The Council of Agents</div>
+  <p class="tagline">
+    A plugin-extensible Go CLI orchestrating coding agents (Claude Code, Codex CLI, Gemini CLI)
+    through council-mode deliberation, peer review, and synthesis.
+  </p>
+  <span class="version-badge">v0.1.0 · Blueprint · Feb 2026</span>
+</div>
+
+<!-- ═══════════════════════════ TABLE OF CONTENTS ═══════════════════════════ -->
+<div class="toc">
+  <a href="#arch"><span class="toc-num">01</span> Architecture Overview</a>
+  <a href="#plugins"><span class="toc-num">02</span> Plugin System</a>
+  <a href="#subcmds"><span class="toc-num">03</span> Subcommands</a>
+  <a href="#flags"><span class="toc-num">04</span> Flags &amp; Bilingual Mapping</a>
+  <a href="#providers"><span class="toc-num">05</span> Provider Configs</a>
+  <a href="#lifecycle"><span class="toc-num">06</span> Lifecycle State Machine</a>
+  <a href="#sequences"><span class="toc-num">07</span> Sequence Diagrams</a>
+  <a href="#observability"><span class="toc-num">08</span> Observability</a>
+  <a href="#libs"><span class="toc-num">09</span> Go Library Stack</a>
+  <a href="#dev-guide"><span class="toc-num">10</span> Dev &amp; Plugin Guide</a>
+  <a href="#usage"><span class="toc-num">11</span> Usage Examples</a>
+  <a href="#config"><span class="toc-num">12</span> Configuration</a>
+</div>
+
+<!-- ═══════════════════════════════ §1 ARCHITECTURE ═══════════════════════════════ -->
+<section id="arch">
+<h2><span class="num">01</span> Architecture Overview</h2>
+
+<p>
+  दूतसभा follows a <strong>small core + plugin shell</strong> architecture. The core handles
+  cross-cutting concerns (config, logging, metrics, subprocess lifecycle, plugin discovery) while
+  every feature — providers, output modes, synthesis strategies — is a plugin implementing a
+  well-defined Go interface. Plugins are standalone binaries communicating over gRPC via
+  <strong>hashicorp/go-plugin</strong>.
+</p>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a2234', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#f59e0b', 'lineColor': '#64748b', 'secondaryColor': '#111827', 'tertiaryColor': '#0d1321'}}}%%
+graph TB
+    subgraph USER["🧑‍💻 User / Agent"]
+        CLI["CLI Interface<br/><small>cobra · bilingual flags</small>"]
+    end
+
+    subgraph CORE["⚙️ Core Engine"]
+        direction TB
+        CFG["Config Manager<br/><small>viper · YAML + env + flags</small>"]
+        PM["Plugin Manager<br/><small>hashicorp/go-plugin · gRPC</small>"]
+        SM["Session Manager<br/><small>state machine · lifecycle</small>"]
+        OBS["Observability<br/><small>slog · prometheus · OTEL</small>"]
+        SUB["Subprocess Runner<br/><small>os/exec · context · cancel</small>"]
+    end
+
+    subgraph GRPC_PLUGINS["🔌 gRPC Plugins <small>(hashicorp/go-plugin)</small>"]
+        direction TB
+        P1["claude-provider<br/><small>Claude Code CLI</small>"]
+        P2["codex-provider<br/><small>Codex CLI</small>"]
+        P3["gemini-provider<br/><small>Gemini CLI</small>"]
+        P4["council-strategy<br/><small>dispatch → review → synth</small>"]
+        P5["output-formatter<br/><small>JSON · table · markdown</small>"]
+        P7["lifecycle-hook<br/><small>pre/post middleware</small>"]
+    end
+
+    subgraph EXT_PLUGINS["🧩 Extension Plugins <small>(PATH binaries, gh-style)</small>"]
+        direction TB
+        E1["dootsabha-bench<br/><small>adds: dootsabha bench</small>"]
+        E2["dootsabha-cost<br/><small>adds: dootsabha cost</small>"]
+        E3["dootsabha-*<br/><small>agent-extensible</small>"]
+    end
+
+    CLI --> CFG
+    CLI --> SM
+    CFG --> PM
+    SM --> PM
+    PM -->|gRPC| P1
+    PM -->|gRPC| P2
+    PM -->|gRPC| P3
+    PM -->|gRPC| P4
+    PM -->|gRPC| P5
+    PM -->|gRPC| P7
+    SM --> OBS
+    SM --> SUB
+    SUB --> P1
+    SUB --> P2
+    SUB --> P3
+    CLI -->|exec| E1
+    CLI -->|exec| E2
+    CLI -->|exec| E3
+
+    style USER fill:#0d1321,stroke:#64748b,color:#e2e8f0
+    style CORE fill:#1a2234,stroke:#f59e0b,color:#e2e8f0
+    style GRPC_PLUGINS fill:#111827,stroke:#3b82f6,color:#e2e8f0
+    style EXT_PLUGINS fill:#111827,stroke:#10b981,color:#e2e8f0
+    style E3 fill:#111827,stroke:#64748b,color:#64748b,stroke-dasharray: 5 5
+</pre>
+<div class="caption">Fig 1 — High-Level Component Architecture</div>
+</div>
+
+<h3>Core Responsibilities</h3>
+<div class="card-grid">
+  <div class="card">
+    <h4>Config Manager</h4>
+    <p>Unified config via <code>viper</code>: YAML file → env vars → CLI flags (highest precedence). Supports per-provider model overrides, YOLO defaults, and plugin paths.</p>
+  </div>
+  <div class="card">
+    <h4>Plugin Manager</h4>
+    <p>Discovers, loads, and manages plugin binaries via <code>hashicorp/go-plugin</code>. Handles handshake protocol, health checks, version negotiation, and graceful shutdown.</p>
+  </div>
+  <div class="card">
+    <h4>Session Manager</h4>
+    <p>Owns the state machine for each request lifecycle. Coordinates dispatch across providers, collects responses, triggers peer review, and orchestrates synthesis.</p>
+  </div>
+  <div class="card">
+    <h4>Subprocess Runner</h4>
+    <p>Wraps <code>os/exec</code> with context-aware cancellation, structured log capture (stdout/stderr splitting), timeout enforcement, and process cleanup on SIGINT/SIGTERM.</p>
+  </div>
+</div>
+
+<h3>Design Principles</h3>
+<div class="card highlight">
+  <p><strong>SOLID + OCP:</strong> The core is closed for modification, open for extension. Every new capability (provider, strategy, formatter, subcommand, lifecycle hook) is a plugin — zero core changes needed.</p>
+  <p><strong>Dual-Track Extensibility:</strong> <em>gRPC plugins</em> (Provider, Strategy, Formatter, Hook) for structured, typed contracts with the core. <em>Extension plugins</em> (dootsabha-*) for adding entirely new subcommands — any language, zero ceremony, gh/kubectl pattern.</p>
+  <p><strong>Structs + Interfaces:</strong> Concrete types implement thin interfaces. No interface pollution. Plugin interfaces are the contract, structs are the implementation.</p>
+  <p><strong>Fail-Fast + Recover:</strong> Plugin crashes don't take down the core (process isolation via go-plugin). Transient failures get retries with exponential backoff; permanent failures fail immediately with actionable error messages.</p>
+  <p><strong>Agent-First DX:</strong> Every output supports <code>--json</code> for machine consumption. Stdout carries data, stderr carries logs. Exit codes are meaningful. Streaming via <code>--watch</code>.</p>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §2 PLUGINS ═══════════════════════════════ -->
+<section id="plugins">
+<h2><span class="num">02</span> Plugin System</h2>
+
+<p>
+  Built on <strong>hashicorp/go-plugin</strong> (battle-tested by Terraform, Vault, Nomad, Packer —
+  3,570+ Go projects). Each plugin is a standalone binary communicating with the core over gRPC.
+  Plugins live in <code>~/.dootsabha/plugins/</code> or a configured path.
+</p>
+
+<h3>Plugin Interface (Go)</h3>
+<pre>
+// ─── Provider Plugin ─── The primary interface for coding agents.
+type Provider interface {
+    // Name returns the friendly name (e.g., "claude", "codex", "gemini").
+    Name() string
+
+    // Capabilities returns supported features (streaming, JSON output, etc.).
+    Capabilities() ProviderCaps
+
+    // Invoke sends a prompt and returns structured output.
+    // ctx carries deadline, cancellation, and trace ID.
+    Invoke(ctx context.Context, req *InvokeRequest) (*InvokeResponse, error)
+
+    // HealthCheck verifies the underlying CLI is installed and authenticated.
+    HealthCheck(ctx context.Context) (*HealthStatus, error)
+}
+
+// ─── Strategy Plugin ─── Orchestration modes (council, consult, etc.).
+type Strategy interface {
+    Name() string
+    Execute(ctx context.Context, req *StrategyRequest) (*StrategyResponse, error)
+}
+
+// ─── Formatter Plugin ─── Output rendering (JSON, table, markdown, diff).
+type Formatter interface {
+    Name() string
+    Format(ctx context.Context, data *FormatInput) ([]byte, error)
+}
+
+// ─── Hook Plugin ─── Lifecycle middleware (pre/post invoke, synthesis, etc.).
+// Hooks run in registration order. Returning an error from a "Pre" hook
+// aborts the operation. "Post" hook errors are logged but don't abort.
+type Hook interface {
+    Name() string
+
+    // Which lifecycle events this hook subscribes to.
+    Events() []HookEvent
+
+    // PreInvoke runs before each agent invocation.
+    // Can modify the request (prompt rewriting, injection, etc.).
+    PreInvoke(ctx context.Context, req *InvokeRequest) (*InvokeRequest, error)
+
+    // PostInvoke runs after each agent invocation.
+    // Can inspect/transform the response (redaction, enrichment, etc.).
+    PostInvoke(ctx context.Context, req *InvokeRequest, resp *InvokeResponse) (*InvokeResponse, error)
+
+    // PreSynthesis runs before the chair synthesizes final output.
+    PreSynthesis(ctx context.Context, responses []*InvokeResponse) ([]*InvokeResponse, error)
+
+    // PostSession runs after the full session completes (metrics, cleanup, etc.).
+    PostSession(ctx context.Context, session *SessionSummary) error
+}
+
+type HookEvent string
+const (
+    HookPreInvoke     HookEvent = "pre_invoke"
+    HookPostInvoke    HookEvent = "post_invoke"
+    HookPreSynthesis  HookEvent = "pre_synthesis"
+    HookPostSession   HookEvent = "post_session"
+)
+
+// ─── Extension Plugin ─── NOT a gRPC plugin.
+// Extensions are standalone binaries on $PATH named "dootsabha-{name}".
+// They register as "dootsabha {name}" subcommands (gh-style).
+// No interface to implement — just a binary that accepts args.
+//
+// Context is delivered via 3 tiers:
+//
+// Tier 1 (env vars): DOOTSABHA_BIN, DOOTSABHA_CONFIG, DOOTSABHA_SESSION_ID,
+//   DOOTSABHA_VERSION, DOOTSABHA_DATA_DIR, DOOTSABHA_CACHE_DIR,
+//   DOOTSABHA_STATE_DIR, DOOTSABHA_PLUGINS_DIR, DOOTSABHA_LOG_LEVEL,
+//   DOOTSABHA_LOG_FORMAT, DOOTSABHA_OUTPUT_FORMAT, DOOTSABHA_TTY,
+//   DOOTSABHA_COLOR, DOOTSABHA_TERM_WIDTH, DOOTSABHA_WORK_DIR,
+//   DOOTSABHA_GIT_ROOT, DOOTSABHA_GIT_BRANCH, DOOTSABHA_CONTEXT_FILE
+//
+// Tier 2 (context file): JSON at $DOOTSABHA_CONTEXT_FILE with full resolved
+//   config, provider registry (health + capabilities), workspace/git state,
+//   directory paths, terminal info, installed extensions/plugins list.
+//   Core writes this before exec, cleans up after exit.
+//
+// Tier 3 (callback): Extensions can invoke $DOOTSABHA_BIN directly to
+//   run agents, council sessions, status checks, etc. Session ID propagates
+//   automatically for correlated metrics/traces.
+//
+// Extensions inherit stdin/stdout/stderr directly (no capture).
+// Exit code is forwarded to the caller.
+
+// ─── Common Types ───
+type InvokeRequest struct {
+    Prompt       string            `json:"prompt"`
+    Model        string            `json:"model,omitempty"`
+    MaxTurns     int               `json:"max_turns,omitempty"`
+    Temperature  float64           `json:"temperature,omitempty"`
+    OutputFormat string            `json:"output_format"` // "json" | "text" | "stream-json"
+    ExtraArgs    []string          `json:"extra_args,omitempty"`
+    Env          map[string]string `json:"env,omitempty"`
+    WorkDir      string            `json:"work_dir,omitempty"`
+    Timeout      time.Duration     `json:"timeout,omitempty"`
+}
+
+type InvokeResponse struct {
+    Content    string             `json:"content"`
+    RawJSON    json.RawMessage    `json:"raw_json,omitempty"`
+    Provider   string             `json:"provider"`
+    Model      string             `json:"model"`
+    SessionID  string             `json:"session_id,omitempty"`
+    CostUSD    float64            `json:"cost_usd,omitempty"`
+    TokensIn   int                `json:"tokens_in,omitempty"`
+    TokensOut  int                `json:"tokens_out,omitempty"`
+    DurationMs int64              `json:"duration_ms"`
+    ExitCode   int                `json:"exit_code"`
+    Stderr     string             `json:"stderr,omitempty"`
+}
+
+type ProviderCaps struct {
+    SupportsJSON      bool     `json:"supports_json"`
+    SupportsStreaming  bool     `json:"supports_streaming"`
+    SupportedModels   []string `json:"supported_models"`
+    DefaultModel      string   `json:"default_model"`
+    MaxContextTokens  int      `json:"max_context_tokens"`
+}
+
+type HealthStatus struct {
+    OK        bool   `json:"ok"`
+    Version   string `json:"version,omitempty"`
+    CLIPath   string `json:"cli_path,omitempty"`
+    AuthValid bool   `json:"auth_valid"`
+    Error     string `json:"error,omitempty"`
+}
+
+type SessionSummary struct {
+    SessionID   string            `json:"session_id"`
+    Strategy    string            `json:"strategy"`
+    Providers   []string          `json:"providers"`
+    TotalCost   float64           `json:"total_cost_usd"`
+    TotalTokens int               `json:"total_tokens"`
+    DurationMs  int64             `json:"duration_ms"`
+    Errors      []string          `json:"errors,omitempty"`
+}
+</pre>
+
+<h3>Plugin Discovery &amp; Loading</h3>
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a2234', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#3b82f6', 'lineColor': '#64748b'}}}%%
+flowchart LR
+    A["Core starts"] --> B["Scan plugin dirs"]
+    B --> C{"Plugin binary\nfound?"}
+    C -->|Yes| D["Handshake\n(magic cookie)"]
+    C -->|No| E["Log warning\nskip"]
+    D --> F{"Version\nmatch?"}
+    F -->|Yes| G["Start gRPC\nconnection"]
+    F -->|No| H["Log error\nskip"]
+    G --> I["Register in\nPlugin Registry"]
+    I --> J["Health Check"]
+    J --> K["Ready ✓"]
+
+    style A fill:#1a2234,stroke:#f59e0b,color:#e2e8f0
+    style K fill:#1a2234,stroke:#10b981,color:#10b981
+    style E fill:#1a2234,stroke:#64748b,color:#64748b
+    style H fill:#1a2234,stroke:#ef4444,color:#ef4444
+</pre>
+<div class="caption">Fig 2 — Plugin Discovery Flow</div>
+</div>
+
+<h3>Plugin Lifecycle</h3>
+<div class="callout callout-info">
+  <strong>Process Isolation:</strong> Each plugin runs as a separate OS process. A panicking plugin cannot crash the core.
+  Plugins are discovered at startup and can be upgraded independently by replacing the binary and restarting.
+  While hashicorp/go-plugin doesn't support hot-reload, plugin processes are lightweight and restart in &lt;100ms.
+</div>
+
+<div class="table-wrap">
+<table>
+<tr>
+  <th>Plugin Type</th>
+  <th>Interface</th>
+  <th>Transport</th>
+  <th>Built-in</th>
+  <th>Purpose</th>
+</tr>
+<tr>
+  <td><span class="badge badge-gold">Provider</span></td>
+  <td><code>Provider</code></td>
+  <td>gRPC</td>
+  <td>claude, codex, gemini</td>
+  <td>Wraps a coding agent CLI — invoke, parse output, health check</td>
+</tr>
+<tr>
+  <td><span class="badge badge-purple">Strategy</span></td>
+  <td><code>Strategy</code></td>
+  <td>gRPC</td>
+  <td>council, consult, solo</td>
+  <td>Orchestration mode — how agents collaborate on a task</td>
+</tr>
+<tr>
+  <td><span class="badge badge-cyan">Formatter</span></td>
+  <td><code>Formatter</code></td>
+  <td>gRPC</td>
+  <td>json, table, markdown, diff</td>
+  <td>Renders final output for humans or agents</td>
+</tr>
+<tr>
+  <td><span class="badge badge-green">Extension</span></td>
+  <td><em>none (binary)</em></td>
+  <td>exec (stdin/out/err)</td>
+  <td><em>none</em></td>
+  <td>Adds new subcommands — gh/kubectl style PATH discovery</td>
+</tr>
+<tr>
+  <td><span class="badge badge-red">Hook</span></td>
+  <td><code>Hook</code></td>
+  <td>gRPC</td>
+  <td><em>none</em></td>
+  <td>Lifecycle middleware — pre/post invoke, synthesis, session</td>
+</tr>
+</table>
+</div>
+
+<h3>Plugin Capability Matrix</h3>
+<p>What each plugin type can and cannot do — the definitive capability map.</p>
+<div class="table-wrap">
+<table>
+<tr>
+  <th>Capability</th>
+  <th><span class="badge badge-gold">Provider</span></th>
+  <th><span class="badge badge-purple">Strategy</span></th>
+  <th><span class="badge badge-cyan">Formatter</span></th>
+  <th><span class="badge badge-green">Extension</span></th>
+  <th><span class="badge badge-red">Hook</span></th>
+</tr>
+<tr>
+  <td>Add new subcommands</td>
+  <td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td>
+</tr>
+<tr>
+  <td>Invoke coding agents</td>
+  <td><strong>✓</strong></td><td>via providers</td><td>—</td><td>own subprocess</td><td>—</td>
+</tr>
+<tr>
+  <td>Modify requests (prompt rewrite, injection)</td>
+  <td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td>
+</tr>
+<tr>
+  <td>Modify responses (redaction, enrichment)</td>
+  <td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td>
+</tr>
+<tr>
+  <td>Define orchestration flow</td>
+  <td>—</td><td><strong>✓</strong></td><td>—</td><td>—</td><td>—</td>
+</tr>
+<tr>
+  <td>Custom output rendering</td>
+  <td>—</td><td>—</td><td><strong>✓</strong></td><td>own stdout</td><td>—</td>
+</tr>
+<tr>
+  <td>Access core config/context</td>
+  <td>via gRPC</td><td>via gRPC</td><td>via gRPC</td><td>via env vars</td><td>via gRPC</td>
+</tr>
+<tr>
+  <td>Language agnostic</td>
+  <td>✓ (gRPC)</td><td>✓ (gRPC)</td><td>✓ (gRPC)</td><td><strong>✓ (any binary)</strong></td><td>✓ (gRPC)</td>
+</tr>
+<tr>
+  <td>Process isolation</td>
+  <td>✓</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td>
+</tr>
+<tr>
+  <td>Interactive terminal (TUI)</td>
+  <td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td><td>—</td>
+</tr>
+<tr>
+  <td>Post-session side effects (logging, webhooks)</td>
+  <td>—</td><td>—</td><td>—</td><td>—</td><td><strong>✓</strong></td>
+</tr>
+</table>
+</div>
+
+<h3>Extension Plugins — The gh/kubectl Pattern</h3>
+<div class="card highlight">
+  <p><strong>How it works:</strong> Any executable on <code>$PATH</code> or in <code>~/.dootsabha/plugins/</code> named <code>dootsabha-{name}</code> automatically becomes available as <code>dootsabha {name}</code>. No gRPC, no interface, no Go required — just a binary that accepts args.</p>
+  <p><strong>Precedent:</strong> This is the exact pattern used by <code>gh</code> (GitHub CLI extensions: <code>gh-dash</code>, <code>gh-copilot</code>), <code>kubectl</code> (krew: <code>kubectl-ctx</code>, <code>kubectl-ns</code>), and <code>git</code> (<code>git-lfs</code>, <code>git-flow</code>). Battle-tested, zero-friction, language-agnostic.</p>
+</div>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a2234', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#10b981', 'lineColor': '#64748b'}}}%%
+flowchart LR
+    A["dootsabha bench ..."] --> B["Core: unknown cmd\n'bench'"]
+    B --> C{"Scan for\ndootsabha-bench"}
+    C -->|"Found on PATH\nor plugins dir"| D["Write context JSON\nto temp file"]
+    C -->|"Not found"| E["Error: unknown\ncommand 'bench'"]
+    D --> F["Set env vars\n(Tier 1 + Tier 2 path)"]
+    F --> G["exec: dootsabha-bench\n+ forward args"]
+    G --> H["Extension runs\ninherits stdin/out/err"]
+    H --> I["Cleanup context file\nforward exit code"]
+
+    style A fill:#1a2234,stroke:#10b981,color:#e2e8f0
+    style I fill:#1a2234,stroke:#10b981,color:#10b981
+    style E fill:#1a2234,stroke:#ef4444,color:#ef4444
+</pre>
+<div class="caption">Fig 2b — Extension Plugin Discovery &amp; Execution</div>
+</div>
+
+<h3>Extension Context Protocol</h3>
+<p>
+  Extensions receive rich context through three tiers — from lightweight env vars to a full JSON context file to callback invocations. This is what separates a toy plugin system from one that enables genuinely sophisticated extensions.
+</p>
+
+<h4>Tier 1 — Environment Variables <span class="badge badge-green">always passed</span></h4>
+<p>Flat, shell-friendly scalars. Available in every language without parsing.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Variable</th><th>Example</th><th>Purpose</th></tr>
+<tr><td colspan="3" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">IDENTITY &amp; PATHS</td></tr>
+<tr><td><code>DOOTSABHA_VERSION</code></td><td><code>0.1.0</code></td><td>Core version (for compat checks)</td></tr>
+<tr><td><code>DOOTSABHA_BIN</code></td><td><code>/usr/local/bin/dootsabha</code></td><td>Absolute path to core binary — for Tier 3 callbacks</td></tr>
+<tr><td><code>DOOTSABHA_CONFIG</code></td><td><code>~/.dootsabha/config.yaml</code></td><td>Resolved config file path</td></tr>
+<tr><td><code>DOOTSABHA_CONTEXT_FILE</code></td><td><code>/tmp/ds_ctx_a1b2.json</code></td><td>Path to Tier 2 JSON context file</td></tr>
+<tr><td colspan="3" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">DIRECTORIES (XDG-aligned)</td></tr>
+<tr><td><code>DOOTSABHA_DATA_DIR</code></td><td><code>~/.local/share/dootsabha</code></td><td>Persistent data (session history, cost ledger, benchmarks)</td></tr>
+<tr><td><code>DOOTSABHA_CACHE_DIR</code></td><td><code>~/.cache/dootsabha</code></td><td>Ephemeral cache (response cache, compiled schemas)</td></tr>
+<tr><td><code>DOOTSABHA_STATE_DIR</code></td><td><code>~/.local/state/dootsabha</code></td><td>Runtime state (PID files, lock files, in-progress sessions)</td></tr>
+<tr><td><code>DOOTSABHA_PLUGINS_DIR</code></td><td><code>~/.dootsabha/plugins</code></td><td>Plugin directory</td></tr>
+<tr><td colspan="3" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">SESSION &amp; OBSERVABILITY</td></tr>
+<tr><td><code>DOOTSABHA_SESSION_ID</code></td><td><code>ds_a1b2c3d4</code></td><td>Parent session/trace ID — for correlated logs/metrics</td></tr>
+<tr><td><code>DOOTSABHA_LOG_LEVEL</code></td><td><code>info</code></td><td>Current log level (debug/info/warn/error)</td></tr>
+<tr><td><code>DOOTSABHA_LOG_FORMAT</code></td><td><code>json</code></td><td>Log format preference (json/text)</td></tr>
+<tr><td><code>DOOTSABHA_OUTPUT_FORMAT</code></td><td><code>text</code></td><td>User's requested output format (text/json) — honor <code>--json</code></td></tr>
+<tr><td colspan="3" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">TERMINAL CONTEXT</td></tr>
+<tr><td><code>DOOTSABHA_TTY</code></td><td><code>true</code></td><td>Is stdout a TTY? (false when piped — skip spinners/color)</td></tr>
+<tr><td><code>DOOTSABHA_COLOR</code></td><td><code>true</code></td><td>Is color output enabled? (respects <code>NO_COLOR</code>)</td></tr>
+<tr><td><code>DOOTSABHA_TERM_WIDTH</code></td><td><code>120</code></td><td>Terminal width in columns (for formatting)</td></tr>
+<tr><td colspan="3" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">WORKSPACE CONTEXT</td></tr>
+<tr><td><code>DOOTSABHA_WORK_DIR</code></td><td><code>/home/user/myproject</code></td><td>Working directory the user invoked दूतसभा from</td></tr>
+<tr><td><code>DOOTSABHA_GIT_ROOT</code></td><td><code>/home/user/myproject</code></td><td>Git repo root (empty if not in a repo)</td></tr>
+<tr><td><code>DOOTSABHA_GIT_BRANCH</code></td><td><code>main</code></td><td>Current git branch (empty if not in a repo)</td></tr>
+</table>
+</div>
+
+<h4>Tier 2 — Context File (JSON) <span class="badge badge-blue">rich structured data</span></h4>
+<p>
+  Before exec'ing an extension, the core writes a temporary JSON file containing the full runtime context. The path is in <code>DOOTSABHA_CONTEXT_FILE</code>. This solves the fundamental problem with env vars — complex nested data, lists, and provider registries don't survive shell escaping.
+</p>
+<div class="callout callout-info">
+  <strong>Why a file, not stdin?</strong> Extensions need stdin for interactive input (TUIs, prompts). A temp file is language-agnostic, parseable by <code>jq</code> in Bash or <code>json.load()</code> in Python, and has no size limits. Core cleans it up after the extension exits.
+</div>
+<pre>
+// $DOOTSABHA_CONTEXT_FILE contents:
+{
+  "version": "0.1.0",
+  "session_id": "ds_a1b2c3d4",
+  "invoked_as": "dootsabha bench --rounds 5",
+  "extension_name": "bench",
+  "extension_args": ["--rounds", "5"],
+
+  // ─── Full resolved config (merged: defaults + file + env + flags) ───
+  "config": {
+    "defaults": {
+      "timeout": "5m",
+      "output_format": "text",
+      "parallel": true
+    },
+    "providers": {
+      "claude": {
+        "model": "sonnet-4-6",
+        "yolo": true,
+        "session_persistence": false,
+        "extra_args": []
+      },
+      "codex": {
+        "model": "gpt-5.3-codex",
+        "reasoning": "medium",
+        "sandbox": "danger-full-access",
+        "ephemeral": true,
+        "skip_git_check": true
+      },
+      "gemini": {
+        "model": "gemini-3-pro",
+        "approval_mode": "yolo"
+      }
+    },
+    "strategy": {
+      "council": { "agents": ["claude", "codex", "gemini"], "chair": "claude", "rounds": 1 },
+      "consult": { "default_agent": "claude" }
+    }
+  },
+
+  // ─── Provider registry: live health + capabilities ───
+  "providers": {
+    "claude": {
+      "healthy": true,
+      "cli_path": "/usr/local/bin/claude",
+      "cli_version": "1.0.24",
+      "auth_valid": true,
+      "capabilities": {
+        "supports_json": true,
+        "supports_streaming": true,
+        "supported_models": ["opus-4-6", "sonnet-4-6", "haiku-4-5"],
+        "default_model": "sonnet-4-6",
+        "max_context_tokens": 1000000
+      }
+    },
+    "codex": {
+      "healthy": true,
+      "cli_path": "/usr/local/bin/codex",
+      "cli_version": "0.9.3",
+      "auth_valid": true,
+      "capabilities": {
+        "supports_json": true,
+        "supports_streaming": true,
+        "supported_models": ["gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-max"],
+        "default_model": "gpt-5.3-codex",
+        "max_context_tokens": 256000
+      }
+    },
+    "gemini": {
+      "healthy": false,
+      "cli_path": "/usr/local/bin/gemini",
+      "cli_version": "0.18.1",
+      "auth_valid": false,
+      "error": "OAuth token expired — run: gemini auth login",
+      "capabilities": {
+        "supports_json": true,
+        "supports_streaming": true,
+        "supported_models": ["gemini-3-pro", "gemini-2.5-flash"],
+        "default_model": "gemini-3-pro",
+        "max_context_tokens": 2000000
+      }
+    }
+  },
+
+  // ─── Workspace context ───
+  "workspace": {
+    "cwd": "/home/user/myproject",
+    "git_root": "/home/user/myproject",
+    "git_branch": "feat/auth-refactor",
+    "git_sha": "a1b2c3d",
+    "git_dirty": true
+  },
+
+  // ─── Directories ───
+  "dirs": {
+    "data": "/home/user/.local/share/dootsabha",
+    "cache": "/home/user/.cache/dootsabha",
+    "state": "/home/user/.local/state/dootsabha",
+    "plugins": "/home/user/.dootsabha/plugins",
+    "sessions": "/home/user/.local/share/dootsabha/sessions"
+  },
+
+  // ─── Terminal ───
+  "terminal": {
+    "tty": true,
+    "color": true,
+    "width": 120,
+    "height": 40
+  },
+
+  // ─── Installed extensions &amp; gRPC plugins ───
+  "extensions": ["bench", "cost", "tui"],
+  "plugins": {
+    "providers": ["claude", "codex", "gemini"],
+    "strategies": ["council", "consult", "solo"],
+    "formatters": ["json", "table", "markdown"],
+    "hooks": ["cost-guard"]
+  }
+}
+</pre>
+
+<div class="card">
+  <h4>Context File in Practice — Bash &amp; Python</h4>
+<pre>
+# Bash: read provider health with jq
+#!/usr/bin/env bash
+CTX=$(cat "$DOOTSABHA_CONTEXT_FILE")
+HEALTHY=$(echo "$CTX" | jq -r '[.providers | to_entries[] | select(.value.healthy)] | map(.key) | join(",")')
+echo "Healthy agents: $HEALTHY"
+MODEL=$(echo "$CTX" | jq -r '.config.providers.claude.model')
+echo "Claude model: $MODEL"
+</pre>
+<pre>
+# Python: full context access
+#!/usr/bin/env python3
+import json, os
+with open(os.environ["DOOTSABHA_CONTEXT_FILE"]) as f:
+    ctx = json.load(f)
+for name, info in ctx["providers"].items():
+    status = "✓" if info["healthy"] else f"✗ {info.get('error','')}"
+    print(f"  {name}: {status} ({info['capabilities']['default_model']})")
+</pre>
+</div>
+
+<h4>Tier 3 — Core Callback <span class="badge badge-purple">full power</span></h4>
+<p>
+  Extensions can invoke <code>$DOOTSABHA_BIN</code> directly for operations that need the core's orchestration — invoking agents, running council sessions, checking live status. This is the <code>gh api</code> equivalent.
+</p>
+<div class="callout callout-warn">
+  <strong>Design choice:</strong> Callback via subprocess (not a local socket/API). Keeps the contract dead simple — extensions just shell out to the same binary the user installed. No daemon, no port conflicts, no auth tokens. The session ID propagates automatically via <code>DOOTSABHA_SESSION_ID</code> so nested calls are correlated in metrics/traces.
+</div>
+<pre>
+#!/usr/bin/env bash
+# dootsabha-bench: benchmark extension using Tier 3 callbacks
+DS="$DOOTSABHA_BIN"
+PROMPT="$1"
+ROUNDS="${2:-3}"
+
+echo "Benchmarking '$PROMPT' across all healthy providers ($ROUNDS rounds)..."
+
+# Read healthy providers from context file (Tier 2)
+PROVIDERS=$(jq -r '[.providers | to_entries[] | select(.value.healthy) | .key] | .[]' "$DOOTSABHA_CONTEXT_FILE")
+
+for provider in $PROVIDERS; do
+  echo "── $provider ──"
+  for i in $(seq 1 "$ROUNDS"); do
+    # Tier 3: callback into core to invoke agents
+    result=$("$DS" consult --agent "$provider" --json "$PROMPT")
+    cost=$(echo "$result" | jq -r '.cost_usd // 0')
+    ms=$(echo "$result" | jq -r '.duration_ms')
+    tokens=$(echo "$result" | jq -r '.tokens_out // 0')
+    echo "  Round $i: ${ms}ms, ${tokens} tokens, \$${cost}"
+  done
+done
+</pre>
+
+<div class="card">
+  <h4>What Each Tier Unlocks</h4>
+  <div class="table-wrap">
+  <table>
+  <tr><th>Extension Needs To...</th><th>Tier 1 (env)</th><th>Tier 2 (context file)</th><th>Tier 3 (callback)</th></tr>
+  <tr><td>Know if stdout is a TTY (skip spinners when piped)</td><td><strong>✓</strong> <code>DOOTSABHA_TTY</code></td><td>—</td><td>—</td></tr>
+  <tr><td>Format terminal width-aware output</td><td><strong>✓</strong> <code>DOOTSABHA_TERM_WIDTH</code></td><td>—</td><td>—</td></tr>
+  <tr><td>Correlate logs with parent session</td><td><strong>✓</strong> <code>DOOTSABHA_SESSION_ID</code></td><td>—</td><td>—</td></tr>
+  <tr><td>Honor user's <code>--json</code> flag</td><td><strong>✓</strong> <code>DOOTSABHA_OUTPUT_FORMAT</code></td><td>—</td><td>—</td></tr>
+  <tr><td>Store persistent data (history, ledger)</td><td><strong>✓</strong> <code>DOOTSABHA_DATA_DIR</code></td><td>—</td><td>—</td></tr>
+  <tr><td>Know which providers are healthy</td><td>—</td><td><strong>✓</strong> <code>.providers[].healthy</code></td><td>—</td></tr>
+  <tr><td>Read per-provider model/config</td><td>—</td><td><strong>✓</strong> <code>.config.providers</code></td><td>—</td></tr>
+  <tr><td>Know available models + context window sizes</td><td>—</td><td><strong>✓</strong> <code>.providers[].capabilities</code></td><td>—</td></tr>
+  <tr><td>Know git repo state (branch, dirty, sha)</td><td>partial</td><td><strong>✓</strong> <code>.workspace</code></td><td>—</td></tr>
+  <tr><td>Know what other extensions/plugins exist</td><td>—</td><td><strong>✓</strong> <code>.extensions</code>, <code>.plugins</code></td><td>—</td></tr>
+  <tr><td>Invoke a specific agent and parse response</td><td>—</td><td>—</td><td><strong>✓</strong> <code>$DS consult --json</code></td></tr>
+  <tr><td>Run a full council session</td><td>—</td><td>—</td><td><strong>✓</strong> <code>$DS council --json</code></td></tr>
+  <tr><td>Check live health (not cached snapshot)</td><td>—</td><td>—</td><td><strong>✓</strong> <code>$DS status --json</code></td></tr>
+  <tr><td>Access core's retry/backoff/timeout logic</td><td>—</td><td>—</td><td><strong>✓</strong> (inherited from core)</td></tr>
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <h4>Example Extension Ideas</h4>
+  <div class="table-wrap">
+  <table>
+  <tr><th>Extension</th><th>Binary</th><th>What it adds</th></tr>
+  <tr><td><code>dootsabha bench</code></td><td><code>dootsabha-bench</code></td><td>Benchmark agents on standardized prompts, compare latency/quality/cost</td></tr>
+  <tr><td><code>dootsabha cost</code></td><td><code>dootsabha-cost</code></td><td>Cost tracking dashboard — historical spend per provider/model</td></tr>
+  <tr><td><code>dootsabha diff</code></td><td><code>dootsabha-diff</code></td><td>Side-by-side diff of outputs from two agents on the same prompt</td></tr>
+  <tr><td><code>dootsabha replay</code></td><td><code>dootsabha-replay</code></td><td>Replay a saved session with different agents or models</td></tr>
+  <tr><td><code>dootsabha upgrade</code></td><td><code>dootsabha-upgrade</code></td><td>Self-update core + plugins from releases</td></tr>
+  <tr><td><code>dootsabha tui</code></td><td><code>dootsabha-tui</code></td><td>Interactive Bubbletea TUI for conversational council sessions</td></tr>
+  </table>
+  </div>
+</div>
+
+<h3>Hook Plugins — Lifecycle Middleware</h3>
+<div class="card highlight">
+  <p><strong>How it works:</strong> Hook plugins subscribe to lifecycle events (<code>pre_invoke</code>, <code>post_invoke</code>, <code>pre_synthesis</code>, <code>post_session</code>) and run as middleware in registration order. They can transform requests/responses or perform side effects.</p>
+  <p><strong>Use cases:</strong> Prompt injection/templating, PII redaction, cost alerts, Slack notifications on completion, audit logging, response caching, A/B testing different models.</p>
+</div>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a2234', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#ef4444', 'lineColor': '#64748b', 'noteBkgColor': '#1a2234', 'noteTextColor': '#e2e8f0', 'noteBorderColor': '#1e2d4a'}}}%%
+sequenceDiagram
+    participant C as Core Engine
+    participant H1 as Hook: prompt-template
+    participant H2 as Hook: cost-guard
+    participant P as Provider (claude)
+    participant H3 as Hook: audit-log
+
+    C->>H1: PreInvoke(req)
+    Note right of H1: Injects system prompt,<br/>adds context from repo
+    H1-->>C: modified req ✓
+
+    C->>H2: PreInvoke(req)
+    Note right of H2: Checks budget.<br/>Abort if over limit.
+    H2-->>C: req ✓ (under budget)
+
+    C->>P: Invoke(req)
+    P-->>C: response
+
+    C->>H3: PostInvoke(req, resp)
+    Note right of H3: Logs to audit trail,<br/>emits webhook
+    H3-->>C: resp ✓ (unchanged)
+</pre>
+<div class="caption">Fig 2c — Hook Plugin Middleware Chain</div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §3 SUBCOMMANDS ═══════════════════════════════ -->
+<section id="subcmds">
+<h2><span class="num">03</span> Subcommands</h2>
+
+<p>
+  Subcommand-driven design to minimize flag overload. Each subcommand has sensible defaults —
+  you can run most commands with zero flags for the common case.
+</p>
+
+<div class="table-wrap">
+<table>
+<tr>
+  <th>Subcommand</th>
+  <th>Sanskrit Alias</th>
+  <th>Purpose</th>
+  <th>Default Behavior</th>
+</tr>
+<tr>
+  <td><code>council</code></td>
+  <td><code>sabha</code></td>
+  <td>All 3 agents deliberate → peer review → synthesized answer</td>
+  <td>claude + codex + gemini, majority synthesis</td>
+</tr>
+<tr>
+  <td><code>consult</code></td>
+  <td><code>paraamarsh</code></td>
+  <td>Ask a single agent directly</td>
+  <td>Uses <code>claude</code> as default agent</td>
+</tr>
+<tr>
+  <td><code>review</code></td>
+  <td><code>sameeksha</code></td>
+  <td>One agent reviews another's output</td>
+  <td>claude reviews codex output</td>
+</tr>
+<tr>
+  <td><code>status</code></td>
+  <td><code>sthiti</code></td>
+  <td>Health check all providers, show versions &amp; auth state</td>
+  <td>Checks all configured providers</td>
+</tr>
+<tr>
+  <td><code>config</code></td>
+  <td><code>vinyaas</code></td>
+  <td>View/edit config, show resolved values</td>
+  <td>Shows effective merged config</td>
+</tr>
+<tr>
+  <td><code>plugin</code></td>
+  <td><code>vistaarak</code></td>
+  <td>List, install, inspect plugins &amp; discovered extensions</td>
+  <td>Lists all gRPC plugins + PATH extensions with health status</td>
+</tr>
+</table>
+</div>
+
+<h3>Subcommand → Flag Matrix</h3>
+<p>Each subcommand accepts only the flags relevant to it. Global flags apply everywhere. Config file values serve as defaults for all flags.</p>
+
+<div class="table-wrap">
+<table>
+<tr>
+  <th>Flag (English)</th>
+  <th>Flag (Sanskrit)</th>
+  <th>Scope</th>
+  <th>Type</th>
+  <th>Default</th>
+  <th>Description</th>
+</tr>
+<!-- GLOBAL -->
+<tr><td colspan="6" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">GLOBAL FLAGS</td></tr>
+<tr>
+  <td><code>--json</code></td>
+  <td><code>—</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>bool</td>
+  <td><code>false</code></td>
+  <td>Structured JSON output (stdout=data, stderr=logs)</td>
+</tr>
+<tr>
+  <td><code>--verbose</code> / <code>-v</code></td>
+  <td><code>—</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>count</td>
+  <td><code>0</code></td>
+  <td>Increase log verbosity (-v, -vv, -vvv)</td>
+</tr>
+<tr>
+  <td><code>--quiet</code> / <code>-q</code></td>
+  <td><code>—</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>bool</td>
+  <td><code>false</code></td>
+  <td>Suppress all non-error output</td>
+</tr>
+<tr>
+  <td><code>--config</code></td>
+  <td><code>—</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>path</td>
+  <td><code>~/.dootsabha/config.yaml</code></td>
+  <td>Config file path</td>
+</tr>
+<tr>
+  <td><code>--timeout</code></td>
+  <td><code>--kaalseema</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>duration</td>
+  <td><code>5m</code></td>
+  <td>Max execution time per agent invocation</td>
+</tr>
+<tr>
+  <td><code>--watch</code></td>
+  <td><code>--nireekshana</code></td>
+  <td><span class="badge badge-green">global</span></td>
+  <td>bool</td>
+  <td><code>false</code></td>
+  <td>Stream output in real-time as agents run</td>
+</tr>
+<!-- COUNCIL -->
+<tr><td colspan="6" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">COUNCIL / SABHA</td></tr>
+<tr>
+  <td><code>--agents</code></td>
+  <td><code>--dootas</code></td>
+  <td><span class="badge badge-gold">council</span></td>
+  <td>[]string</td>
+  <td><code>claude,codex,gemini</code></td>
+  <td>Agents to include in council</td>
+</tr>
+<tr>
+  <td><code>--chair</code></td>
+  <td><code>--adhyaksha</code></td>
+  <td><span class="badge badge-gold">council</span></td>
+  <td>string</td>
+  <td><code>claude</code></td>
+  <td>Agent that synthesizes final answer</td>
+</tr>
+<tr>
+  <td><code>--rounds</code></td>
+  <td><code>--chakra</code></td>
+  <td><span class="badge badge-gold">council</span></td>
+  <td>int</td>
+  <td><code>1</code></td>
+  <td>Number of deliberation rounds</td>
+</tr>
+<tr>
+  <td><code>--parallel</code></td>
+  <td><code>--samantar</code></td>
+  <td><span class="badge badge-gold">council</span></td>
+  <td>bool</td>
+  <td><code>true</code></td>
+  <td>Run agents concurrently (vs sequential)</td>
+</tr>
+<!-- CONSULT -->
+<tr><td colspan="6" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">CONSULT / PARAMARSH</td></tr>
+<tr>
+  <td><code>--agent</code></td>
+  <td><code>--doota</code></td>
+  <td><span class="badge badge-blue">consult</span></td>
+  <td>string</td>
+  <td><code>claude</code></td>
+  <td>Agent to consult</td>
+</tr>
+<tr>
+  <td><code>--model</code></td>
+  <td><code>--pratyaya</code></td>
+  <td><span class="badge badge-blue">consult</span></td>
+  <td>string</td>
+  <td><em>per-agent default</em></td>
+  <td>Override model for this invocation</td>
+</tr>
+<tr>
+  <td><code>--max-turns</code></td>
+  <td><code>—</code></td>
+  <td><span class="badge badge-blue">consult</span></td>
+  <td>int</td>
+  <td><code>0</code> (unlimited)</td>
+  <td>Max agentic turns</td>
+</tr>
+<!-- REVIEW -->
+<tr><td colspan="6" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">REVIEW / SAMIIKSHA</td></tr>
+<tr>
+  <td><code>--reviewer</code></td>
+  <td><code>--pareekshak</code></td>
+  <td><span class="badge badge-purple">review</span></td>
+  <td>string</td>
+  <td><code>claude</code></td>
+  <td>Agent performing the review</td>
+</tr>
+<tr>
+  <td><code>--author</code></td>
+  <td><code>--kartaa</code></td>
+  <td><span class="badge badge-purple">review</span></td>
+  <td>string</td>
+  <td><code>codex</code></td>
+  <td>Agent whose output is being reviewed</td>
+</tr>
+<!-- PLUGIN -->
+<tr><td colspan="6" style="background:var(--bg-secondary); color:var(--accent-gold); font-weight:600; font-family:'JetBrains Mono',monospace; font-size:0.8rem;">PLUGIN / VISTAAR</td></tr>
+<tr>
+  <td><code>plugin list</code></td>
+  <td><code>vistaarak soochi</code></td>
+  <td><span class="badge badge-cyan">plugin</span></td>
+  <td>—</td>
+  <td>—</td>
+  <td>List installed plugins with health</td>
+</tr>
+<tr>
+  <td><code>plugin inspect</code></td>
+  <td><code>vistaarak parikshan</code></td>
+  <td><span class="badge badge-cyan">plugin</span></td>
+  <td>—</td>
+  <td>—</td>
+  <td>Show plugin details (caps, version, interface)</td>
+</tr>
+</table>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §4 BILINGUAL FLAGS ═══════════════════════════════ -->
+<section id="flags">
+<h2><span class="num">04</span> Bilingual Flag Reference (English ↔ Sanskrit)</h2>
+
+<p>Every flag has an English primary and a Sanskrit alias. Both work identically. The Sanskrit names use simplified IAST-friendly romanization for shell compatibility.</p>
+
+<div class="table-wrap">
+<table>
+<tr><th>English</th><th>Sanskrit</th><th>Devanāgarī</th><th>Meaning</th></tr>
+<tr><td><code>council</code></td><td><code>sabha</code></td><td>सभा</td><td>Assembly, council</td></tr>
+<tr><td><code>consult</code></td><td><code>paraamarsh</code></td><td>परामर्श</td><td>Consultation, advice</td></tr>
+<tr><td><code>review</code></td><td><code>sameeksha</code></td><td>समीक्षा</td><td>Review, examination</td></tr>
+<tr><td><code>status</code></td><td><code>sthiti</code></td><td>स्थिति</td><td>State, condition</td></tr>
+<tr><td><code>config</code></td><td><code>vinyaas</code></td><td>विन्यास</td><td>Configuration, arrangement</td></tr>
+<tr><td><code>plugin</code></td><td><code>vistaarak</code></td><td>विस्तारक</td><td>Expander, extender</td></tr>
+<tr><td><code>--agents</code></td><td><code>--dootas</code></td><td>दूताः</td><td>Messengers, agents</td></tr>
+<tr><td><code>--chair</code></td><td><code>--adhyaksha</code></td><td>अध्यक्ष</td><td>Chairperson, president</td></tr>
+<tr><td><code>--rounds</code></td><td><code>--chakra</code></td><td>चक्र</td><td>Cycle, round</td></tr>
+<tr><td><code>--parallel</code></td><td><code>--samantar</code></td><td>समान्तर</td><td>Parallel</td></tr>
+<tr><td><code>--agent</code></td><td><code>--doota</code></td><td>दूत</td><td>Messenger, agent</td></tr>
+<tr><td><code>--model</code></td><td><code>--pratyaya</code></td><td>प्रत्यय</td><td>Form, model, conception</td></tr>
+<tr><td><code>--reviewer</code></td><td><code>--pareekshak</code></td><td>परीक्षक</td><td>Examiner, reviewer</td></tr>
+<tr><td><code>--author</code></td><td><code>--kartaa</code></td><td>कर्ता</td><td>Creator, author</td></tr>
+<tr><td><code>--timeout</code></td><td><code>--kaalseema</code></td><td>कालसीमा</td><td>Time limit</td></tr>
+<tr><td><code>--watch</code></td><td><code>--nireekshana</code></td><td>निरीक्षण</td><td>Observation, monitoring (streaming)</td></tr>
+</table>
+</div>
+
+<div class="callout callout-tip">
+  <strong>Implementation:</strong> Both names are registered as cobra aliases. The <code>dootsabha help</code> output shows them side-by-side. Example: <code>council (sabha)</code>.
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §5 PROVIDERS ═══════════════════════════════ -->
+<section id="providers">
+<h2><span class="num">05</span> Provider Configurations</h2>
+
+<p>Each provider plugin wraps the official coding agent CLI. All flags below are <strong>verified against official documentation as of February 2026</strong>.</p>
+
+<div class="card-grid">
+<!-- CLAUDE -->
+<div class="card">
+  <div class="provider-header">
+    <span class="provider-dot claude"></span>
+    <h4 style="margin:0;">Claude Code <span class="badge badge-gold">Anthropic</span></h4>
+  </div>
+  <div class="table-wrap" style="margin-top:12px;">
+  <table>
+  <tr><td><strong>Default Model</strong></td><td><code>sonnet-4-6</code></td></tr>
+  <tr><td><strong>Available</strong></td><td><code>opus-4-6</code>, <code>sonnet-4-6</code>, <code>haiku-4-5</code></td></tr>
+  <tr><td><strong>Aliases</strong></td><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td></tr>
+  <tr><td><strong>Context</strong></td><td>1M tokens (beta) for opus/sonnet 4.6</td></tr>
+  <tr><td><strong>YOLO Flag</strong></td><td><code>--dangerously-skip-permissions</code></td></tr>
+  <tr><td><strong>Non-interactive</strong></td><td><code>claude -p &lt;prompt&gt;</code></td></tr>
+  <tr><td><strong>JSON Output</strong></td><td><code>--output-format json</code></td></tr>
+  <tr><td><strong>JSON Shape</strong></td><td><code>{"result","session_id","cost_usd"}</code></td></tr>
+  <tr><td><strong>Tool Control</strong></td><td><code>--allowedTools "Bash(...)"</code></td></tr>
+  <tr><td><strong>Session</strong></td><td><code>--no-session-persistence</code></td></tr>
+  <tr><td><strong>Max Turns</strong></td><td><code>--max-turns N</code></td></tr>
+  </table>
+  </div>
+  <pre>claude -p "prompt" \
+  --output-format json \
+  --model sonnet-4-6 \
+  --dangerously-skip-permissions \
+  --no-session-persistence \
+  --max-turns 10</pre>
+</div>
+
+<!-- CODEX -->
+<div class="card">
+  <div class="provider-header">
+    <span class="provider-dot codex"></span>
+    <h4 style="margin:0;">Codex CLI <span class="badge badge-green">OpenAI</span></h4>
+  </div>
+  <div class="table-wrap" style="margin-top:12px;">
+  <table>
+  <tr><td><strong>Default Model</strong></td><td><code>gpt-5.3-codex</code></td></tr>
+  <tr><td><strong>Available</strong></td><td><code>gpt-5.3-codex</code>, <code>gpt-5.2-codex</code>, <code>gpt-5.1-codex-max</code>, <code>gpt-5.1-codex</code>, <code>gpt-5.1-codex-mini</code>, <code>gpt-5-codex</code>, <code>gpt-5-codex-mini</code></td></tr>
+  <tr><td><strong>Reasoning</strong></td><td><code>low</code>, <code>medium</code> (default), <code>high</code>, <code>xhigh</code></td></tr>
+  <tr><td><strong>YOLO Flag</strong></td><td><code>--sandbox danger-full-access</code></td></tr>
+  <tr><td><strong>Non-interactive</strong></td><td><code>codex exec &lt;prompt&gt;</code></td></tr>
+  <tr><td><strong>JSON Output</strong></td><td><code>--json</code> (JSONL stream)</td></tr>
+  <tr><td><strong>JSONL Events</strong></td><td><code>turn.started</code>, <code>turn.completed</code>, <code>item.*</code>, <code>error</code></td></tr>
+  <tr><td><strong>Structured</strong></td><td><code>--output-schema &lt;schema.json&gt;</code></td></tr>
+  <tr><td><strong>Ephemeral</strong></td><td><code>--ephemeral</code></td></tr>
+  <tr><td><strong>Git Bypass</strong></td><td><code>--skip-git-repo-check</code></td></tr>
+  </table>
+  </div>
+  <pre>codex exec "prompt" \
+  --json \
+  --model gpt-5.3-codex \
+  --sandbox danger-full-access \
+  --ephemeral \
+  --skip-git-repo-check</pre>
+</div>
+
+<!-- GEMINI -->
+<div class="card">
+  <div class="provider-header">
+    <span class="provider-dot gemini"></span>
+    <h4 style="margin:0;">Gemini CLI <span class="badge badge-blue">Google</span></h4>
+  </div>
+  <div class="table-wrap" style="margin-top:12px;">
+  <table>
+  <tr><td><strong>Default Model</strong></td><td><code>gemini-3-pro</code></td></tr>
+  <tr><td><strong>Available</strong></td><td><code>gemini-3-pro</code>, <code>gemini-2.5-flash</code></td></tr>
+  <tr><td><strong>YOLO Flag</strong></td><td><code>--approval-mode yolo</code></td></tr>
+  <tr><td><strong>Non-interactive</strong></td><td><code>gemini "prompt"</code> (positional arg)</td></tr>
+  <tr><td><strong>JSON Output</strong></td><td><code>--output-format json</code></td></tr>
+  <tr><td><strong>JSON Shape</strong></td><td><code>{"response","stats":{"models","tools","files"}}</code></td></tr>
+  <tr><td><strong>Tool Control</strong></td><td><code>--allowed-tools "ShellTool(...)"</code></td></tr>
+  <tr><td><strong>Model Flag</strong></td><td><code>--model gemini-3-pro</code></td></tr>
+  </table>
+  </div>
+  <pre>gemini "prompt" \
+  --output-format json \
+  --model gemini-3-pro \
+  --approval-mode yolo</pre>
+  <div class="callout callout-warn" style="margin-top:12px;">
+    <strong>Gotcha:</strong> <code>--yolo</code> shorthand has known bug (#13561). Always use <code>--approval-mode yolo</code>.
+    Positional prompt (not <code>-p</code>) — the <code>-p</code> flag was deprecated in v0.17+.
+  </div>
+</div>
+</div>
+
+<h3>YOLO Defaults — Rationale</h3>
+<div class="card highlight">
+  <p>All three providers default to their maximum-permission modes. This eliminates interactive approval prompts, which is <strong>essential</strong> for non-interactive subprocess orchestration. The alternative (interactive approvals) would cause the subprocess to hang waiting for stdin.</p>
+  <p>Override per-provider via config:</p>
+<pre>
+providers:
+  claude:
+    yolo: false                          # Reverts to interactive approvals
+    allowed_tools: ["Bash(git *)"]       # Restrict tool access
+  codex:
+    sandbox: "workspace-write"           # Downgrade from full access
+  gemini:
+    approval_mode: "auto"                # Downgrade from yolo
+</pre>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §6 LIFECYCLE STATE MACHINE ═══════════════════════════════ -->
+<section id="lifecycle">
+<h2><span class="num">06</span> Lifecycle State Machine</h2>
+
+<p>Every session (a single user request) moves through a well-defined state machine. This ensures predictable behavior, clean error handling, and comprehensive observability at each transition.</p>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#1a2234', 'primaryTextColor': '#e2e8f0', 'primaryBorderColor': '#f59e0b', 'lineColor': '#64748b'}}}%%
+stateDiagram-v2
+    [*] --> Init: CLI parsed
+    Init --> ConfigLoaded: Config merged
+    ConfigLoaded --> PluginsReady: Plugins discovered & healthy
+
+    PluginsReady --> Dispatching: Strategy selected
+    Dispatching --> AgentRunning: Subprocess(es) launched
+
+    AgentRunning --> AgentRunning: Streaming output
+    AgentRunning --> ResponseCollected: All agents completed
+    AgentRunning --> AgentFailed: Timeout / crash / error
+
+    AgentFailed --> RetryDecision: Evaluate failure
+    RetryDecision --> AgentRunning: Transient → retry (backoff)
+    RetryDecision --> PartialResult: Permanent → degrade gracefully
+
+    ResponseCollected --> PeerReview: council mode only
+    ResponseCollected --> Formatting: consult / review modes
+
+    PeerReview --> Synthesis: Reviews collected
+    Synthesis --> Formatting: Final answer ready
+
+    PartialResult --> Formatting: Best available result
+
+    Formatting --> Output: Render to stdout
+    Output --> MetricsFlush: Emit metrics/traces
+    MetricsFlush --> [*]: Done
+
+    note right of Init: Validate CLI args\nResolve config file
+    note right of AgentRunning: os/exec with context\nstdout/stderr split\nProcess group cleanup
+    note right of PeerReview: Each agent reviews\nother agents' outputs
+    note right of Synthesis: Chair agent produces\nfinal unified answer
+</pre>
+<div class="caption">Fig 3 — Session Lifecycle State Machine</div>
+</div>
+
+<h3>State Transitions &amp; Guards</h3>
+<div class="table-wrap">
+<table>
+<tr><th>From</th><th>To</th><th>Guard / Trigger</th><th>Action</th></tr>
+<tr><td>Init</td><td>ConfigLoaded</td><td>Config file + env + flags merged</td><td>Validate schema, resolve paths</td></tr>
+<tr><td>ConfigLoaded</td><td>PluginsReady</td><td>All required plugins healthy</td><td>gRPC handshake, health check</td></tr>
+<tr><td>PluginsReady</td><td>Dispatching</td><td>Strategy plugin selected</td><td>Build InvokeRequest per agent</td></tr>
+<tr><td>Dispatching</td><td>AgentRunning</td><td>Subprocess launched (parallel/sequential)</td><td>Start timers, attach log capture</td></tr>
+<tr><td>AgentRunning</td><td>ResponseCollected</td><td>exit code 0 + valid JSON/text</td><td>Parse response, record metrics</td></tr>
+<tr><td>AgentRunning</td><td>AgentFailed</td><td>timeout || exit code != 0 || parse error</td><td>Capture stderr, classify error</td></tr>
+<tr><td>AgentFailed</td><td>RetryDecision</td><td>Always</td><td>Check retry budget (max 2)</td></tr>
+<tr><td>RetryDecision</td><td>AgentRunning</td><td>Retries remaining && transient error</td><td>Exponential backoff, re-launch</td></tr>
+<tr><td>RetryDecision</td><td>PartialResult</td><td>Retries exhausted || permanent error</td><td>Mark agent as failed, continue with others</td></tr>
+<tr><td>ResponseCollected</td><td>PeerReview</td><td>Strategy == council</td><td>Feed each response to other agents for critique</td></tr>
+<tr><td>PeerReview</td><td>Synthesis</td><td>All reviews collected</td><td>Compile review dossier</td></tr>
+<tr><td>Synthesis</td><td>Formatting</td><td>Chair agent produces final</td><td>Merge into single coherent output</td></tr>
+</table>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §7 SEQUENCE DIAGRAMS ═══════════════════════════════ -->
+<section id="sequences">
+<h2><span class="num">07</span> Sequence Diagrams</h2>
+
+<h3>Council Mode (Full 3-Stage Pipeline)</h3>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'actorTextColor': '#e2e8f0', 'actorBorder': '#f59e0b', 'actorBkg': '#1a2234', 'signalColor': '#64748b', 'signalTextColor': '#e2e8f0', 'labelBoxBkgColor': '#111827', 'labelBoxBorderColor': '#1e2d4a', 'labelTextColor': '#e2e8f0', 'loopTextColor': '#f59e0b', 'noteBkgColor': '#1a2234', 'noteTextColor': '#e2e8f0', 'noteBorderColor': '#1e2d4a'}}}%%
+sequenceDiagram
+    participant U as User/Agent
+    participant C as Core Engine
+    participant CL as Claude Plugin
+    participant CX as Codex Plugin
+    participant GM as Gemini Plugin
+    participant CH as Chair (Claude)
+
+    U->>C: dootsabha council "refactor auth module"
+    activate C
+    C->>C: Load config, init plugins
+
+    Note over C: ═══ Stage 1: Dispatch ═══
+
+    par Parallel Invocation
+        C->>CL: Invoke(prompt, json, sonnet-4-6)
+        activate CL
+        C->>CX: Invoke(prompt, json, gpt-5.3-codex)
+        activate CX
+        C->>GM: Invoke(prompt, json, gemini-3-pro)
+        activate GM
+    end
+
+    CL-->>C: InvokeResponse (claude)
+    deactivate CL
+    CX-->>C: InvokeResponse (codex)
+    deactivate CX
+    GM-->>C: InvokeResponse (gemini)
+    deactivate GM
+
+    Note over C: ═══ Stage 2: Peer Review ═══
+
+    par Cross-Review
+        C->>CL: Review(codex_output + gemini_output)
+        activate CL
+        C->>CX: Review(claude_output + gemini_output)
+        activate CX
+        C->>GM: Review(claude_output + codex_output)
+        activate GM
+    end
+
+    CL-->>C: ReviewResponse
+    deactivate CL
+    CX-->>C: ReviewResponse
+    deactivate CX
+    GM-->>C: ReviewResponse
+    deactivate GM
+
+    Note over C: ═══ Stage 3: Synthesis ═══
+
+    C->>CH: Synthesize(all_outputs + all_reviews)
+    activate CH
+    CH-->>C: FinalResponse
+    deactivate CH
+
+    C->>C: Format + Metrics
+    C-->>U: Structured output
+    deactivate C
+</pre>
+<div class="caption">Fig 4 — Council Mode: Dispatch → Peer Review → Synthesis</div>
+</div>
+
+<h3>Consult Mode (Single Agent)</h3>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'actorTextColor': '#e2e8f0', 'actorBorder': '#06b6d4', 'actorBkg': '#1a2234', 'signalColor': '#64748b', 'signalTextColor': '#e2e8f0', 'noteBkgColor': '#1a2234', 'noteTextColor': '#e2e8f0', 'noteBorderColor': '#1e2d4a'}}}%%
+sequenceDiagram
+    participant U as User/Agent
+    participant C as Core
+    participant P as Provider Plugin
+
+    U->>C: dootsabha consult "explain this error"
+    activate C
+    C->>C: Resolve agent (default: claude)
+    C->>P: HealthCheck()
+    P-->>C: OK ✓
+    C->>P: Invoke(prompt, json, model)
+    activate P
+    P->>P: Build CLI args
+    P->>P: exec.CommandContext(...)
+    P->>P: Parse JSON stdout
+    P-->>C: InvokeResponse
+    deactivate P
+    C->>C: Format output + emit metrics
+    C-->>U: Result
+    deactivate C
+</pre>
+<div class="caption">Fig 5 — Consult Mode: Direct Single-Agent Query</div>
+</div>
+
+<h3>Review Mode (Agent Reviews Agent)</h3>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+%%{init: {'theme': 'dark', 'themeVariables': {'actorTextColor': '#e2e8f0', 'actorBorder': '#8b5cf6', 'actorBkg': '#1a2234', 'signalColor': '#64748b', 'signalTextColor': '#e2e8f0', 'noteBkgColor': '#1a2234', 'noteTextColor': '#e2e8f0', 'noteBorderColor': '#1e2d4a'}}}%%
+sequenceDiagram
+    participant U as User/Agent
+    participant C as Core
+    participant A as Author Plugin
+    participant R as Reviewer Plugin
+
+    U->>C: dootsabha review "optimize DB queries"
+    activate C
+    C->>A: Invoke(prompt) [author: codex]
+    activate A
+    A-->>C: AuthorResponse
+    deactivate A
+    C->>C: Build review prompt with author output
+    C->>R: Invoke(review_prompt) [reviewer: claude]
+    activate R
+    R-->>C: ReviewResponse
+    deactivate R
+    C->>C: Format combined output
+    C-->>U: Author output + Review + Suggestions
+    deactivate C
+</pre>
+<div class="caption">Fig 6 — Review Mode: One Agent Reviews Another</div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §8 OBSERVABILITY ═══════════════════════════════ -->
+<section id="observability">
+<h2><span class="num">08</span> Observability</h2>
+
+<h3>Logging Strategy</h3>
+<div class="card">
+  <p>Structured logging via Go's <strong>log/slog</strong> (stdlib, zero deps). Logs go to <strong>stderr</strong> (agent-friendly — stdout is reserved for data). Log levels: DEBUG, INFO, WARN, ERROR. JSON format by default; text format with <code>--verbose</code>.</p>
+<pre>
+// Every log line includes:
+slog.Info("agent invoked",
+    "provider", "claude",
+    "model", "sonnet-4-6",
+    "session_id", req.SessionID,
+    "trace_id", ctx.Value(traceIDKey),
+    "duration_ms", elapsed.Milliseconds(),
+    "exit_code", exitCode,
+)
+</pre>
+</div>
+
+<h3>Metrics</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Metric</th><th>Type</th><th>Labels</th><th>Purpose</th></tr>
+<tr><td><code>dootsabha_invoke_duration_ms</code></td><td>Histogram</td><td>provider, model, strategy</td><td>Latency per agent invocation</td></tr>
+<tr><td><code>dootsabha_invoke_total</code></td><td>Counter</td><td>provider, model, status</td><td>Total invocations (success/failure)</td></tr>
+<tr><td><code>dootsabha_tokens_used</code></td><td>Counter</td><td>provider, model, direction</td><td>Token usage (in/out)</td></tr>
+<tr><td><code>dootsabha_cost_usd</code></td><td>Counter</td><td>provider, model</td><td>Running cost tracking</td></tr>
+<tr><td><code>dootsabha_retries_total</code></td><td>Counter</td><td>provider, reason</td><td>Retry count by failure type</td></tr>
+<tr><td><code>dootsabha_plugin_health</code></td><td>Gauge</td><td>plugin, type</td><td>1=healthy, 0=unhealthy</td></tr>
+<tr><td><code>dootsabha_session_state</code></td><td>Gauge</td><td>state</td><td>Current state machine position</td></tr>
+</table>
+</div>
+
+<h3>Error Classification</h3>
+<div class="card-grid">
+  <div class="card">
+    <h4><span class="badge badge-gold">Transient</span> → Auto-Retry</h4>
+    <p>Rate limiting (429), network timeouts, temporary auth failures, process killed by OOM. Up to 2 retries with exponential backoff (1s, 4s). Logged at WARN.</p>
+  </div>
+  <div class="card">
+    <h4><span class="badge badge-red">Permanent</span> → Fail Fast</h4>
+    <p>CLI not found, auth invalid (401/403), model not available, invalid arguments, schema mismatch. No retry. Logged at ERROR with actionable suggestion.</p>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §9 GO LIBRARIES ═══════════════════════════════ -->
+<section id="libs">
+<h2><span class="num">09</span> Go Library Stack</h2>
+
+<div class="table-wrap">
+<table>
+<tr><th>Concern</th><th>Library</th><th>Rationale</th></tr>
+<tr>
+  <td><strong>CLI Framework</strong></td>
+  <td><code>github.com/spf13/cobra</code></td>
+  <td>Industry standard. Subcommands, aliases, auto-help, shell completion. Used by kubectl, gh, docker.</td>
+</tr>
+<tr>
+  <td><strong>Config</strong></td>
+  <td><code>github.com/spf13/viper</code></td>
+  <td>YAML + env + flags merge with precedence. Pairs with cobra. Supports watching config file changes.</td>
+</tr>
+<tr>
+  <td><strong>Plugin System</strong></td>
+  <td><code>github.com/hashicorp/go-plugin</code></td>
+  <td>gRPC-based, process-isolated plugins. Battle-tested (Terraform, Vault). Cross-language support. MPL-2.0.</td>
+</tr>
+<tr>
+  <td><strong>gRPC</strong></td>
+  <td><code>google.golang.org/grpc</code> + <code>protobuf</code></td>
+  <td>Required by hashicorp/go-plugin. Typed contracts via .proto files. Streaming support.</td>
+</tr>
+<tr>
+  <td><strong>Logging</strong></td>
+  <td><code>log/slog</code> (stdlib)</td>
+  <td>Go 1.21+ stdlib structured logging. Zero deps. JSON + text handlers. Context-aware.</td>
+</tr>
+<tr>
+  <td><strong>Terminal UI</strong></td>
+  <td><code>github.com/charmbracelet/lipgloss</code></td>
+  <td>Beautiful terminal styling (colors, borders, padding). Composable. Used for status output &amp; tables.</td>
+</tr>
+<tr>
+  <td><strong>Spinners/Progress</strong></td>
+  <td><code>github.com/charmbracelet/huh</code></td>
+  <td>Elegant spinners, progress indicators, and prompts. Pairs with lipgloss.</td>
+</tr>
+<tr>
+  <td><strong>Tables</strong></td>
+  <td><code>github.com/charmbracelet/lipgloss/table</code></td>
+  <td>Built-in table rendering from lipgloss. Professional output formatting.</td>
+</tr>
+<tr>
+  <td><strong>Subprocess</strong></td>
+  <td><code>os/exec</code> (stdlib)</td>
+  <td>Standard library. Context-aware via <code>CommandContext</code>. Process group management via <code>Setpgid</code>.</td>
+</tr>
+<tr>
+  <td><strong>Concurrency</strong></td>
+  <td><code>golang.org/x/sync/errgroup</code></td>
+  <td>Fan-out/fan-in with error propagation. Context cancellation. Used for parallel agent dispatch.</td>
+</tr>
+<tr>
+  <td><strong>JSON Streaming</strong></td>
+  <td><code>encoding/json</code> (stdlib)</td>
+  <td>Decoder for JSONL (Codex). Standard marshal/unmarshal for Claude/Gemini single-object responses.</td>
+</tr>
+<tr>
+  <td><strong>Retry</strong></td>
+  <td><code>github.com/avast/retry-go/v4</code></td>
+  <td>Simple, typed retry with exponential backoff. Context-aware. Customizable retry conditions.</td>
+</tr>
+<tr>
+  <td><strong>Testing</strong></td>
+  <td><code>github.com/stretchr/testify</code></td>
+  <td>Assertions, mocks, suites. De facto standard. Used with <code>testing</code> stdlib.</td>
+</tr>
+<tr>
+  <td><strong>Metrics (optional)</strong></td>
+  <td><code>github.com/prometheus/client_golang</code></td>
+  <td>Optional Prometheus metrics export. Activated via config. Push via <code>--metrics-push</code> or pull via <code>/metrics</code>.</td>
+</tr>
+</table>
+</div>
+
+<h3>Module Layout</h3>
+<pre>
+dootsabha/
+├── cmd/
+│   └── dootsabha/
+│       └── main.go                 # Entry point
+├── internal/
+│   ├── core/
+│   │   ├── engine.go               # Session manager, state machine
+│   │   ├── config.go               # Viper-based config loader
+│   │   ├── subprocess.go           # os/exec wrapper with log capture
+│   │   └── retry.go                # Retry logic with classification
+│   ├── plugin/
+│   │   ├── manager.go              # gRPC plugin discovery, loading, registry
+│   │   ├── interfaces.go           # Provider, Strategy, Formatter, Hook interfaces
+│   │   ├── grpc.go                 # gRPC server/client for go-plugin
+│   │   ├── extension.go            # PATH-based extension discovery &amp; exec
+│   │   └── hooks.go                # Hook chain runner (ordered middleware)
+│   ├── cli/
+│   │   ├── root.go                 # Cobra root command + global flags
+│   │   ├── council.go              # council (sabha) subcommand
+│   │   ├── consult.go              # consult (paraamarsh) subcommand
+│   │   ├── review.go               # review (sameeksha) subcommand
+│   │   ├── status.go               # status (sthiti) subcommand
+│   │   ├── config_cmd.go           # config (vinyaas) subcommand
+│   │   └── plugin_cmd.go           # plugin (vistaarak) subcommand
+│   ├── observability/
+│   │   ├── logger.go               # slog setup (JSON/text, levels)
+│   │   ├── metrics.go              # Prometheus metrics
+│   │   └── trace.go                # Trace ID generation & propagation
+│   └── output/
+│       ├── json.go                 # JSON formatter
+│       ├── table.go                # lipgloss table formatter
+│       └── markdown.go             # Markdown formatter
+├── plugins/
+│   ├── claude/
+│   │   ├── main.go                 # Plugin binary entry
+│   │   └── provider.go             # Claude Code provider impl
+│   ├── codex/
+│   │   ├── main.go
+│   │   └── provider.go             # Codex CLI provider impl
+│   ├── gemini/
+│   │   ├── main.go
+│   │   └── provider.go             # Gemini CLI provider impl
+│   └── council-strategy/
+│       ├── main.go
+│       └── strategy.go             # 3-stage council strategy impl
+├── proto/
+│   ├── provider.proto              # Provider gRPC service definition
+│   ├── strategy.proto              # Strategy gRPC service definition
+│   ├── formatter.proto             # Formatter gRPC service definition
+│   └── hook.proto                  # Hook gRPC service definition
+├── configs/
+│   └── default.yaml                # Default config (ships with binary)
+├── Makefile                        # Build core + all plugins
+├── go.mod
+└── go.sum
+</pre>
+</section>
+
+<!-- ═══════════════════════════════ §10 DEV GUIDE ═══════════════════════════════ -->
+<section id="dev-guide">
+<h2><span class="num">10</span> Plugin Development Guide</h2>
+
+<h3>Writing a New Provider Plugin</h3>
+<p>Every provider plugin is a standalone Go binary that implements the <code>Provider</code> gRPC service. Here's the minimal skeleton:</p>
+
+<pre>
+// plugins/my-agent/main.go
+package main
+
+import (
+    "github.com/hashicorp/go-plugin"
+    shared "github.com/indrasvat/dootsabha/proto"
+)
+
+type MyAgentProvider struct{}
+
+func (p *MyAgentProvider) Name() string { return "my-agent" }
+
+func (p *MyAgentProvider) Capabilities() *shared.ProviderCaps {
+    return &shared.ProviderCaps{
+        SupportsJson:     true,
+        SupportsStreaming: false,
+        SupportedModels:  []string{"model-v1", "model-v2"},
+        DefaultModel:     "model-v1",
+        MaxContextTokens: 128000,
+    }
+}
+
+func (p *MyAgentProvider) Invoke(ctx context.Context, req *shared.InvokeRequest) (*shared.InvokeResponse, error) {
+    // 1. Build CLI command from req
+    // 2. Execute via os/exec.CommandContext
+    // 3. Parse output (JSON/text)
+    // 4. Return InvokeResponse
+}
+
+func (p *MyAgentProvider) HealthCheck(ctx context.Context) (*shared.HealthStatus, error) {
+    // Check CLI is installed, authenticated, reachable
+}
+
+func main() {
+    plugin.Serve(&plugin.ServeConfig{
+        HandshakeConfig: shared.Handshake,
+        Plugins: map[string]plugin.Plugin{
+            "provider": &shared.ProviderGRPCPlugin{Impl: &MyAgentProvider{}},
+        },
+        GRPCServer: plugin.DefaultGRPCServer,
+    })
+}
+</pre>
+
+<h3>Build &amp; Install</h3>
+<pre>
+# Build the plugin binary
+cd plugins/my-agent
+go build -o dootsabha-provider-my-agent .
+
+# Install to plugin directory
+cp dootsabha-provider-my-agent ~/.dootsabha/plugins/
+
+# Verify discovery
+dootsabha plugin list    # Should show "my-agent" with health status
+</pre>
+
+<h3>Testing Plugins</h3>
+<pre>
+# Unit tests (mock the subprocess)
+go test ./plugins/my-agent/... -v
+
+# Integration test (requires actual CLI installed)
+go test ./plugins/my-agent/... -v -tags=integration
+
+# Test plugin in isolation (hashicorp/go-plugin test harness)
+go test ./plugins/my-agent/... -v -run TestPluginGRPC
+
+# End-to-end via core
+dootsabha consult --agent my-agent "hello world" --verbose
+</pre>
+
+<h3>Debugging Plugins</h3>
+<div class="card">
+  <p><strong>hashicorp/go-plugin debug mode:</strong> Set <code>PLUGIN_DEBUG=1</code> env var. The plugin will print its gRPC address instead of auto-connecting, allowing you to attach a debugger (delve) or manually test with <code>grpcurl</code>.</p>
+<pre>
+# Terminal 1: Run plugin in debug mode
+PLUGIN_DEBUG=1 ./dootsabha-provider-my-agent
+# Output: Plugin address: /tmp/plugin123456
+
+# Terminal 2: Test with grpcurl
+grpcurl -plaintext -unix /tmp/plugin123456 \
+  dootsabha.Provider/HealthCheck
+</pre>
+</div>
+
+<h3>Plugin Naming Convention</h3>
+<div class="table-wrap">
+<table>
+<tr><th>Plugin Type</th><th>Binary Naming</th><th>Example</th><th>Discovery</th></tr>
+<tr><td><span class="badge badge-gold">Provider</span></td><td><code>dootsabha-provider-{name}</code></td><td><code>dootsabha-provider-claude</code></td><td>plugins dir, gRPC handshake</td></tr>
+<tr><td><span class="badge badge-purple">Strategy</span></td><td><code>dootsabha-strategy-{name}</code></td><td><code>dootsabha-strategy-council</code></td><td>plugins dir, gRPC handshake</td></tr>
+<tr><td><span class="badge badge-cyan">Formatter</span></td><td><code>dootsabha-formatter-{name}</code></td><td><code>dootsabha-formatter-diff</code></td><td>plugins dir, gRPC handshake</td></tr>
+<tr><td><span class="badge badge-green">Extension</span></td><td><code>dootsabha-{name}</code></td><td><code>dootsabha-bench</code></td><td><strong>$PATH + plugins dir</strong>, exec</td></tr>
+<tr><td><span class="badge badge-red">Hook</span></td><td><code>dootsabha-hook-{name}</code></td><td><code>dootsabha-hook-audit</code></td><td>plugins dir, gRPC handshake</td></tr>
+</table>
+</div>
+
+<h3>Writing an Extension Plugin (Any Language)</h3>
+<p>Extensions are the simplest plugin type — just a binary named <code>dootsabha-{name}</code>. No Go required, no gRPC, no interface. Write it in Python, Rust, Bash, whatever.</p>
+
+<pre>
+#!/usr/bin/env bash
+# dootsabha-hello — simplest possible extension
+# Install: chmod +x dootsabha-hello && mv to ~/.dootsabha/plugins/ or PATH
+
+# Tier 1: env vars (always available)
+echo "Hello from दूतसभा extension!"
+echo "Core:    ${DOOTSABHA_VERSION} (${DOOTSABHA_BIN})"
+echo "Session: ${DOOTSABHA_SESSION_ID}"
+echo "Args:    $@"
+
+# Tier 2: context file (rich structured data)
+if [ -n "$DOOTSABHA_CONTEXT_FILE" ]; then
+  AGENTS=$(jq -r '[.providers | to_entries[] | select(.value.healthy) | .key] | join(", ")' "$DOOTSABHA_CONTEXT_FILE")
+  echo "Healthy: $AGENTS"
+fi
+
+# Tier 3: callback (invoke agents via core)
+if [ -n "$1" ]; then
+  echo "Asking claude: $1"
+  "$DOOTSABHA_BIN" consult --agent claude --json "$1" | jq -r '.content'
+fi
+</pre>
+
+<pre>
+# Usage — automatically discovered as a subcommand:
+$ dootsabha hello "what is a goroutine?"
+Hello from दूतसभा extension!
+Core:    0.1.0 (/usr/local/bin/dootsabha)
+Session: ds_a1b2c3d4
+Args:    what is a goroutine?
+Healthy: claude, codex
+Asking claude: what is a goroutine?
+A goroutine is a lightweight thread of execution managed by the Go runtime...
+</pre>
+
+<div class="callout callout-tip">
+  <strong>Key difference from gRPC plugins:</strong> Extensions inherit the terminal directly — they get stdin/stdout/stderr unmediated. This means they can run interactive TUIs, prompt for input, display spinners, etc. gRPC plugins can't do this because the core captures their output.
+</div>
+
+<h3>Writing a Hook Plugin</h3>
+<p>Hook plugins implement the <code>Hook</code> gRPC interface and subscribe to specific lifecycle events.</p>
+
+<pre>
+// plugins/cost-guard/main.go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/hashicorp/go-plugin"
+    shared "github.com/indrasvat/dootsabha/proto"
+)
+
+type CostGuardHook struct {
+    budgetUSD float64
+    spentUSD  float64
+}
+
+func (h *CostGuardHook) Name() string { return "cost-guard" }
+
+func (h *CostGuardHook) Events() []shared.HookEvent {
+    return []shared.HookEvent{shared.HookPreInvoke, shared.HookPostInvoke}
+}
+
+func (h *CostGuardHook) PreInvoke(ctx context.Context, req *shared.InvokeRequest) (*shared.InvokeRequest, error) {
+    if h.spentUSD >= h.budgetUSD {
+        return nil, fmt.Errorf("budget exhausted: spent $%.2f of $%.2f", h.spentUSD, h.budgetUSD)
+    }
+    return req, nil // pass through unmodified
+}
+
+func (h *CostGuardHook) PostInvoke(ctx context.Context, req *shared.InvokeRequest, resp *shared.InvokeResponse) (*shared.InvokeResponse, error) {
+    h.spentUSD += resp.CostUsd
+    return resp, nil
+}
+
+// ... (PreSynthesis, PostSession return unchanged / nil)
+
+func main() {
+    plugin.Serve(&plugin.ServeConfig{
+        HandshakeConfig: shared.Handshake,
+        Plugins: map[string]plugin.Plugin{
+            "hook": &shared.HookGRPCPlugin{Impl: &CostGuardHook{budgetUSD: 5.0}},
+        },
+        GRPCServer: plugin.DefaultGRPCServer,
+    })
+}
+</pre>
+
+<h3>Subprocess Best Practices (Go)</h3>
+<div class="card highlight">
+<pre>
+func (p *ClaudeProvider) execCLI(ctx context.Context, args []string) (*ExecResult, error) {
+    cmd := exec.CommandContext(ctx, "claude", args...)
+
+    // Separate stdout (data) from stderr (logs)
+    var stdout, stderr bytes.Buffer
+    cmd.Stdout = &stdout
+    cmd.Stderr = &stderr
+
+    // Set process group for clean cleanup
+    cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+    // Working directory
+    cmd.Dir = p.workDir
+
+    // Environment (inherit + extras)
+    cmd.Env = append(os.Environ(), p.extraEnv...)
+
+    start := time.Now()
+    err := cmd.Run()
+    elapsed := time.Since(start)
+
+    result := &ExecResult{
+        Stdout:     stdout.Bytes(),
+        Stderr:     stderr.String(),
+        ExitCode:   cmd.ProcessState.ExitCode(),
+        DurationMs: elapsed.Milliseconds(),
+    }
+
+    if err != nil {
+        if ctx.Err() == context.DeadlineExceeded {
+            return result, fmt.Errorf("timeout after %v: %w", p.timeout, err)
+        }
+        if ctx.Err() == context.Canceled {
+            return result, fmt.Errorf("canceled: %w", err)
+        }
+        return result, fmt.Errorf("exit code %d: %s", result.ExitCode, result.Stderr)
+    }
+
+    return result, nil
+}
+</pre>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ §11 USAGE ═══════════════════════════════ -->
+<section id="usage">
+<h2><span class="num">11</span> Usage Examples</h2>
+
+<h3>Quick Start</h3>
+<pre>
+# Check all agents are healthy
+dootsabha status
+
+# Ask claude a question (default agent, default model)
+dootsabha consult "explain this Kubernetes CrashLoopBackOff"
+
+# Same in Sanskrit
+dootsabha paraamarsh "explain this Kubernetes CrashLoopBackOff"
+
+# Full council deliberation
+dootsabha council "refactor auth middleware for better testability"
+
+# Council with streaming
+dootsabha sabha --watch "design a rate limiter for our API gateway"
+
+# Review: codex writes, claude reviews
+dootsabha review "optimize the database queries in pkg/store"
+
+# Use a specific model
+dootsabha consult --agent claude --model opus-4-6 "complex architecture decision"
+
+# JSON output for agent consumption
+dootsabha council --json "implement retry logic" | jq .
+
+# Override council members
+dootsabha council --agents claude,codex "only need two opinions"
+
+# Change the synthesis chair
+dootsabha sabha --adhyaksha gemini "want gemini to synthesize"
+</pre>
+
+<h3>Agent / CI Usage</h3>
+<pre>
+# Machine-readable output (stdout=JSON, stderr=logs)
+result=$(dootsabha council --json "fix failing tests" 2>/tmp/ds.log)
+echo "$result" | jq -r '.synthesis.content'
+
+# With timeout
+dootsabha consult --timeout 2m --json "quick question"
+
+# Pipe prompt from file
+cat prompt.md | dootsabha council --json
+
+# Non-zero exit codes for failures
+dootsabha consult "query" || echo "Failed with exit code $?"
+</pre>
+
+<h3>Help Output Preview</h3>
+<pre style="color: var(--accent-gold);">
+$ dootsabha help
+
+दूतसभा — The Council of Agents   v0.1.0
+
+USAGE
+  dootsabha &lt;command&gt; [flags] [prompt]
+
+COMMANDS
+  council  (sabha)      All agents deliberate → peer review → synthesis
+  consult  (paraamarsh)  Ask a single agent directly
+  review   (sameeksha)  One agent reviews another's output
+  status   (sthiti)     Health check all providers
+  config   (vinyaas)    View/edit configuration
+  plugin   (vistaarak)    Manage plugins &amp; extensions
+
+EXTENSIONS (discovered)
+  bench               Benchmark agents on standardized prompts
+  cost                Cost tracking dashboard
+  tui                 Interactive council TUI
+
+GLOBAL FLAGS
+  --json                Structured JSON output (stdout=data, stderr=logs)
+  --watch   (nireekshana)    Stream output in real-time
+  --timeout (kaalseema) Max time per agent [default: 5m]
+  --verbose (-v)        Increase log verbosity (-v, -vv, -vvv)
+  --quiet   (-q)        Suppress non-error output
+  --config              Config file path [default: ~/.dootsabha/config.yaml]
+
+EXAMPLES
+  dootsabha council "refactor the auth module"
+  dootsabha consult --agent codex "optimize this query"
+  dootsabha sabha --watch "design a caching layer"
+  dootsabha bench --rounds 5 "fibonacci in 3 languages"
+  dootsabha status
+
+CONFIG  ~/.dootsabha/config.yaml
+PLUGINS ~/.dootsabha/plugins/
+
+Use "dootsabha &lt;command&gt; --help" for more details.
+</pre>
+</section>
+
+<!-- ═══════════════════════════════ §12 CONFIG ═══════════════════════════════ -->
+<section id="config">
+<h2><span class="num">12</span> Configuration</h2>
+
+<h3>Default Config File</h3>
+<pre>
+# ~/.dootsabha/config.yaml
+# ─────────────────────────────────────────────────
+# दूतसभा Configuration
+# ─────────────────────────────────────────────────
+
+# Global defaults
+defaults:
+  timeout: 5m
+  output_format: text            # text | json
+  log_level: info                # debug | info | warn | error
+  parallel: true                 # Run agents concurrently in council
+
+# Provider configurations
+providers:
+  claude:
+    model: sonnet-4-6            # Default model
+    yolo: true                   # --dangerously-skip-permissions
+    session_persistence: false   # --no-session-persistence
+    max_turns: 0                 # 0 = unlimited
+    extra_args: []               # Additional CLI args
+    env: {}                      # Extra environment variables
+
+  codex:
+    model: gpt-5.3-codex         # Default model
+    reasoning: medium            # low | medium | high | xhigh
+    sandbox: danger-full-access  # YOLO equivalent
+    ephemeral: true              # --ephemeral
+    skip_git_check: true         # --skip-git-repo-check
+    extra_args: []
+    env: {}
+
+  gemini:
+    model: gemini-3-pro          # Default model
+    approval_mode: yolo          # --approval-mode yolo
+    extra_args: []
+    env: {}
+
+# Strategy defaults
+strategy:
+  council:
+    agents: [claude, codex, gemini]
+    chair: claude                # Synthesizer
+    rounds: 1                    # Deliberation rounds
+  consult:
+    default_agent: claude
+  review:
+    reviewer: claude
+    author: codex
+
+# Plugin paths (searched in order)
+plugins:
+  paths:
+    - ~/.dootsabha/plugins
+    - /usr/local/lib/dootsabha/plugins
+  # Extension binaries are also discovered on $PATH (dootsabha-*)
+
+# Hooks (loaded in order, first match wins for aborts)
+hooks:
+  enabled: []                        # e.g., ["cost-guard", "audit-log"]
+  config:
+    cost-guard:
+      budget_usd: 10.0               # Abort if session exceeds budget
+    audit-log:
+      output: ~/.dootsabha/audit.jsonl
+
+# Observability
+observability:
+  metrics:
+    enabled: false
+    push_gateway: ""             # Prometheus push gateway URL
+  log:
+    format: json                 # json | text
+    file: ""                     # Log to file (empty = stderr only)
+
+# Directories (XDG-aligned defaults, override if needed)
+dirs:
+  data: ""                       # default: $XDG_DATA_HOME/dootsabha
+  cache: ""                      # default: $XDG_CACHE_HOME/dootsabha
+  state: ""                      # default: $XDG_STATE_HOME/dootsabha
+  sessions: ""                   # default: $data/sessions (session history)
+</pre>
+
+<h3>Config Precedence</h3>
+<div class="callout callout-info">
+  <strong>Highest → Lowest:</strong> CLI flags → Environment variables (<code>DOOTSABHA_*</code>) → Config file → Built-in defaults.
+  <br/>Environment variables follow the pattern <code>DOOTSABHA_PROVIDERS_CLAUDE_MODEL=opus-4-6</code>.
+</div>
+
+</section>
+
+</div><!-- .container -->
+
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#1a2234',
+    primaryTextColor: '#e2e8f0',
+    primaryBorderColor: '#f59e0b',
+    lineColor: '#64748b',
+    secondaryColor: '#111827',
+    tertiaryColor: '#0d1321',
+    fontFamily: 'JetBrains Mono, monospace',
+    fontSize: '13px',
+  },
+  flowchart: { curve: 'monotoneX', padding: 20 },
+  sequence: { mirrorActors: false, messageMargin: 40 },
+  stateDiagram: { padding: 20 },
+});
+</script>
+
+</body>
+</html>

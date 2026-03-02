@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package dootsabha;
+
+option go_package = "github.com/indrasvat/dootsabha/proto/gen";
+
+// Provider is the gRPC service that agent provider plugins implement.
+// Each provider wraps a coding agent CLI (Claude, Codex, Gemini, or custom).
+service Provider {
+  // Invoke sends a prompt to the agent and returns structured output.
+  rpc Invoke(InvokeRequest) returns (InvokeResponse);
+
+  // Cancel requests cancellation of an in-progress invocation.
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  // HealthCheck verifies the underlying CLI is installed and authenticated.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Capabilities returns the provider's supported features and models.
+  rpc Capabilities(CapabilitiesRequest) returns (CapabilitiesResponse);
+}
+
+// InvokeRequest configures a single agent invocation.
+message InvokeRequest {
+  // The prompt to send to the agent.
+  string prompt = 1;
+
+  // Override the default model (empty = use provider default).
+  string model = 2;
+
+  // Maximum agent turns (0 = no limit).
+  int32 max_turns = 3;
+
+  // Sampling temperature (0.0 = use provider default).
+  double temperature = 4;
+
+  // Desired output format: "json", "text", or "stream-json".
+  string output_format = 5;
+
+  // Additional CLI flags passed to the agent binary.
+  repeated string extra_args = 6;
+
+  // Environment variables for the subprocess.
+  map<string, string> env = 7;
+
+  // Working directory for the subprocess.
+  string work_dir = 8;
+
+  // Per-invocation timeout in milliseconds (0 = use config default).
+  int64 timeout_ms = 9;
+}
+
+// InvokeResponse holds the structured output of a provider invocation.
+message InvokeResponse {
+  // The text content of the agent's response.
+  string content = 1;
+
+  // Raw JSON from the agent CLI (opaque bytes for passthrough).
+  bytes raw_json = 2;
+
+  // Provider name that generated this response (e.g., "claude").
+  string provider = 3;
+
+  // Model that was used (e.g., "claude-sonnet-4-6").
+  string model = 4;
+
+  // Session identifier from the agent CLI.
+  string session_id = 5;
+
+  // Cost in USD for this invocation.
+  double cost_usd = 6;
+
+  // Input tokens consumed.
+  int32 tokens_in = 7;
+
+  // Output tokens generated.
+  int32 tokens_out = 8;
+
+  // Wall-clock duration in milliseconds.
+  int64 duration_ms = 9;
+
+  // Process exit code (0 = success).
+  int32 exit_code = 10;
+
+  // Stderr output from the agent CLI.
+  string stderr = 11;
+}
+
+// CancelRequest identifies an invocation to cancel.
+message CancelRequest {
+  // Session identifier of the invocation to cancel.
+  string session_id = 1;
+}
+
+// CancelResponse reports the result of a cancel request.
+message CancelResponse {
+  // Whether the invocation was successfully cancelled.
+  bool cancelled = 1;
+}
+
+// HealthCheckRequest is empty — no parameters needed.
+message HealthCheckRequest {}
+
+// HealthCheckResponse reports the provider CLI's health.
+message HealthCheckResponse {
+  // Whether the provider is healthy and ready.
+  bool healthy = 1;
+
+  // Version of the agent CLI (e.g., "2.1.63").
+  string cli_version = 2;
+
+  // Default model name (e.g., "claude-sonnet-4-6").
+  string model = 3;
+
+  // Whether authentication is valid.
+  bool auth_valid = 4;
+
+  // Error message if unhealthy (empty when healthy).
+  string error = 5;
+}
+
+// CapabilitiesRequest is empty — no parameters needed.
+message CapabilitiesRequest {}
+
+// CapabilitiesResponse describes what the provider supports.
+message CapabilitiesResponse {
+  // Whether the provider supports JSON output format.
+  bool supports_json = 1;
+
+  // Whether the provider supports streaming output.
+  bool supports_streaming = 2;
+
+  // List of supported model names.
+  repeated string supported_models = 3;
+
+  // Default model when none is specified.
+  string default_model = 4;
+
+  // Maximum context window size in tokens.
+  int32 max_context_tokens = 5;
+}

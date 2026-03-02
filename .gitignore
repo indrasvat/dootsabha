@@ -25,8 +25,47 @@ go.work
 go.work.sum
 
 # env file
-.env
+*.env
+
+*.log
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# Build output
+bin/
+dist/
+/dootsabha
+
+# Spike compiled binaries
+_spikes/codex-jsonl/codex-jsonl
+_spikes/claude-json/claude-json
+_spikes/gemini-json/gemini-json
+_spikes/cobra-alias/cobra-alias
+_spikes/subprocess/subprocess
+_spikes/terminal-ux/terminal-ux
+_spikes/pty-pipe/pty-pipe
+_spikes/go-plugin-grpc/plugin/greeter-plugin
+testdata/mock-plugins/bin/
+plugins/bin/
+
+# Coverage
+coverage/
+
+# Debug
+__debug_bin*
+
+# Temp
+*.tmp
+*~
+*.swp
+Thumbs.db
+
+.local/
+.codemap/
+.claude/screenshots/
+.claude/worktrees/
+.agent/
+
+.DS_Store

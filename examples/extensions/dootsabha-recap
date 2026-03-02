@@ -1,0 +1,439 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.14"
+# dependencies = ["rich"]
+# ///
+"""
+dootsabha-recap — Workspace Intelligence Briefing
+
+A dootsabha extension that reads Tier 2 context and renders a rich
+workspace briefing: git status, provider matrix, and suggested commands.
+
+Usage:
+  dootsabha recap          # Full briefing via extension dispatch
+  ./dootsabha-recap        # Standalone mode (no context file)
+
+Environment:
+  DOOTSABHA_CONTEXT_FILE   Path to Tier 2 JSON context file (auto-set by host)
+  DOOTSABHA_VERSION        Host version string (Tier 1)
+"""
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from rich.console import Console
+from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
+
+
+# ── Color constants matching Go output/styles.go ────────────────────────────
+
+CLAUDE_COLOR = "#F59E0B"
+CODEX_COLOR = "#10B981"
+GEMINI_COLOR = "#3B82F6"
+ACCENT_COLOR = "#06B6D4"
+MUTED_COLOR = "#64748B"
+SUCCESS_COLOR = "#22C55E"
+ERROR_COLOR = "#EF4444"
+
+PROVIDER_COLORS = {
+    "claude": CLAUDE_COLOR,
+    "codex": CODEX_COLOR,
+    "gemini": GEMINI_COLOR,
+}
+
+
+# ── Context loading ─────────────────────────────────────────────────────────
+
+
+def load_context() -> dict | None:
+    """Load Tier 2 context from DOOTSABHA_CONTEXT_FILE. Returns None on failure."""
+    ctx_path = os.environ.get("DOOTSABHA_CONTEXT_FILE")
+    if not ctx_path:
+        return None
+    try:
+        with open(ctx_path) as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"warning: failed to read context file: {e}", file=sys.stderr)
+        return None
+
+
+# ── Git analysis ────────────────────────────────────────────────────────────
+
+
+def git_info(workspace: str) -> dict:
+    """Gather git information from the workspace directory."""
+    info = {
+        "branch": "",
+        "recent_commits": [],
+        "staged": 0,
+        "unstaged": 0,
+        "languages": [],
+        "topic": "",
+    }
+
+    def run_git(*args: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", *args],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=workspace,
+            )
+            if result.returncode == 0:
+                return result.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return None
+
+    # Branch name
+    branch = run_git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch:
+        info["branch"] = branch
+        # Extract topic from branch name (e.g., "feature/auth-flow" → "auth flow")
+        parts = branch.split("/")[-1].replace("-", " ").replace("_", " ")
+        if parts and parts != branch:
+            info["topic"] = parts
+
+    # Recent commits (last 3)
+    log = run_git("log", "--oneline", "-3", "--no-decorate")
+    if log:
+        info["recent_commits"] = log.splitlines()
+
+    # Staged/unstaged counts
+    status = run_git("status", "--porcelain")
+    if status:
+        for line in status.splitlines():
+            if len(line) >= 2:
+                idx, wt = line[0], line[1]
+                if idx not in (" ", "?"):
+                    info["staged"] += 1
+                if wt not in (" ", "?"):
+                    info["unstaged"] += 1
+
+    # Language detection from file extensions (cap sample for large repos)
+    ls_files = run_git("ls-files")
+    if ls_files:
+        exts: dict[str, int] = {}
+        ext_lang = {
+            ".go": "Go",
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".ts": "TypeScript",
+            ".rs": "Rust",
+            ".rb": "Ruby",
+            ".java": "Java",
+            ".yaml": "YAML",
+            ".yml": "YAML",
+            ".md": "Markdown",
+            ".sh": "Shell",
+            ".proto": "Protobuf",
+        }
+        for filepath in ls_files.splitlines()[:1000]:
+            ext = Path(filepath).suffix
+            if ext in ext_lang:
+                lang = ext_lang[ext]
+                exts[lang] = exts.get(lang, 0) + 1
+        # Top 3 languages by file count
+        info["languages"] = sorted(exts, key=lambda k: exts[k], reverse=True)[:3]
+
+    return info
+
+
+# ── Suggestion engine ───────────────────────────────────────────────────────
+
+
+def suggest_commands(
+    git: dict,
+    providers: dict,
+    capabilities: dict,
+) -> list[tuple[str, str]]:
+    """Generate actionable command suggestions based on workspace + context."""
+    suggestions: list[tuple[str, str]] = []
+    healthy = [name for name, p in providers.items() if p.get("healthy")]
+
+    if not healthy:
+        return suggestions
+
+    # Staged files → suggest review
+    if git["staged"] > 0 and capabilities.get("review"):
+        suggestions.append(("review", '"review staged changes"'))
+
+    # Branch topic → suggest council discussion
+    if git["branch"] and capabilities.get("council"):
+        topic = git["topic"] or git["branch"]
+        suggestions.append(("council", f'"discuss {topic} approach"'))
+
+    # Unstaged files → suggest refine
+    if git["unstaged"] > 0 and capabilities.get("refine"):
+        suggestions.append(("refine", '"refine recent changes"'))
+
+    # Recent commits → suggest consult
+    if git["recent_commits"]:
+        last = git["recent_commits"][0]
+        # Get just the message part (after the hash)
+        msg = last.split(" ", 1)[-1] if " " in last else last
+        suggestions.append(("consult", f'"explain: {msg}"'))
+
+    return suggestions[:4]  # Max 4 suggestions
+
+
+# ── Context extraction ─────────────────────────────────────────────────────
+
+
+def extract_context(context: dict | None) -> dict:
+    """Extract rendering values from Tier 2 context with standalone fallbacks."""
+    def get(key: str, default):
+        return context.get(key, default) if context else default
+
+    workspace = get("workspace", os.getcwd())
+    return {
+        "session_id": get("session_id", "standalone"),
+        "version": get("version", os.environ.get("DOOTSABHA_VERSION", "")),
+        "workspace": workspace,
+        "project_name": Path(workspace).name,
+        "providers": get("providers", {}),
+        "capabilities": get("capabilities", {}),
+        "term_width": get("terminal_width", 80),
+    }
+
+
+# ── Rich rendering ──────────────────────────────────────────────────────────
+
+
+def render(
+    console: Console,
+    context: dict | None,
+    git: dict,
+) -> None:
+    """Render the full recap briefing."""
+    ctx = extract_context(context)
+    session_id = ctx["session_id"]
+    version = ctx["version"]
+    providers = ctx["providers"]
+    capabilities = ctx["capabilities"]
+    term_width = ctx["term_width"]
+    project_name = ctx["project_name"]
+
+    # ── Header box (rounded rect, Go CommandHeader style) ──────────────
+    name = "dootsabha Recap"
+    info = f"Workspace Intelligence Briefing \u00b7 {session_id}"
+    w = min(term_width, 60)
+    name_w = len(name)
+    info_w = len(info)
+
+    max_info = w - 5
+    if info_w > max_info and max_info > 3:
+        info = info[: max_info - 1] + "\u2026"
+        info_w = len(info)
+    top_fill = max(w - name_w - 4, 1)
+    mid_fill = max(w - info_w - 4, 1)
+    bot_fill = max(w - 2, 1)
+
+    # Raw ANSI codes for the box — matches how Go's lipgloss renders.
+    A = f"\x1b[38;2;6;182;212m"   # AccentColor
+    BA = f"\x1b[1;38;2;6;182;212m"  # Bold + AccentColor
+    M = f"\x1b[38;2;100;116;139m"   # MutedColor
+    R = f"\x1b[0m"                   # Reset
+
+    print(f"{A}\u250c{R} {BA}{name}{R} {A}{'\u2500' * top_fill}\u2510{R}")
+    print(f"{A}\u2502{R}  {M}{info}{' ' * mid_fill}{R}{A}\u2502{R}")
+    print(f"{A}\u2514{'\u2500' * bot_fill}\u2518{R}")
+    print()
+
+    # ── Workspace info ──────────────────────────────────────────────────
+    info_text = Text()
+    info_text.append("  Workspace   ", style=MUTED_COLOR)
+    info_text.append(project_name, style="bold")
+    console.print(info_text)
+
+    if git["branch"]:
+        branch_text = Text()
+        branch_text.append("  Branch      ", style=MUTED_COLOR)
+        branch_text.append(git["branch"], style=ACCENT_COLOR)
+        console.print(branch_text)
+
+    session_text = Text()
+    session_text.append("  Session     ", style=MUTED_COLOR)
+    session_text.append(session_id, style=MUTED_COLOR)
+    console.print(session_text)
+    console.print()
+
+    # ── Provider matrix ─────────────────────────────────────────────────
+    if providers:
+        console.print(Rule("Provider Matrix", style=MUTED_COLOR, align="left"))
+
+        table = Table(
+            show_header=False,
+            show_edge=False,
+            box=None,
+            padding=(0, 1),
+            pad_edge=False,
+        )
+        table.add_column("dot", width=3)
+        table.add_column("name", width=10)
+        table.add_column("model", width=20)
+        table.add_column("status", width=12)
+
+        for name in sorted(providers):
+            prov = providers[name]
+            color = PROVIDER_COLORS.get(name, MUTED_COLOR)
+            dot = Text("\u25cf", style=color)
+            model = Text(prov.get("model", "unknown"), style=MUTED_COLOR)
+
+            if prov.get("healthy"):
+                status = Text("\u2713 healthy", style=SUCCESS_COLOR)
+            else:
+                status = Text("\u2717 unhealthy", style=ERROR_COLOR)
+
+            table.add_row(dot, Text(f" {name}"), model, status)
+
+        console.print(table)
+        console.print()
+
+    # ── Workspace activity ──────────────────────────────────────────────
+    if git["branch"]:
+        console.print(Rule("Workspace Activity", style=MUTED_COLOR, align="left"))
+
+        total_modified = git["staged"] + git["unstaged"]
+        langs = ", ".join(git["languages"]) if git["languages"] else "unknown"
+
+        activity = Text()
+        activity.append(f"  {total_modified} files modified", style="bold" if total_modified > 0 else MUTED_COLOR)
+        activity.append(f" \u00b7 {langs}", style=MUTED_COLOR)
+        console.print(activity)
+
+        if git["staged"] > 0:
+            staged_text = Text()
+            staged_text.append(f"  {git['staged']} file{'s' if git['staged'] != 1 else ''} staged", style=SUCCESS_COLOR)
+            console.print(staged_text)
+
+        if git["recent_commits"]:
+            latest = git["recent_commits"][0]
+            commit_text = Text()
+            commit_text.append("  Latest: ", style=MUTED_COLOR)
+            commit_text.append(latest, style="dim")
+            console.print(commit_text)
+
+        console.print()
+
+    # ── Suggested commands ──────────────────────────────────────────────
+    suggestions = suggest_commands(git, providers, capabilities)
+    if suggestions:
+        console.print(Rule("Suggested Commands", style=MUTED_COLOR, align="left"))
+
+        for cmd, args in suggestions:
+            suggestion_text = Text()
+            suggestion_text.append("  \u2192 ", style=ACCENT_COLOR)
+            suggestion_text.append(f"dootsabha {cmd} ", style="bold")
+            suggestion_text.append(args, style=MUTED_COLOR)
+            console.print(suggestion_text)
+
+        console.print()
+
+    # ── Footer ──────────────────────────────────────────────────────────
+    footer_parts = []
+    footer_parts.append(session_id)
+    if version:
+        footer_parts.append(f"v{version}" if not version.startswith("v") else version)
+    footer_parts.append(f"{term_width} cols")
+
+    footer = Text("  " + " \u2502 ".join(footer_parts), style=MUTED_COLOR)
+    console.print(footer)
+
+
+# ── Plain-text rendering (piped mode) ───────────────────────────────────────
+
+
+def render_plain(
+    context: dict | None,
+    git: dict,
+) -> None:
+    """Render plain-text output for piped mode (no ANSI, no box chars)."""
+    ctx = extract_context(context)
+    session_id = ctx["session_id"]
+    version = ctx["version"]
+    providers = ctx["providers"]
+    capabilities = ctx["capabilities"]
+    term_width = ctx["term_width"]
+    project_name = ctx["project_name"]
+
+    print("dootsabha Recap")
+    print(f"Workspace Intelligence Briefing - {session_id}")
+    print()
+    print(f"  Workspace   {project_name}")
+    if git["branch"]:
+        print(f"  Branch      {git['branch']}")
+    print(f"  Session     {session_id}")
+    print()
+
+    if providers:
+        print("--- Provider Matrix ---")
+        for name in sorted(providers):
+            prov = providers[name]
+            dot = "*"
+            model = prov.get("model", "unknown")
+            status = "healthy" if prov.get("healthy") else "unhealthy"
+            print(f"  {dot} {name:<10} {model:<20} {status}")
+        print()
+
+    if git["branch"]:
+        print("--- Workspace Activity ---")
+        total_modified = git["staged"] + git["unstaged"]
+        langs = ", ".join(git["languages"]) if git["languages"] else "unknown"
+        print(f"  {total_modified} files modified - {langs}")
+        if git["staged"] > 0:
+            print(f"  {git['staged']} file{'s' if git['staged'] != 1 else ''} staged")
+        if git["recent_commits"]:
+            print(f"  Latest: {git['recent_commits'][0]}")
+        print()
+
+    suggestions = suggest_commands(git, providers, capabilities)
+    if suggestions:
+        print("--- Suggested Commands ---")
+        for cmd, args in suggestions:
+            print(f"  -> dootsabha {cmd} {args}")
+        print()
+
+    footer_parts = [session_id]
+    if version:
+        footer_parts.append(f"v{version}" if not version.startswith("v") else version)
+    footer_parts.append(f"{term_width} cols")
+    print("  " + " | ".join(footer_parts))
+
+
+# ── Main ────────────────────────────────────────────────────────────────────
+
+
+def main() -> int:
+    context = load_context()
+
+    # Determine TTY from context or fallback to os.isatty
+    is_tty = context.get("tty", sys.stdout.isatty()) if context else sys.stdout.isatty()
+    term_width = context.get("terminal_width", 80) if context else 80
+
+    # Workspace for git analysis
+    workspace = context.get("workspace", os.getcwd()) if context else os.getcwd()
+    git = git_info(workspace)
+
+    if is_tty:
+        console = Console(
+            width=min(term_width, 80),
+            force_terminal=True,
+            force_jupyter=False,
+        )
+        render(console, context, git)
+    else:
+        render_plain(context, git)
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
