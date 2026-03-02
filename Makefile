@@ -157,6 +157,20 @@ ci-fast: fmt vet test ## Fast CI: fmt+vet+test
 .PHONY: check
 check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+fix+lint+vet+test+smoke
 
+# ── Extensions ───────────────────────────────────────────────────────────────
+
+EXTENSION_DIR := examples/extensions
+LOCAL_BIN     := $(HOME)/.local/bin
+
+.PHONY: install-extensions
+install-extensions: ## Symlink extensions from examples/ into ~/.local/bin
+	@mkdir -p $(LOCAL_BIN)
+	@for ext in $(EXTENSION_DIR)/dootsabha-*; do \
+		name=$$(basename "$$ext"); \
+		ln -sf "$$(pwd)/$$ext" "$(LOCAL_BIN)/$$name"; \
+		printf "$(COLOR_GREEN)>> Linked: $(LOCAL_BIN)/$$name$(COLOR_RESET)\n"; \
+	done
+
 # ── Provider Plugins ─────────────────────────────────────────────────────────
 
 PLUGIN_BIN := plugins/bin

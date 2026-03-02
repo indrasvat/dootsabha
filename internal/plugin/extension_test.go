@@ -153,6 +153,54 @@ func TestFindExtensionFirstDirWins(t *testing.T) {
 	}
 }
 
+func TestExtensionDirsContainsExpectedPaths(t *testing.T) {
+	dirs := plugin.ExtensionDirs()
+	if len(dirs) < 1 {
+		t.Fatal("expected at least 1 directory from ExtensionDirs()")
+	}
+	// Last entry should always be /usr/local/bin.
+	if dirs[len(dirs)-1] != "/usr/local/bin" {
+		t.Errorf("last dir = %q, want /usr/local/bin", dirs[len(dirs)-1])
+	}
+	// First entry should be ~/.local/bin (if home is available).
+	home, err := os.UserHomeDir()
+	if err == nil {
+		want := filepath.Join(home, ".local", "bin")
+		if dirs[0] != want {
+			t.Errorf("first dir = %q, want %q", dirs[0], want)
+		}
+	}
+}
+
+func TestExtensionDirsOrder(t *testing.T) {
+	dirs := plugin.ExtensionDirs()
+	if len(dirs) != 2 {
+		t.Skipf("expected 2 dirs, got %d (home may not be available)", len(dirs))
+	}
+	// ~/.local/bin should come before /usr/local/bin.
+	home, _ := os.UserHomeDir()
+	if dirs[0] != filepath.Join(home, ".local", "bin") {
+		t.Errorf("dirs[0] = %q, want ~/.local/bin", dirs[0])
+	}
+	if dirs[1] != "/usr/local/bin" {
+		t.Errorf("dirs[1] = %q, want /usr/local/bin", dirs[1])
+	}
+}
+
+func TestExtensionDirsExtraDirsPrepended(t *testing.T) {
+	// Verify that extraDirs are prepended (first match wins = user-local wins).
+	dir1 := setupExtensionDir(t, "test-prepend")
+	dir2 := setupExtensionDir(t, "test-prepend")
+	ext, found := plugin.FindExtension("test-prepend", dir1, dir2)
+	if !found {
+		t.Fatal("expected to find extension")
+	}
+	// dir1 is passed first, so it should win.
+	if ext.Path != filepath.Join(dir1, "dootsabha-test-prepend") {
+		t.Errorf("expected dir1 to win, got path %q", ext.Path)
+	}
+}
+
 func TestExtensionEnv(t *testing.T) {
 	env := plugin.ExtensionEnv()
 	foundPlugin := false

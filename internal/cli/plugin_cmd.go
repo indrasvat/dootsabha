@@ -109,7 +109,7 @@ func discoverAll() []pluginEntry {
 	entries = append(entries, discoverGRPCPlugins()...)
 
 	// 2. Scan for PATH extensions.
-	exts := plugin.DiscoverExtensions()
+	exts := plugin.DiscoverExtensions(plugin.ExtensionDirs()...)
 	for _, ext := range exts {
 		entries = append(entries, pluginEntry{
 			Name:   ext.Name,

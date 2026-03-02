@@ -68,7 +68,7 @@ council-mode deliberation, peer review, and synthesis.
 			return cmd.Help()
 		}
 		// Check for extension binary (dootsabha-{name} on $PATH or plugins/).
-		ext, found := plugin.FindExtension(args[0])
+		ext, found := plugin.FindExtension(args[0], plugin.ExtensionDirs()...)
 		if found {
 			return execExtension(ext, args[1:])
 		}

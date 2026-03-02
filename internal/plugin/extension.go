@@ -9,6 +9,16 @@ import (
 
 const extensionPrefix = "dootsabha-"
 
+// ExtensionDirs returns standard directories to scan for extensions
+// beyond $PATH: ~/.local/bin (user), /usr/local/bin (system).
+func ExtensionDirs() []string {
+	dirs := []string{"/usr/local/bin"}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append([]string{filepath.Join(home, ".local", "bin")}, dirs...)
+	}
+	return dirs
+}
+
 // Extension describes a discovered external extension binary.
 type Extension struct {
 	// Name is the extension name (without the dootsabha- prefix).
@@ -23,12 +33,9 @@ func DiscoverExtensions(extraDirs ...string) []Extension {
 	seen := make(map[string]bool)
 	var extensions []Extension
 
-	// Scan $PATH.
+	// Prepend extra directories so user-local dirs win over $PATH.
 	pathEnv := os.Getenv("PATH")
-	dirs := filepath.SplitList(pathEnv)
-
-	// Append extra directories (e.g., plugins/).
-	dirs = append(dirs, extraDirs...)
+	dirs := append(extraDirs, filepath.SplitList(pathEnv)...)
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
@@ -76,9 +83,9 @@ func DiscoverExtensions(extraDirs ...string) []Extension {
 // FindExtension searches for a specific extension by name.
 // Returns the extension and true if found, zero value and false otherwise.
 func FindExtension(name string, extraDirs ...string) (Extension, bool) {
+	// Prepend extra directories so user-local dirs win over $PATH.
 	pathEnv := os.Getenv("PATH")
-	dirs := filepath.SplitList(pathEnv)
-	dirs = append(dirs, extraDirs...)
+	dirs := append(extraDirs, filepath.SplitList(pathEnv)...)
 
 	binaryName := extensionPrefix + name
 
