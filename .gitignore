@@ -36,7 +36,7 @@ go.work.sum
 # Build output
 bin/
 dist/
-dootsabha
+/dootsabha
 
 # Spike compiled binaries
 _spikes/codex-jsonl/codex-jsonl
