@@ -114,7 +114,7 @@ All 4 items addressed in PRD v1.6.
 - 14 plugin command tests (type inference, JSON, aliases, discovery, rendering)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
 
-## Phase 4: Hardening & Polish (In Progress)
+## Phase 4: Hardening & Polish (All Complete)
 
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
@@ -122,7 +122,7 @@ All 4 items addressed in PRD v1.6.
 | 4.2 | Metrics Collection (In-Process Counters) | DONE | — |
 | 4.3 | Edge Cases & Error Paths | DONE | — |
 | 4.4 | Tier 2 Context File for Extensions | DONE | — |
-| 4.5 | Full L5 Acceptance Suite | PENDING | — |
+| 4.5 | Full L5 Acceptance Suite | DONE | — |
 
 ### What Works End-to-End
 - `internal/observability/logger.go` — slog with JSON/text handlers on stderr
@@ -142,4 +142,8 @@ All 4 items addressed in PRD v1.6.
 - WriteContextFile creates temp JSON, DefaultContextFile with sensible defaults
 - Wired into execExtension: context file created → DOOTSABHA_CONTEXT_FILE env var set → cleanup on exit
 - 7 context file tests (valid JSON, all fields, cleanup, providers, capabilities, defaults, empty)
+- L5 agent workflow tests: 27 tests across 10 categories (JSON, exit codes, ANSI, fields, status, errors, perf, aliases, context file, SIGPIPE)
+- L4 full acceptance suite: 24 visual tests with 8 screenshots (help, status, consult, config, plugin, errors, json, piped)
+- Performance verified: startup 25ms, --help 26ms, consult 33ms (all well under 2s target)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
+- `make test-agent` — 27/27 L5 tests pass
