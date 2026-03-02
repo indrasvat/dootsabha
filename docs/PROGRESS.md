@@ -120,8 +120,8 @@ All 4 items addressed in PRD v1.6.
 |------|-------------|--------|-------|
 | 4.1 | Structured Logging (slog) | DONE | — |
 | 4.2 | Metrics Collection (In-Process Counters) | DONE | — |
-| 4.3 | Edge Cases & Error Paths | PENDING | — |
-| 4.4 | Tier 2 Context File for Extensions | PENDING | — |
+| 4.3 | Edge Cases & Error Paths | DONE | — |
+| 4.4 | Tier 2 Context File for Extensions | DONE | — |
 | 4.5 | Full L5 Acceptance Suite | PENDING | — |
 
 ### What Works End-to-End
@@ -133,4 +133,13 @@ All 4 items addressed in PRD v1.6.
 - Per-provider: invocations, duration, cost, tokens (in/out), errors
 - Session-level: total duration, total cost, total tokens
 - 9 metrics tests (single, multiple, errors, concurrent, summary, aggregation)
+- Exit code precedence matrix: 2 > 4 > 3 > 5 > 1 > 0 (PRD §6.1)
+- Exit code constants: ExitSuccess(0), ExitError(1), ExitUsage(2), ExitProvider(3), ExitTimeout(4), ExitPartial(5)
+- 30 precedence tests (pairwise + multi-code scenarios)
+- SIGPIPE handling: exit 0 cleanly when piped to head
+- `internal/plugin/context_file.go` — Tier 2 JSON context for extensions
+- ContextFile struct: version, session_id, workspace, providers, capabilities, tty, terminal_width
+- WriteContextFile creates temp JSON, DefaultContextFile with sensible defaults
+- Wired into execExtension: context file created → DOOTSABHA_CONTEXT_FILE env var set → cleanup on exit
+- 7 context file tests (valid JSON, all fields, cleanup, providers, capabilities, defaults, empty)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests

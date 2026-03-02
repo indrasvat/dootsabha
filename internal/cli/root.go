@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
 	"github.com/indrasvat/dootsabha/internal/observability"
@@ -89,12 +90,29 @@ func Execute() {
 }
 
 // execExtension runs an extension binary, forwarding args and stdio.
+// It creates a Tier 2 context file with session info and cleans up after execution.
 func execExtension(ext plugin.Extension, args []string) error {
+	// Generate Tier 2 context file.
+	traceID := observability.NewTraceID()
+	isTTY := isatty.IsTerminal(os.Stdout.Fd())
+	ctxFile := plugin.DefaultContextFile(traceID, isTTY, 80)
+	ctxPath, err := plugin.WriteContextFile(ctxFile)
+	if err != nil {
+		slog.Warn("failed to create context file", "error", err)
+	} else {
+		defer func() { _ = os.Remove(ctxPath) }()
+	}
+
+	env := plugin.ExtensionEnv()
+	if ctxPath != "" {
+		env = append(env, "DOOTSABHA_CONTEXT_FILE="+ctxPath)
+	}
+
 	cmd := exec.Command(ext.Path, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = plugin.ExtensionEnv()
+	cmd.Env = env
 
 	if err := cmd.Run(); err != nil {
 		var exitErr *exec.ExitError
