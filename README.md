@@ -77,7 +77,7 @@ dootsabha review "Write a retry function with exponential backoff"
 dootsabha refine "Implement a concurrent-safe LRU cache"
 
 # JSON output for scripting/agents
-dootsabha council "question" --json | jq '.data.synthesis.content'
+dootsabha council "question" --json | jq -r '.synthesis.content'
 ```
 
 ---

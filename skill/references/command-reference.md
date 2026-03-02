@@ -36,6 +36,8 @@ dootsabha council [flags] "<prompt>"
 
 ### JSON Output Schema
 
+Written directly (no envelope wrapper). All fields snake_case.
+
 ```json
 {
   "dispatch": [{
@@ -46,17 +48,17 @@ dootsabha council [flags] "<prompt>"
     "cost_usd": 0.0,
     "tokens_in": 0,
     "tokens_out": 0,
-    "error": "string (empty if success)"
+    "error": "string (omitted if success)"
   }],
   "reviews": [{
     "reviewer": "string",
-    "reviewed": "string",
+    "reviewed": ["string"],
     "content": "string",
-    "error": "string"
+    "error": "string (omitted if success)"
   }],
   "synthesis": {
     "chair": "string",
-    "chair_fallback": "string (set if original chair failed)",
+    "chair_fallback": "string (omitted if no fallback)",
     "content": "string"
   },
   "meta": {
@@ -66,7 +68,7 @@ dootsabha council [flags] "<prompt>"
     "total_cost_usd": 0.0,
     "total_tokens_in": 0,
     "total_tokens_out": 0,
-    "providers": ["string"]
+    "providers": { "claude": "ok", "codex": "ok" }
   }
 }
 ```
@@ -99,17 +101,25 @@ dootsabha consult [flags] --agent <name> "<prompt>"
 
 ### JSON Output Schema
 
+Wrapped in envelope. Fields are PascalCase (no json tags on ProviderResult struct).
+`Duration` is `time.Duration` in nanoseconds, not milliseconds.
+
 ```json
 {
-  "content": "string",
-  "model": "string",
-  "duration_ms": 0,
-  "cost_usd": 0.0,
-  "tokens_in": 0,
-  "tokens_out": 0,
-  "session_id": "string"
+  "meta": { "schema_version": 1 },
+  "data": {
+    "Content": "string",
+    "Model": "string",
+    "Duration": 0,
+    "CostUSD": 0.0,
+    "TokensIn": 0,
+    "TokensOut": 0,
+    "SessionID": "string"
+  }
 }
 ```
+
+Extract content: `jq -r '.data.Content'`
 
 ### Exit Codes
 
@@ -144,6 +154,8 @@ dootsabha review [flags] "<prompt>"
 
 ### JSON Output Schema
 
+Written directly (no envelope wrapper). All fields snake_case.
+
 ```json
 {
   "author": {
@@ -171,7 +183,7 @@ dootsabha review [flags] "<prompt>"
     "total_cost_usd": 0.0,
     "total_tokens_in": 0,
     "total_tokens_out": 0,
-    "providers": ["string"]
+    "providers": { "codex": "ok", "claude": "ok" }
   }
 }
 ```
@@ -213,6 +225,8 @@ dootsabha refine [flags] "<prompt>"
 
 ### JSON Output Schema
 
+Written directly (no envelope wrapper). All fields snake_case.
+
 ```json
 {
   "versions": [{
@@ -238,7 +252,7 @@ dootsabha refine [flags] "<prompt>"
     "total_cost_usd": 0.0,
     "total_tokens_in": 0,
     "total_tokens_out": 0,
-    "providers": ["string"]
+    "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" }
   }
 }
 ```
@@ -267,16 +281,23 @@ No command-specific flags.
 
 ### JSON Output Schema
 
+Wrapped in envelope. Fields are PascalCase (no json tags on healthRow struct).
+
 ```json
-[{
-  "name": "string",
-  "healthy": true,
-  "version": "string",
-  "model": "string",
-  "auth": "string",
-  "error": "string"
-}]
+{
+  "meta": { "schema_version": 1 },
+  "data": [{
+    "Name": "string",
+    "Healthy": true,
+    "Version": "string",
+    "Model": "string",
+    "Auth": "string",
+    "Error": "string"
+  }]
+}
 ```
+
+Extract healthy agents: `jq '[.data[] | select(.Healthy)] | length'`
 
 ### Exit Codes
 
@@ -322,13 +343,18 @@ dootsabha plugin inspect <name> [flags]
 
 ### JSON Output Schema (list)
 
+Wrapped in envelope:
+
 ```json
-[{
-  "name": "string",
-  "type": "string",
-  "path": "string",
-  "status": "string"
-}]
+{
+  "meta": { "schema_version": 1 },
+  "data": [{
+    "name": "string",
+    "type": "string",
+    "path": "string",
+    "status": "string"
+  }]
+}
 ```
 
 Type values: `plugin`, `extension`, `provider`, `strategy`, `hook`.

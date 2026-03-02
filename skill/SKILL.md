@@ -109,74 +109,98 @@ For complete flag reference, see [references/command-reference.md](references/co
 
 ### consult
 
+Wrapped in an envelope. Fields are PascalCase (no json tags on struct).
+
 ```json
 {
-  "content": "Agent's response text",
-  "model": "claude-sonnet-4-6",
-  "duration_ms": 3200,
-  "cost_usd": 0.012,
-  "tokens_in": 150,
-  "tokens_out": 800
+  "meta": { "schema_version": 1 },
+  "data": {
+    "Content": "Agent's response text",
+    "Model": "claude-sonnet-4-6",
+    "Duration": 3200000000,
+    "CostUSD": 0.012,
+    "TokensIn": 150,
+    "TokensOut": 800,
+    "SessionID": ""
+  }
 }
 ```
 
+Extract content: `jq -r '.data.Content'`
+
 ### council
+
+Written directly (no envelope wrapper). All fields snake_case with json tags.
 
 ```json
 {
   "dispatch": [
-    { "provider": "claude", "model": "...", "content": "...", "duration_ms": 3200, "cost_usd": 0.012 },
-    { "provider": "codex",  "model": "...", "content": "...", "duration_ms": 2800, "cost_usd": 0.008 }
+    { "provider": "claude", "model": "...", "content": "...", "duration_ms": 3200, "cost_usd": 0.012, "tokens_in": 150, "tokens_out": 800 },
+    { "provider": "codex",  "model": "...", "content": "...", "duration_ms": 2800, "cost_usd": 0.008, "tokens_in": 120, "tokens_out": 600 }
   ],
   "reviews": [
-    { "reviewer": "claude", "reviewed": "codex", "content": "..." }
+    { "reviewer": "claude", "reviewed": ["codex", "gemini"], "content": "..." }
   ],
   "synthesis": {
     "chair": "claude",
     "content": "Synthesized answer combining all perspectives..."
   },
   "meta": {
+    "schema_version": 1,
     "strategy": "council",
     "duration_ms": 12400,
     "total_cost_usd": 0.045,
-    "providers": ["claude", "codex", "gemini"]
+    "total_tokens_in": 420,
+    "total_tokens_out": 2000,
+    "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" }
   }
 }
 ```
 
 ### review
 
+Written directly (no envelope wrapper). All fields snake_case with json tags.
+
 ```json
 {
-  "author": { "provider": "codex", "content": "...", "duration_ms": 2800, "cost_usd": 0.008 },
-  "review": { "provider": "claude", "content": "...", "duration_ms": 3200, "cost_usd": 0.012 },
-  "meta": { "strategy": "review", "duration_ms": 6000, "total_cost_usd": 0.020 }
+  "author": { "provider": "codex", "model": "...", "content": "...", "duration_ms": 2800, "cost_usd": 0.008, "tokens_in": 120, "tokens_out": 600 },
+  "review": { "provider": "claude", "model": "...", "content": "...", "duration_ms": 3200, "cost_usd": 0.012, "tokens_in": 150, "tokens_out": 800 },
+  "meta": { "schema_version": 1, "strategy": "review", "duration_ms": 6000, "total_cost_usd": 0.020, "total_tokens_in": 270, "total_tokens_out": 1400, "providers": { "codex": "ok", "claude": "ok" } }
 }
 ```
 
 ### refine
 
+Written directly (no envelope wrapper). All fields snake_case with json tags.
+
 ```json
 {
   "versions": [
-    { "version": 1, "provider": "claude", "content": "v1 draft..." },
-    { "version": 2, "provider": "claude", "content": "v2 after codex review...", "reviewer": "codex", "review": "..." },
-    { "version": 3, "provider": "claude", "content": "v3 after gemini review...", "reviewer": "gemini", "review": "..." }
+    { "version": 1, "provider": "claude", "content": "v1 draft...", "duration_ms": 3200 },
+    { "version": 2, "provider": "claude", "content": "v2 after codex review...", "reviewer": "codex", "review": "...", "duration_ms": 5400 },
+    { "version": 3, "provider": "claude", "content": "v3 after gemini review...", "reviewer": "gemini", "review": "...", "duration_ms": 5200 }
   ],
   "final": { "version": 3, "content": "Final refined output..." },
-  "meta": { "strategy": "refine", "duration_ms": 18000, "total_cost_usd": 0.065 }
+  "meta": { "schema_version": 1, "strategy": "refine", "anonymous": true, "duration_ms": 18000, "total_cost_usd": 0.065, "total_tokens_in": 900, "total_tokens_out": 4200, "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" } }
 }
 ```
 
 ### status
 
+Wrapped in an envelope. Fields are PascalCase (no json tags on struct).
+
 ```json
-[
-  { "name": "claude", "healthy": true, "version": "2.1.63", "model": "claude-sonnet-4-6", "auth": "OK" },
-  { "name": "codex",  "healthy": true, "version": "0.106.0", "model": "gpt-5.3-codex", "auth": "OK" },
-  { "name": "gemini", "healthy": false, "version": "", "model": "", "auth": "", "error": "binary not found" }
-]
+{
+  "meta": { "schema_version": 1 },
+  "data": [
+    { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-sonnet-4-6", "Auth": "✓", "Error": "" },
+    { "Name": "codex",  "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.3-codex", "Auth": "✓", "Error": "" },
+    { "Name": "gemini", "Healthy": false, "Version": "", "Model": "", "Auth": "", "Error": "binary not found" }
+  ]
+}
 ```
+
+Extract healthy count: `jq '[.data[] | select(.Healthy)] | length'`
 
 ## Exit Codes
 
@@ -198,8 +222,8 @@ For conditional patterns, see [references/exit-codes.md](references/exit-codes.m
 ## Core Workflow
 
 ```bash
-# 1. Verify agents are available
-dootsabha status --json | jq '[.[] | select(.healthy)] | length'
+# 1. Verify agents are available (status uses envelope + PascalCase)
+dootsabha status --json | jq '[.data[] | select(.Healthy)] | length'
 
 # 2. Get multi-perspective answer
 RESULT=$(dootsabha council --json "Should we use Redis or Memcached for session caching?")

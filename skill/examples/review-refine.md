@@ -12,7 +12,8 @@ You have a function and want one agent to produce it and another to review it.
 ```bash
 dootsabha review --json \
   "Write a Go function that retries HTTP requests with exponential backoff,
-   jitter, and configurable max retries. Include context cancellation support."
+   jitter, and configurable max retries. Include context cancellation support." \
+  > result.json
 ```
 
 Default pipeline: codex authors, claude reviews.
@@ -61,7 +62,8 @@ critique it sequentially with the author incorporating each round of feedback.
 ```bash
 dootsabha refine --json \
   "Write a production-ready rate limiter middleware for a Go HTTP server.
-   Support per-IP and per-API-key limits with sliding window algorithm."
+   Support per-IP and per-API-key limits with sliding window algorithm." \
+  > result.json
 ```
 
 Default pipeline: claude authors, codex and gemini review in order.

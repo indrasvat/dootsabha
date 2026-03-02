@@ -11,14 +11,14 @@ input from multiple AI agents before committing to an approach.
 ## Step 1: Check Agent Health
 
 ```bash
-dootsabha status --json | jq '.[] | {name, healthy, model}'
+dootsabha status --json | jq '.data[] | {Name, Healthy, Model}'
 ```
 
-Output:
+Output (status uses envelope + PascalCase):
 ```json
-{"name":"claude","healthy":true,"model":"claude-sonnet-4-6"}
-{"name":"codex","healthy":true,"model":"gpt-5.3-codex"}
-{"name":"gemini","healthy":true,"model":"gemini-3-pro"}
+{"Name":"claude","Healthy":true,"Model":"claude-sonnet-4-6"}
+{"Name":"codex","Healthy":true,"Model":"gpt-5.3-codex"}
+{"Name":"gemini","Healthy":true,"Model":"gemini-3-pro"}
 ```
 
 Exit code: `0` (all healthy).
@@ -30,7 +30,7 @@ dootsabha council --json \
   "We need a job queue for background tasks: email sending, PDF generation,
    and webhook delivery. Compare Redis-based (Bull/BullMQ) vs PostgreSQL-based
    (pgboss/Graphile Worker) approaches. Consider: operational complexity,
-   failure handling, observability, and our existing Postgres stack."
+   failure handling, observability, and our existing Postgres stack." > result.json
 ```
 
 This runs three stages:
@@ -54,8 +54,8 @@ jq -r '.synthesis.chair' result.json
 # See each agent's take
 jq -r '.dispatch[] | "--- \(.provider) ---\n\(.content)\n"' result.json
 
-# See peer reviews
-jq -r '.reviews[] | "\(.reviewer) on \(.reviewed): \(.content)\n"' result.json
+# See peer reviews (reviewed is an array of agent names)
+jq -r '.reviews[] | "\(.reviewer) on \(.reviewed | join(", ")): \(.content)\n"' result.json
 ```
 
 ## Step 5: Check Cost and Duration
@@ -68,12 +68,12 @@ jq '{
 }' result.json
 ```
 
-Output:
+Output (`providers` is a map of agent → status):
 ```json
 {
   "duration_s": 12.4,
   "cost_usd": 0.045,
-  "agents": ["claude", "codex", "gemini"]
+  "agents": { "claude": "ok", "codex": "ok", "gemini": "ok" }
 }
 ```
 
