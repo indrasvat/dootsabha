@@ -152,7 +152,7 @@ All 4 items addressed in PRD v1.6.
 
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
-| 5.1 | README + User Guide | PENDING | — |
+| 5.1 | README + User Guide | DONE | — |
 | 5.2 | Default Config + Embedded Docs | DONE | — |
 | 5.3 | Claude Code SKILL | PENDING | — |
 | 5.4 | Build & Release CI | PENDING | — |
@@ -166,3 +166,5 @@ All 4 items addressed in PRD v1.6.
 - `dootsabha config show --json` — valid JSON output
 - `dootsabha config show --reveal` — shows sensitive values (disables redaction)
 - 11 config tests: defaults, file load, env override, unknown keys, redaction, reveal, duration parsing, merge order, comments keys, comments not empty, no-file defaults
+- README.md: hero, quick start, commands reference, config guide, output modes, exit codes, extensions guide, plugin system, bilingual interface, development guide
+- All README commands verified: --version, status --json, config show --commented, config show --json, all 7 bilingual aliases

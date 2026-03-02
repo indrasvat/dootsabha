@@ -1,6 +1,6 @@
 # Task 5.1: README (Hero, Quick Start, Screenshots)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 4 complete
