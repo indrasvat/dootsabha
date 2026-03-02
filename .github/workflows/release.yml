@@ -3,65 +3,48 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]+.[0-9]+.[0-9]+*"
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
-    env:
-      GOOS: ${{ matrix.goos }}
-      GOARCH: ${{ matrix.goarch }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
           cache: true
 
-      - name: Build
-        env:
-          VERSION: ${{ github.ref_name }}
-          COMMIT: ${{ github.sha }}
+      - name: Install tools
         run: |
-          SHORT_COMMIT="${COMMIT::8}"
-          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          BINARY="dootsabha-${GOOS}-${GOARCH}"
-          mkdir -p dist
-          go build \
-            -ldflags "-X github.com/indrasvat/dootsabha/internal/version.Version=${VERSION} -X github.com/indrasvat/dootsabha/internal/version.Commit=${SHORT_COMMIT} -X github.com/indrasvat/dootsabha/internal/version.Date=${DATE}" \
-            -o "dist/${BINARY}" \
-            ./cmd/dootsabha
+          go install mvdan.cc/gofumpt@latest
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dootsabha-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: dist/
+      - run: make check
 
   release:
-    name: Create Release
-    needs: build
+    name: Build & Release
+    needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          path: dist/
-          merge-multiple: true
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build all platforms
+        run: bash scripts/build-release.sh "${{ github.ref_name }}"
 
       - name: Generate checksums
         working-directory: dist

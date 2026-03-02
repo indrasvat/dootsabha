@@ -6,41 +6,27 @@ on:
   pull_request:
     branches: ["**"]
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     name: Lint + Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.26"
+          go-version-file: go.mod
           cache: true
 
-      - name: Install gofumpt
-        run: go install mvdan.cc/gofumpt@latest
+      - name: Install tools
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
 
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v2.9.0
-          args: --timeout=5m
-
-      - name: fmt-check
-        run: make fmt-check
-
-      - name: fix-check
-        run: make fix-check
-
-      - name: vet
-        run: make vet
-
-      - name: test
-        run: make test
-
-      - name: build
-        run: make build
-
-      - name: test-binary
-        run: make test-binary
+      - name: CI
+        run: make check
