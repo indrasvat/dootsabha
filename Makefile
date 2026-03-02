@@ -9,7 +9,8 @@ MODULE        := github.com/indrasvat/dootsabha
 VERSION       ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT        ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE          ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
-LDFLAGS       := -X $(MODULE)/internal/version.Version=$(VERSION) \
+LDFLAGS       := -s -w \
+                 -X $(MODULE)/internal/version.Version=$(VERSION) \
                  -X $(MODULE)/internal/version.Commit=$(COMMIT) \
                  -X $(MODULE)/internal/version.Date=$(DATE)
 
@@ -29,7 +30,7 @@ COVERAGE_DIR  := coverage
 build: hooks ## Build binary to bin/dootsabha (auto-installs hooks)
 	@mkdir -p $(BIN_DIR)
 	@printf "$(COLOR_BLUE)>> Building $(BINARY_NAME)...$(COLOR_RESET)\n"
-	go build -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_PATH)
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o $(BIN_DIR)/$(BINARY_NAME) $(CMD_PATH)
 	@printf "$(COLOR_GREEN)>> Built: $(BIN_DIR)/$(BINARY_NAME)$(COLOR_RESET)\n"
 
 .PHONY: install
