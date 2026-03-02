@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -34,8 +35,10 @@ func (e *Engine) PeerReview(ctx context.Context, dispatches []DispatchResult, op
 		}
 	}
 	if len(good) < 2 {
+		slog.Info("peer review skipped", "reason", "fewer than 2 successful dispatches", "successful", len(good))
 		return nil, nil // skip review with fewer than 2 agents
 	}
+	slog.Info("peer review starting", "reviewers", len(good))
 
 	results := make([]ReviewResult, len(good))
 
@@ -76,6 +79,7 @@ func (e *Engine) reviewOne(ctx context.Context, reviewer DispatchResult, all []D
 	}
 
 	e.notify(reviewer.Provider, ProgressStarted)
+	slog.Debug("review starting", "reviewer", reviewer.Provider)
 
 	// Build review prompt with all other agents' outputs.
 	var reviewed []string
@@ -97,6 +101,7 @@ func (e *Engine) reviewOne(ctx context.Context, reviewer DispatchResult, all []D
 
 	result, err := agent.Invoke(ctx, prompt, opts)
 	if err != nil {
+		slog.Warn("review failed", "reviewer", reviewer.Provider, "reviewed", reviewed, "error", err)
 		e.notify(reviewer.Provider, ProgressFailed)
 		return ReviewResult{
 			Reviewer: reviewer.Provider,
@@ -105,6 +110,8 @@ func (e *Engine) reviewOne(ctx context.Context, reviewer DispatchResult, all []D
 		}
 	}
 
+	slog.Info("review complete", "reviewer", reviewer.Provider, "reviewed", reviewed,
+		"duration", result.Duration, "content_len", len(result.Content))
 	e.notify(reviewer.Provider, ProgressDone)
 	return ReviewResult{
 		Reviewer:  reviewer.Provider,

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -66,6 +67,7 @@ func (p *ClaudeProvider) Invoke(ctx context.Context, prompt string, opts InvokeO
 		args = append(args, "--model", model)
 	}
 
+	slog.Debug("claude invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
 	sanitized := core.SanitizeEnvForClaude(os.Environ())
 	res, err := p.runner.Run(ctx, pc.Binary, args, core.WithEnv(sanitized))
 	if err != nil {

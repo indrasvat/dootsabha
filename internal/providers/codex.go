@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/indrasvat/dootsabha/internal/core"
@@ -62,6 +63,7 @@ func (p *CodexProvider) Invoke(ctx context.Context, prompt string, opts InvokeOp
 	args = append(args, pc.Flags...)
 	args = append(args, prompt)
 
+	slog.Debug("codex invoke", "binary", pc.Binary, "model", pc.Model, "prompt_len", len(prompt))
 	res, err := p.runner.Run(ctx, pc.Binary, args)
 	if err != nil {
 		return nil, fmt.Errorf("codex invoke: %w", err)

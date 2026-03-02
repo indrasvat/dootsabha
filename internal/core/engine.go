@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -99,10 +100,17 @@ func (e *Engine) Dispatch(ctx context.Context, prompt string, opts InvokeOptions
 
 	results := make([]DispatchResult, n)
 
+	mode := "parallel"
+	if !e.cfg.Council.Parallel {
+		mode = "sequential"
+	}
+	slog.Info("dispatch starting", "agents", n, "mode", mode, "prompt_len", len(prompt))
+
 	if !e.cfg.Council.Parallel {
 		for i, agent := range e.agents {
 			results[i] = e.invokeOne(ctx, agent, prompt, opts)
 		}
+		slog.Info("dispatch complete", "agents", n, "mode", mode)
 		return results, nil
 	}
 
@@ -116,6 +124,7 @@ func (e *Engine) Dispatch(ctx context.Context, prompt string, opts InvokeOptions
 	}
 	_ = g.Wait() // always nil since goroutines never return errors
 
+	slog.Info("dispatch complete", "agents", n, "mode", mode)
 	return results, nil
 }
 
@@ -123,9 +132,11 @@ func (e *Engine) Dispatch(ctx context.Context, prompt string, opts InvokeOptions
 func (e *Engine) invokeOne(ctx context.Context, agent Agent, prompt string, opts InvokeOptions) DispatchResult {
 	name := agent.Name()
 	e.notify(name, ProgressStarted)
+	slog.Debug("invoking agent", "provider", name, "model", opts.Model, "timeout", opts.Timeout)
 
 	result, err := agent.Invoke(ctx, prompt, opts)
 	if err != nil {
+		slog.Warn("agent invocation failed", "provider", name, "error", err)
 		e.notify(name, ProgressFailed)
 		return DispatchResult{
 			Provider: name,
@@ -133,6 +144,9 @@ func (e *Engine) invokeOne(ctx context.Context, agent Agent, prompt string, opts
 		}
 	}
 
+	slog.Info("agent invocation succeeded", "provider", name, "model", result.Model,
+		"duration", result.Duration, "tokens_in", result.TokensIn, "tokens_out", result.TokensOut,
+		"cost_usd", result.CostUSD, "content_len", len(result.Content))
 	e.notify(name, ProgressDone)
 	return DispatchResult{
 		Provider:  name,

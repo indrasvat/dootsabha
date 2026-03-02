@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -25,12 +26,15 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 
 	// Find the chair agent.
 	chairName := e.cfg.Council.Chair
+	slog.Info("synthesis starting", "chair", chairName, "dispatches", len(dispatches), "reviews", len(reviews))
 	chair := e.findAgent(chairName)
 
 	if chair != nil {
 		e.notify(chairName, ProgressStarted)
+		slog.Debug("invoking chair", "chair", chairName)
 		result, err := chair.Invoke(ctx, prompt, opts)
 		if err == nil {
+			slog.Info("synthesis complete", "chair", chairName, "duration", result.Duration, "content_len", len(result.Content))
 			e.notify(chairName, ProgressDone)
 			return &SynthesisResult{
 				Chair:     chairName,
@@ -41,6 +45,7 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 				TokensOut: result.TokensOut,
 			}, nil
 		}
+		slog.Warn("chair failed, trying fallback", "chair", chairName, "error", err)
 		e.notify(chairName, ProgressFailed)
 		// Chair failed — try fallback.
 	}
@@ -52,6 +57,7 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 	}
 
 	fallbackName := fallback.Name()
+	slog.Info("synthesis fallback", "fallback", fallbackName)
 	e.notify(fallbackName, ProgressStarted)
 	result, err := fallback.Invoke(ctx, prompt, opts)
 	if err != nil {

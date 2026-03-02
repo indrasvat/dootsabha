@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -130,6 +131,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 			partial := false
 
 			// Step 1: Author generates v1.
+			slog.Info("refine: author generating v1", "author", author, "reviewers", reviewerNames, "anonymous", anonymous)
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineStep(rc, author, "v1", true)
 			}
@@ -147,6 +149,8 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				stderrRefineDone(rc, author, "v1", v1Result.Duration)
 			}
 
+			slog.Info("refine: v1 complete", "author", author, "duration", v1Result.Duration,
+				"tokens_in", v1Result.TokensIn, "tokens_out", v1Result.TokensOut, "content_len", len(v1Result.Content))
 			currentContent := v1Result.Content
 			currentVersion := 1
 			totalCost += v1Result.CostUSD
@@ -156,7 +160,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 			versions = append(versions, toRefineVersionJSON(1, author, v1Result, "", "", nil))
 
 			// Steps 2..N: reviewer reviews → author incorporates.
-			for i, revName := range reviewerNames {
+			for _, revName := range reviewerNames {
 				revProv, revErr := getProvider(revName, cfg, runner)
 				if revErr != nil {
 					// Unknown reviewer — skip.
@@ -169,6 +173,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				}
 
 				// Review step.
+				slog.Debug("refine: reviewer starting", "reviewer", revName, "version", currentVersion)
 				reviewPrompt := buildReviewPrompt(currentContent, author, anonymous)
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
@@ -189,12 +194,15 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineDone(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), reviewResult.Duration)
 				}
+				slog.Info("refine: review complete", "reviewer", revName, "version", currentVersion,
+					"duration", reviewResult.Duration, "content_len", len(reviewResult.Content))
 				providerStatus[revName] = "ok"
 				totalCost += reviewResult.CostUSD
 				totalIn += reviewResult.TokensIn
 				totalOut += reviewResult.TokensOut
 
 				// Incorporate step.
+				slog.Debug("refine: incorporating feedback", "author", author, "reviewer", revName)
 				incorporatePrompt := buildIncorporatePrompt(currentContent, reviewResult.Content, revName, anonymous)
 				if rc.IsTTY && !rc.IsJSON() {
 					nextVersion := currentVersion + 1
@@ -244,7 +252,6 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 					vj.TokensOut = &tOut
 				}
 				versions = append(versions, vj)
-				_ = i // suppress unused warning
 			}
 
 			totalDuration := time.Since(totalStart)

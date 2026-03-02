@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -103,6 +104,7 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
+	slog.Debug("subprocess starting", "binary", binary, "args", args)
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("subprocess start %q: %w", binary, err)
@@ -120,6 +122,8 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	case err := <-waitCh:
 		elapsed := time.Since(start)
 		exitCode := exitCodeFromErr(err)
+		slog.Debug("subprocess finished", "binary", binary, "exit_code", exitCode,
+			"duration", elapsed, "stdout_len", stdoutBuf.Len(), "stderr_len", stderrBuf.Len())
 		return &SubprocessResult{
 			Stdout:   stdoutBuf.Bytes(),
 			Stderr:   stderrBuf.Bytes(),
@@ -130,6 +134,7 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	case <-ctx.Done():
 		// Reaper: send SIGTERM to the entire process group, wait for grace period,
 		// then SIGKILL if still alive. Negative pgid targets the whole group.
+		slog.Warn("subprocess timed out, sending SIGTERM", "binary", binary, "pgid", pgid)
 		_ = syscall.Kill(-pgid, syscall.SIGTERM)
 		select {
 		case <-waitCh:

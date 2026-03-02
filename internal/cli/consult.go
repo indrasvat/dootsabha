@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
@@ -71,6 +72,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
+			slog.Info("consult starting", "agent", agent, "model", model, "prompt_len", len(prompt))
 			result, err := prov.Invoke(ctx, prompt, providers.InvokeOptions{
 				Model:    model,
 				MaxTurns: maxTurns,
