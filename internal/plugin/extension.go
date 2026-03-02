@@ -35,7 +35,9 @@ func DiscoverExtensions(extraDirs ...string) []Extension {
 
 	// Prepend extra directories so user-local dirs win over $PATH.
 	pathEnv := os.Getenv("PATH")
-	dirs := append(extraDirs, filepath.SplitList(pathEnv)...)
+	dirs := make([]string, 0, len(extraDirs)+1)
+	dirs = append(dirs, extraDirs...)
+	dirs = append(dirs, filepath.SplitList(pathEnv)...)
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
@@ -85,7 +87,9 @@ func DiscoverExtensions(extraDirs ...string) []Extension {
 func FindExtension(name string, extraDirs ...string) (Extension, bool) {
 	// Prepend extra directories so user-local dirs win over $PATH.
 	pathEnv := os.Getenv("PATH")
-	dirs := append(extraDirs, filepath.SplitList(pathEnv)...)
+	dirs := make([]string, 0, len(extraDirs)+1)
+	dirs = append(dirs, extraDirs...)
+	dirs = append(dirs, filepath.SplitList(pathEnv)...)
 
 	binaryName := extensionPrefix + name
 

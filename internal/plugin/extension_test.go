@@ -8,6 +8,12 @@ import (
 	"github.com/indrasvat/dootsabha/internal/plugin"
 )
 
+// isolatePATH sets PATH to empty so DiscoverExtensions only sees extraDirs.
+func isolatePATH(t *testing.T) {
+	t.Helper()
+	t.Setenv("PATH", "")
+}
+
 // setupExtensionDir creates a temp directory with fake extension binaries.
 func setupExtensionDir(t *testing.T, names ...string) string {
 	t.Helper()
@@ -22,6 +28,7 @@ func setupExtensionDir(t *testing.T, names ...string) string {
 }
 
 func TestDiscoverExtensionsEmpty(t *testing.T) {
+	isolatePATH(t)
 	dir := t.TempDir()
 	exts := plugin.DiscoverExtensions(dir)
 	if len(exts) != 0 {
@@ -30,6 +37,7 @@ func TestDiscoverExtensionsEmpty(t *testing.T) {
 }
 
 func TestDiscoverExtensionsSingle(t *testing.T) {
+	isolatePATH(t)
 	dir := setupExtensionDir(t, "hello")
 	exts := plugin.DiscoverExtensions(dir)
 	if len(exts) != 1 {
@@ -44,6 +52,7 @@ func TestDiscoverExtensionsSingle(t *testing.T) {
 }
 
 func TestDiscoverExtensionsMultiple(t *testing.T) {
+	isolatePATH(t)
 	dir := setupExtensionDir(t, "hello", "world", "test")
 	exts := plugin.DiscoverExtensions(dir)
 	if len(exts) != 3 {
@@ -61,6 +70,7 @@ func TestDiscoverExtensionsMultiple(t *testing.T) {
 }
 
 func TestDiscoverExtensionsDedup(t *testing.T) {
+	isolatePATH(t)
 	dir1 := setupExtensionDir(t, "hello")
 	dir2 := setupExtensionDir(t, "hello")
 	exts := plugin.DiscoverExtensions(dir1, dir2)
@@ -70,6 +80,7 @@ func TestDiscoverExtensionsDedup(t *testing.T) {
 }
 
 func TestDiscoverExtensionsSkipsNonExecutable(t *testing.T) {
+	isolatePATH(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dootsabha-noexec")
 	if err := os.WriteFile(path, []byte("#!/bin/bash"), 0o644); err != nil {
@@ -82,6 +93,7 @@ func TestDiscoverExtensionsSkipsNonExecutable(t *testing.T) {
 }
 
 func TestDiscoverExtensionsSkipsDirectories(t *testing.T) {
+	isolatePATH(t)
 	dir := t.TempDir()
 	subdir := filepath.Join(dir, "dootsabha-subdir")
 	if err := os.MkdirAll(subdir, 0o755); err != nil {
@@ -94,6 +106,7 @@ func TestDiscoverExtensionsSkipsDirectories(t *testing.T) {
 }
 
 func TestDiscoverExtensionsSkipsBarePrefix(t *testing.T) {
+	isolatePATH(t)
 	dir := t.TempDir()
 	// "dootsabha-" with no suffix — should be skipped.
 	path := filepath.Join(dir, "dootsabha-")
@@ -107,6 +120,7 @@ func TestDiscoverExtensionsSkipsBarePrefix(t *testing.T) {
 }
 
 func TestDiscoverExtensionsSkipsNonPrefixed(t *testing.T) {
+	isolatePATH(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "some-other-binary")
 	if err := os.WriteFile(path, []byte("#!/bin/bash"), 0o755); err != nil {
