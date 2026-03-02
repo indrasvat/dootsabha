@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/indrasvat/dootsabha/internal/version"
 )
 
 const extensionPrefix = "dootsabha-"
@@ -117,7 +119,7 @@ func FindExtension(name string, extraDirs ...string) (Extension, bool) {
 // to extension binaries (DOOTSABHA_* env vars).
 func ExtensionEnv() []string {
 	env := os.Environ()
-	env = append(env, fmt.Sprintf("DOOTSABHA_VERSION=%s", "1.0.0"))
+	env = append(env, fmt.Sprintf("DOOTSABHA_VERSION=%s", version.Version))
 	env = append(env, "DOOTSABHA_PLUGIN=1")
 	return env
 }

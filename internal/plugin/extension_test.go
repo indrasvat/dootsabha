@@ -204,19 +204,24 @@ func TestExtensionDirsOrder(t *testing.T) {
 func TestExtensionEnv(t *testing.T) {
 	env := plugin.ExtensionEnv()
 	foundPlugin := false
-	foundVersion := false
+	foundVersion := ""
 	for _, e := range env {
 		if e == "DOOTSABHA_PLUGIN=1" {
 			foundPlugin = true
 		}
-		if len(e) > len("DOOTSABHA_VERSION=") && e[:len("DOOTSABHA_VERSION=")] == "DOOTSABHA_VERSION=" {
-			foundVersion = true
+		const prefix = "DOOTSABHA_VERSION="
+		if len(e) > len(prefix) && e[:len(prefix)] == prefix {
+			foundVersion = e[len(prefix):]
 		}
 	}
 	if !foundPlugin {
 		t.Error("missing DOOTSABHA_PLUGIN=1")
 	}
-	if !foundVersion {
-		t.Error("missing DOOTSABHA_VERSION")
+	if foundVersion == "" {
+		t.Fatal("missing DOOTSABHA_VERSION")
+	}
+	// Must not be the old hardcoded "1.0.0" — should match version.Version.
+	if foundVersion == "1.0.0" {
+		t.Error("DOOTSABHA_VERSION is still hardcoded to 1.0.0")
 	}
 }
