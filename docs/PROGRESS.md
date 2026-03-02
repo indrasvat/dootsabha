@@ -154,8 +154,8 @@ All 4 items addressed in PRD v1.6.
 |------|-------------|--------|-------|
 | 5.1 | README + User Guide | DONE | — |
 | 5.2 | Default Config + Embedded Docs | DONE | — |
-| 5.3 | Claude Code SKILL | PENDING | — |
-| 5.4 | Build & Release CI | PENDING | — |
+| 5.3 | Claude Code SKILL | DONE | — |
+| 5.4 | Build & Release CI | DONE | — |
 | 5.5 | Final Acceptance | PENDING | — |
 
 ### What Works End-to-End
@@ -168,3 +168,9 @@ All 4 items addressed in PRD v1.6.
 - 11 config tests: defaults, file load, env override, unknown keys, redaction, reveal, duration parsing, merge order, comments keys, comments not empty, no-file defaults
 - README.md: hero, quick start, commands reference, config guide, output modes, exit codes, extensions guide, plugin system, bilingual interface, development guide
 - All README commands verified: --version, status --json, config show --commented, config show --json, all 7 bilingual aliases
+- `commands/dootsabha.md` — Claude Code SKILL with accurate JSON schemas for all commands
+- SKILL jq patterns verified against actual binary output
+- CI workflow: fmt-check + fix-check + lint + vet + test + build + test-binary on all branches
+- Release workflow: 4 cross-compile targets (darwin/linux × amd64/arm64), checksums, GitHub release
+- Cross-compilation verified: linux/amd64 (ELF x86-64), linux/arm64 (ELF aarch64)
+- Version injection verified: ldflags → `dootsabha version v0.1.0-test (abcd1234)`

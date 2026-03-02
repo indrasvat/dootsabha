@@ -1,6 +1,6 @@
 # Task 5.4: Build & Release (CI, v0.1.0)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 5.1 (README), Task 5.2 (default config)

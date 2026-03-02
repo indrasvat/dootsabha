@@ -1,6 +1,6 @@
 # Task 5.3: Claude Code SKILL for दूतसभा
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 5.1 (README), Task 5.2 (default config)

@@ -30,8 +30,17 @@ jobs:
       - name: fmt-check
         run: make fmt-check
 
+      - name: fix-check
+        run: make fix-check
+
       - name: vet
         run: make vet
 
       - name: test
         run: make test
+
+      - name: build
+        run: make build
+
+      - name: test-binary
+        run: make test-binary
