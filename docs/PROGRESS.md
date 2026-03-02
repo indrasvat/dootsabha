@@ -73,7 +73,7 @@ All 4 items addressed in PRD v1.6.
 - `make test-binary` — 8/8 L3 smoke tests
 - L4 visual tests: 14/14 pass with 4 screenshots (refine, council, review, consult)
 
-## Phase 3: Plugin System (In Progress)
+## Phase 3: Plugin System (All Complete)
 
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
@@ -82,7 +82,7 @@ All 4 items addressed in PRD v1.6.
 | 3.3 | Extract Providers to Plugins | DONE | — |
 | 3.4 | Council Strategy Plugin | DONE | — |
 | 3.5 | Extension Discovery | DONE | — |
-| 3.6 | Plugin Command (vistaarak) | PENDING | — |
+| 3.6 | Plugin Command (vistaarak) | DONE | — |
 
 ### What Works End-to-End
 - `proto/provider.proto`, `strategy.proto`, `hook.proto` — full gRPC service contracts
@@ -107,4 +107,9 @@ All 4 items addressed in PRD v1.6.
 - Council strategy plugin: `plugins/council-strategy/` — wraps dispatch→review→synthesis pipeline
 - 12 strategy unit tests (response building, tokens, costs, errors, fallback, status map)
 - `make build-plugins` target builds all 4 plugins (3 provider + 1 strategy)
+- `dootsabha plugin list` / `vistaarak soochi` — lists gRPC plugins + PATH extensions
+- `dootsabha plugin inspect {name}` / `vistaarak parikshan` — detailed plugin info
+- Bilingual aliases: vistaarak/विस्तारक (plugin), soochi/सूची (list), parikshan/परीक्षण (inspect)
+- JSON output: `--json` for machine consumption with schema_version envelope
+- 14 plugin command tests (type inference, JSON, aliases, discovery, rendering)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests

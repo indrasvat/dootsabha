@@ -132,4 +132,5 @@ func init() {
 	rootCmd.AddCommand(newConfigCmd())
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRefineCmd())
+	rootCmd.AddCommand(newPluginCmd())
 }

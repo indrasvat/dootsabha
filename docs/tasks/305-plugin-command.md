@@ -1,6 +1,6 @@
 # Task 3.6: Plugin Command (vistaarak list/inspect)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 3.5 (extension discovery)
