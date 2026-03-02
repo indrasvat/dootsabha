@@ -67,6 +67,11 @@ test-binary: build ## L3: Binary smoke tests (mock providers)
 	@printf "$(COLOR_BLUE)>> Running L3 smoke tests...$(COLOR_RESET)\n"
 	@bash scripts/test-binary.sh
 
+.PHONY: test-plugins
+test-plugins: build-mock-plugins build-plugins ## L3: Plugin smoke tests (mock + provider plugins)
+	@printf "$(COLOR_BLUE)>> Running plugin smoke tests...$(COLOR_RESET)\n"
+	@bash scripts/test-plugin-smoke.sh
+
 .PHONY: test-visual
 test-visual: ## L4: Visual integration tests via iTerm2-driver
 	@printf "$(COLOR_BLUE)>> Running L4 visual tests...$(COLOR_RESET)\n"
@@ -151,6 +156,19 @@ ci-fast: fmt vet test ## Fast CI: fmt+vet+test
 
 .PHONY: check
 check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+fix+lint+vet+test+smoke
+
+# ── Provider Plugins ─────────────────────────────────────────────────────────
+
+PLUGIN_BIN := plugins/bin
+
+.PHONY: build-plugins
+build-plugins: ## Build provider plugin binaries
+	@mkdir -p $(PLUGIN_BIN)
+	@printf "$(COLOR_BLUE)>> Building provider plugins...$(COLOR_RESET)\n"
+	go build -o $(PLUGIN_BIN)/claude-provider ./plugins/claude
+	go build -o $(PLUGIN_BIN)/codex-provider ./plugins/codex
+	go build -o $(PLUGIN_BIN)/gemini-provider ./plugins/gemini
+	@printf "$(COLOR_GREEN)>> Provider plugins built$(COLOR_RESET)\n"
 
 # ── Mock Plugins ─────────────────────────────────────────────────────────────
 

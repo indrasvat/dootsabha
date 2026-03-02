@@ -1,6 +1,6 @@
 # Task 3.3: Extract Provider Plugins (claude, codex, gemini)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 3.2 (plugin manager)
