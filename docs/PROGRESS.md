@@ -147,3 +147,22 @@ All 4 items addressed in PRD v1.6.
 - Performance verified: startup 25ms, --help 26ms, consult 33ms (all well under 2s target)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
 - `make test-agent` — 27/27 L5 tests pass
+
+## Phase 5: Documentation & Release (In Progress)
+
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 5.1 | README + User Guide | PENDING | — |
+| 5.2 | Default Config + Embedded Docs | DONE | — |
+| 5.3 | Claude Code SKILL | PENDING | — |
+| 5.4 | Build & Release CI | PENDING | — |
+| 5.5 | Final Acceptance | PENDING | — |
+
+### What Works End-to-End
+- `configs/default.yaml` — comprehensive with inline YAML comments for all options
+- `ConfigComments` map — 14 entries covering all config keys for `--commented` output
+- `dootsabha config show` — works with zero-config (embedded defaults via Viper)
+- `dootsabha config show --commented` — inline `# description` for every field
+- `dootsabha config show --json` — valid JSON output
+- `dootsabha config show --reveal` — shows sensitive values (disables redaction)
+- 11 config tests: defaults, file load, env override, unknown keys, redaction, reveal, duration parsing, merge order, comments keys, comments not empty, no-file defaults

@@ -101,7 +101,15 @@ func printMap(m map[string]any, prefix string, withComments bool) {
 			if err != nil {
 				formatted = fmt.Appendf(nil, "%v", v)
 			}
-			fmt.Fprintf(os.Stdout, "%s = %s\n", fullKey, formatted) //nolint:errcheck
+			if withComments {
+				if comment, ok := core.ConfigComments[fullKey]; ok {
+					fmt.Fprintf(os.Stdout, "%s = %s  # %s\n", fullKey, formatted, comment) //nolint:errcheck
+				} else {
+					fmt.Fprintf(os.Stdout, "%s = %s\n", fullKey, formatted) //nolint:errcheck
+				}
+			} else {
+				fmt.Fprintf(os.Stdout, "%s = %s\n", fullKey, formatted) //nolint:errcheck
+			}
 		}
 	}
 }

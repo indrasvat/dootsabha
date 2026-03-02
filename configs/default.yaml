@@ -1,12 +1,22 @@
-# दूतसभा default configuration
-# Override via ~/.config/dootsabha/config.yaml or DOOTSABHA_* env vars
-# Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=opus-4-6
+# ─────────────────────────────────────────────────────────────
+# दूतसभा (dootsabha) — Default Configuration
+# ─────────────────────────────────────────────────────────────
+#
+# Override order: defaults → this file → env vars (DOOTSABHA_*) → CLI flags
+#
+# Env var convention: DOOTSABHA_{SECTION}_{KEY}
+#   Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=opus-4-6
+#
+# Copy this file to ~/.config/dootsabha/config.yaml to customize.
+# ─────────────────────────────────────────────────────────────
 
+# Provider settings — one entry per AI agent backend.
+# Each provider needs: binary (CLI executable name), model, flags.
 providers:
   claude:
-    binary: claude
-    model: sonnet-4-6
-    flags:
+    binary: claude                    # CLI executable name (must be on $PATH)
+    model: claude-sonnet-4-6          # Default model for invocations
+    flags:                            # Flags passed to every invocation
       - --dangerously-skip-permissions
       - --no-session-persistence
   codex:
@@ -26,10 +36,16 @@ providers:
       - --approval-mode
       - yolo
 
+# Council deliberation settings.
 council:
-  chair: claude
-  parallel: true
-  rounds: 1
+  chair: claude       # Agent that synthesizes final output (fallback: first healthy non-chair)
+  parallel: true      # Run dispatch phase in parallel (false = sequential)
+  rounds: 1           # Number of deliberation rounds (max 5)
 
+# Global invocation timeout — applies to each agent call.
+# Formats: 30s, 5m, 1h. Set to 0 to disable.
 timeout: 5m
+
+# Session timeout — max total duration for multi-agent pipelines.
+# Formats: 30m, 1h, 2h. Set to 0 to disable.
 session_timeout: 30m

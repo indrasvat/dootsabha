@@ -9,6 +9,25 @@ import (
 	"github.com/spf13/viper"
 )
 
+// ConfigComments maps config keys to human-readable descriptions.
+// Used by `config show --commented` to provide inline documentation.
+var ConfigComments = map[string]string{
+	"providers.claude.binary": "CLI executable name (must be on $PATH)",
+	"providers.claude.model":  "Default model for claude invocations",
+	"providers.claude.flags":  "Flags passed to every claude invocation",
+	"providers.codex.binary":  "CLI executable name (must be on $PATH)",
+	"providers.codex.model":   "Default model for codex invocations",
+	"providers.codex.flags":   "Flags passed to every codex invocation",
+	"providers.gemini.binary": "CLI executable name (must be on $PATH)",
+	"providers.gemini.model":  "Default model for gemini invocations",
+	"providers.gemini.flags":  "Flags passed to every gemini invocation",
+	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
+	"council.parallel":        "Run dispatch phase in parallel (false = sequential)",
+	"council.rounds":          "Number of deliberation rounds (max 5)",
+	"timeout":                 "Global invocation timeout (e.g. 30s, 5m, 1h; 0 = disabled)",
+	"session_timeout":         "Max total duration for multi-agent pipelines (e.g. 30m, 1h; 0 = disabled)",
+}
+
 // Config holds the resolved दूतसभा configuration.
 type Config struct {
 	Providers      map[string]ProviderConfig

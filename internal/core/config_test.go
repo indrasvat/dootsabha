@@ -315,3 +315,41 @@ session_timeout: 30m
 		t.Errorf("merge order: got %q, want %q (env > file > default)", cfg.Providers["claude"].Model, "opus-4-6")
 	}
 }
+
+func TestConfigCommentsKeys(t *testing.T) {
+	// All default config keys should have a comment.
+	requiredKeys := []string{
+		"providers.claude.binary", "providers.claude.model", "providers.claude.flags",
+		"providers.codex.binary", "providers.codex.model", "providers.codex.flags",
+		"providers.gemini.binary", "providers.gemini.model", "providers.gemini.flags",
+		"council.chair", "council.parallel", "council.rounds",
+		"timeout", "session_timeout",
+	}
+	for _, key := range requiredKeys {
+		if _, ok := core.ConfigComments[key]; !ok {
+			t.Errorf("ConfigComments missing key: %q", key)
+		}
+	}
+}
+
+func TestConfigCommentsNotEmpty(t *testing.T) {
+	for key, comment := range core.ConfigComments {
+		if comment == "" {
+			t.Errorf("ConfigComments[%q] is empty", key)
+		}
+	}
+}
+
+func TestConfigNoFileStillWorks(t *testing.T) {
+	// LoadConfig("") should work with zero-config (embedded defaults).
+	cfg, err := core.LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig with no file: %v", err)
+	}
+	if len(cfg.Providers) != 3 {
+		t.Errorf("providers count = %d, want 3", len(cfg.Providers))
+	}
+	if cfg.Timeout == 0 {
+		t.Error("timeout should have a default value")
+	}
+}

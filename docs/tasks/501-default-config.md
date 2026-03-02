@@ -1,6 +1,6 @@
 # Task 5.2: Default Config + Embedded Docs
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 4 complete
