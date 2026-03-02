@@ -113,3 +113,24 @@ All 4 items addressed in PRD v1.6.
 - JSON output: `--json` for machine consumption with schema_version envelope
 - 14 plugin command tests (type inference, JSON, aliases, discovery, rendering)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
+
+## Phase 4: Hardening & Polish (In Progress)
+
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 4.1 | Structured Logging (slog) | DONE | — |
+| 4.2 | Metrics Collection (In-Process Counters) | DONE | — |
+| 4.3 | Edge Cases & Error Paths | PENDING | — |
+| 4.4 | Tier 2 Context File for Extensions | PENDING | — |
+| 4.5 | Full L5 Acceptance Suite | PENDING | — |
+
+### What Works End-to-End
+- `internal/observability/logger.go` — slog with JSON/text handlers on stderr
+- `-v`/`-vv`/`-vvv` verbosity levels (Warn → Info → Debug → Debug+source)
+- Session trace ID (`ds_{random5}`) in all log entries
+- 9 logger tests (level mapping, JSON/text output, filtering, source)
+- `internal/observability/metrics.go` — thread-safe per-provider metrics collector
+- Per-provider: invocations, duration, cost, tokens (in/out), errors
+- Session-level: total duration, total cost, total tokens
+- 9 metrics tests (single, multiple, errors, concurrent, summary, aggregation)
+- `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests

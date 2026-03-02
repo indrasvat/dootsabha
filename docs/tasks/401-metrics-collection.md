@@ -1,6 +1,6 @@
 # Task 4.2: Metrics Collection (In-Process Counters)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Phase 3 complete

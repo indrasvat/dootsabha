@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dootsabha/internal/observability"
 	"github.com/indrasvat/dootsabha/internal/plugin"
 	"github.com/indrasvat/dootsabha/internal/version"
 )
@@ -26,7 +28,7 @@ func (e *ExitError) Error() string { return e.Message }
 
 var (
 	jsonOutput     bool
-	verbose        bool
+	verbosity      int
 	quiet          bool
 	globalTimeout  time.Duration
 	sessionTimeout time.Duration
@@ -54,6 +56,10 @@ council-mode deliberation, peer review, and synthesis.
 		if kaalseema, _ := pf.GetDuration("kaalseema"); kaalseema != 0 && !pf.Changed("timeout") {
 			globalTimeout = kaalseema
 		}
+		// Initialize structured logger.
+		logger := observability.SetupDefaultLogger(verbosity, jsonOutput)
+		traceID := observability.NewTraceID()
+		slog.SetDefault(logger.With("session_id", traceID))
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +124,7 @@ func init() {
 
 	f := rootCmd.PersistentFlags()
 	f.BoolVar(&jsonOutput, "json", false, "Output as JSON (agent-friendly)")
-	f.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	f.CountVarP(&verbosity, "verbose", "v", "Verbosity level (-v info, -vv debug, -vvv debug+source)")
 	f.BoolVarP(&quiet, "quiet", "q", false, "Suppress all non-essential output")
 	f.DurationVar(&globalTimeout, "timeout", 0, "Global invocation timeout (e.g. 5m, 30s)")
 	f.Duration("kaalseema", 0, "Alias for --timeout (कालसीमा)")
