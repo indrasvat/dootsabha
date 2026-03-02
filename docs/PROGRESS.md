@@ -180,3 +180,22 @@ All 4 items addressed in PRD v1.6.
 - All 7 bilingual aliases verified
 - Cross-compilation: 4 targets (darwin/linux × amd64/arm64)
 - All checklist items from Task 5.5 verified
+
+## Phase 6: Extension Showcase (All Complete)
+
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 6.1 | Recap Extension + Enhanced Discovery | DONE | — |
+
+### What Works End-to-End
+- `ExtensionDirs()` returns `[~/.local/bin, /usr/local/bin]` — user-local wins scan order
+- Extra dirs prepended before $PATH in both `FindExtension` and `DiscoverExtensions`
+- 3 new L2 tests for `ExtensionDirs()` (paths, order, prepend behavior)
+- `dootsabha recap` — workspace intelligence briefing via Python extension
+- Uses ALL Tier 2 context fields: version, session_id, workspace, providers, capabilities, tty, terminal_width
+- Rich TTY output: manual header box (Go CommandHeader style), provider matrix with colored dots, Rule dividers, styled suggestions
+- Graceful degradation: TTY+color → piped (no ANSI, `*` dots, `---` markers) → standalone (no providers)
+- `dootsabha plugin list` shows recap as extension from `~/.local/bin`
+- Git analysis: branch, recent commits, staged/unstaged counts, language detection, topic extraction
+- Suggestion engine: cross-references workspace + providers + capabilities → actionable commands
+- L4 visual tests: 10/10 pass with 2 screenshots (TTY, piped)
