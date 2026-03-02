@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package dootsabha;
+
+option go_package = "github.com/indrasvat/dootsabha/proto/gen";
+
+// Strategy is the gRPC service that orchestration strategy plugins implement.
+// A strategy defines how multiple agents collaborate (council, consult, review, etc.).
+service Strategy {
+  // Execute runs the strategy's orchestration pipeline.
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}
+
+// AgentConfig identifies an agent and its invocation settings.
+message AgentConfig {
+  // Agent name (e.g., "claude", "codex", "gemini").
+  string name = 1;
+
+  // Override model for this agent (empty = use provider default).
+  string model = 2;
+
+  // Per-agent timeout in milliseconds (0 = use config default).
+  int64 timeout_ms = 3;
+
+  // Additional CLI flags for this agent.
+  repeated string extra_args = 4;
+}
+
+// StrategyConfig holds orchestration-level settings.
+message StrategyConfig {
+  // Whether to dispatch/review in parallel or sequential.
+  bool parallel = 1;
+
+  // Number of deliberation rounds (1 = single pass).
+  int32 rounds = 2;
+
+  // Chair agent name for synthesis (empty = use first agent).
+  string chair = 3;
+
+  // Strategy name (e.g., "council", "consult", "review", "refine").
+  string strategy_name = 4;
+
+  // Whether reviews are anonymous (hide agent names from reviewers).
+  bool anonymous = 5;
+}
+
+// ExecuteRequest configures a full strategy execution.
+message ExecuteRequest {
+  // The prompt to send to agents.
+  string prompt = 1;
+
+  // Agent configurations (1-5 agents).
+  repeated AgentConfig agents = 2;
+
+  // Strategy orchestration settings.
+  StrategyConfig config = 3;
+}
+
+// DispatchResult holds one agent's dispatch output.
+message DispatchResult {
+  // Provider name that produced this result.
+  string provider = 1;
+
+  // Model that was used.
+  string model = 2;
+
+  // The agent's response content.
+  string content = 3;
+
+  // Wall-clock duration in milliseconds.
+  int64 duration_ms = 4;
+
+  // Cost in USD.
+  double cost_usd = 5;
+
+  // Input tokens consumed.
+  int32 tokens_in = 6;
+
+  // Output tokens generated.
+  int32 tokens_out = 7;
+
+  // Error message if this agent failed (empty on success).
+  string error = 8;
+}
+
+// ReviewResult holds one agent's peer review output.
+message ReviewResult {
+  // Name of the reviewing agent.
+  string reviewer = 1;
+
+  // Names of agents whose outputs were reviewed.
+  repeated string reviewed = 2;
+
+  // The review content.
+  string content = 3;
+
+  // Wall-clock duration in milliseconds.
+  int64 duration_ms = 4;
+
+  // Cost in USD.
+  double cost_usd = 5;
+
+  // Input tokens consumed.
+  int32 tokens_in = 6;
+
+  // Output tokens generated.
+  int32 tokens_out = 7;
+
+  // Error message if this review failed (empty on success).
+  string error = 8;
+}
+
+// SynthesisResult holds the chair's synthesized output.
+message SynthesisResult {
+  // Name of the intended chair agent.
+  string chair = 1;
+
+  // Non-empty if a fallback chair was used (original chair failed).
+  string chair_fallback = 2;
+
+  // The synthesized content.
+  string content = 3;
+
+  // Wall-clock duration in milliseconds.
+  int64 duration_ms = 4;
+
+  // Cost in USD.
+  double cost_usd = 5;
+
+  // Input tokens consumed.
+  int32 tokens_in = 6;
+
+  // Output tokens generated.
+  int32 tokens_out = 7;
+}
+
+// SessionMeta holds aggregate metadata for the entire strategy execution.
+message SessionMeta {
+  // Total cost across all invocations.
+  double total_cost_usd = 1;
+
+  // Total input tokens across all invocations.
+  int32 total_tokens_in = 2;
+
+  // Total output tokens across all invocations.
+  int32 total_tokens_out = 3;
+
+  // Total wall-clock duration in milliseconds.
+  int64 total_duration_ms = 4;
+
+  // Per-provider status (e.g., {"claude": "healthy", "codex": "error:timeout"}).
+  map<string, string> providers_status = 5;
+}
+
+// ExecuteResponse holds the complete result of a strategy execution.
+message ExecuteResponse {
+  // Results from the dispatch stage (one per agent).
+  repeated DispatchResult dispatch_results = 1;
+
+  // Results from the peer review stage (one per reviewer).
+  repeated ReviewResult review_results = 2;
+
+  // The chair's synthesis (nil if strategy doesn't synthesize).
+  SynthesisResult synthesis = 3;
+
+  // Aggregate session metadata.
+  SessionMeta metadata = 4;
+}

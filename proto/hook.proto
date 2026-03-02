@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package dootsabha;
+
+option go_package = "github.com/indrasvat/dootsabha/proto/gen";
+
+import "proto/provider.proto";
+
+// Hook is the gRPC service that lifecycle hook plugins implement.
+// Hooks intercept and optionally modify requests/responses at various
+// pipeline stages (prompt rewriting, response redaction, audit logging, etc.).
+service Hook {
+  // PreInvoke runs before each agent invocation.
+  // Can modify the InvokeRequest (e.g., prompt rewriting, injection).
+  // Returning an error aborts the invocation.
+  rpc PreInvoke(HookRequest) returns (HookResponse);
+
+  // PostInvoke runs after each agent invocation.
+  // Can modify the InvokeResponse (e.g., PII redaction, enrichment).
+  rpc PostInvoke(HookRequest) returns (HookResponse);
+
+  // PreSynthesis runs before the chair synthesizes the final output.
+  // Can filter or reorder the list of responses.
+  rpc PreSynthesis(HookRequest) returns (HookResponse);
+
+  // PostSession runs after the full session completes.
+  // Used for metrics, cleanup, webhooks. Errors are logged but don't abort.
+  rpc PostSession(HookRequest) returns (HookResponse);
+}
+
+// EventType identifies which lifecycle event triggered a hook.
+enum EventType {
+  PRE_INVOKE = 0;
+  POST_INVOKE = 1;
+  PRE_SYNTHESIS = 2;
+  POST_SESSION = 3;
+}
+
+// SessionSummary provides aggregate session data for PostSession hooks.
+message SessionSummary {
+  // Unique session identifier.
+  string session_id = 1;
+
+  // Strategy that was used (e.g., "council", "review").
+  string strategy = 2;
+
+  // Names of providers involved.
+  repeated string providers = 3;
+
+  // Total cost across all invocations.
+  double total_cost_usd = 4;
+
+  // Total tokens (input + output) across all invocations.
+  int32 total_tokens = 5;
+
+  // Total wall-clock duration in milliseconds.
+  int64 duration_ms = 6;
+
+  // Error messages accumulated during the session.
+  repeated string errors = 7;
+}
+
+// InvokeResponseList wraps a list of InvokeResponses for the PreSynthesis oneof.
+message InvokeResponseList {
+  repeated InvokeResponse responses = 1;
+}
+
+// HookRequest carries the payload for a hook invocation.
+message HookRequest {
+  // Which lifecycle event triggered this hook.
+  EventType event_type = 1;
+
+  // Arbitrary metadata (e.g., session context, trace IDs).
+  map<string, string> metadata = 2;
+
+  // The payload varies by event type.
+  oneof payload {
+    // For PRE_INVOKE: the request about to be sent.
+    InvokeRequest invoke_request = 3;
+
+    // For POST_INVOKE: the response received from the agent.
+    InvokeResponse invoke_response = 4;
+
+    // For PRE_SYNTHESIS: all responses before synthesis.
+    InvokeResponseList invoke_responses = 5;
+
+    // For POST_SESSION: aggregate session data.
+    SessionSummary session_summary = 6;
+  }
+}
+
+// HookResponse carries the hook's result.
+message HookResponse {
+  // Whether to proceed with the operation (false = abort).
+  bool proceed = 1;
+
+  // Error message if the hook wants to signal a problem.
+  string error = 2;
+
+  // The optionally modified payload (same oneof as request).
+  oneof modified_payload {
+    // Modified InvokeRequest (for PreInvoke).
+    InvokeRequest modified_invoke_request = 3;
+
+    // Modified InvokeResponse (for PostInvoke).
+    InvokeResponse modified_invoke_response = 4;
+
+    // Modified response list (for PreSynthesis).
+    InvokeResponseList modified_invoke_responses = 5;
+  }
+}

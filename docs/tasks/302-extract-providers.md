@@ -55,6 +55,16 @@ Extract the 3 hardcoded providers from `internal/providers/` into standalone gRP
 - Host communicates with plugin via gRPC
 - Fallback to direct invocation when plugin missing
 
+### Step 6: Real-world scenario smoke tests (deferred from Task 300)
+Create `scripts/test-plugin-smoke.sh` with these scenarios:
+- Mock-provider serves Claude-like responses with realistic payloads (session_id, cost, tokens)
+- Mock-strategy executes council pipeline end-to-end (3 dispatch, 3 review, synthesis, meta)
+- Mock-hook rewrites prompts (PreInvoke) + redacts responses (PostInvoke)
+- Full lifecycle: discover → handshake → invoke → shutdown → no orphan processes (pgrep check)
+- Realistic payload sizes (10KB prompt, 32KB response — the truncation limit)
+- Zero regression: all existing `make test-binary` tests still pass
+- Add `make test-plugins` target
+
 ## Verification
 
 ### L1: Unit tests
@@ -62,9 +72,11 @@ Extract the 3 hardcoded providers from `internal/providers/` into standalone gRP
 make test
 ```
 
-### L3: Zero regression
+### L3: Zero regression + plugin smoke
 ```bash
 make build build-plugins
+make test-binary     # 8/8 existing smoke tests
+make test-plugins    # 6 real-world scenario tests
 ./bin/dootsabha consult --agent claude "PONG"
 ./bin/dootsabha consult --agent codex "PONG"
 ./bin/dootsabha consult --agent gemini "PONG"
@@ -78,7 +90,8 @@ make build build-plugins
 2. Host communicates with plugins via go-plugin
 3. Zero regression — all existing tests pass
 4. Fallback to direct invocation when plugins missing
-5. `make ci` passes
+5. 6 real-world scenario smoke tests pass
+6. `make check` passes
 
 ## Commit
 

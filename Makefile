@@ -91,7 +91,7 @@ lint-fix: ## Run golangci-lint with auto-fix (excludes _spikes)
 	golangci-lint run --fix $(GO_DIRS)
 
 # Directories to format/check (excludes _spikes — separate modules)
-GO_DIRS := ./cmd/... ./internal/...
+GO_DIRS := ./cmd/... ./internal/... ./proto/...
 
 .PHONY: fmt
 fmt: ## Format code with gofumpt (excludes _spikes)
@@ -151,6 +151,16 @@ ci-fast: fmt vet test ## Fast CI: fmt+vet+test
 
 .PHONY: check
 check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+fix+lint+vet+test+smoke
+
+# ── Proto ─────────────────────────────────────────────────────────────────────
+
+.PHONY: proto
+proto: ## Regenerate protobuf Go code from .proto files
+	@printf "$(COLOR_BLUE)>> Generating protobuf Go code...$(COLOR_RESET)\n"
+	protoc --go_out=. --go_opt=module=$(MODULE) \
+	       --go-grpc_out=. --go-grpc_opt=module=$(MODULE) \
+	       proto/provider.proto proto/strategy.proto proto/hook.proto
+	@printf "$(COLOR_GREEN)>> Proto generation complete$(COLOR_RESET)\n"
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
 
