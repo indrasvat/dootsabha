@@ -117,7 +117,7 @@ def git_info(workspace: str) -> dict:
                 if wt not in (" ", "?"):
                     info["unstaged"] += 1
 
-    # Language detection from file extensions
+    # Language detection from file extensions (cap sample for large repos)
     ls_files = run_git("ls-files")
     if ls_files:
         exts: dict[str, int] = {}
@@ -135,7 +135,7 @@ def git_info(workspace: str) -> dict:
             ".sh": "Shell",
             ".proto": "Protobuf",
         }
-        for filepath in ls_files.splitlines():
+        for filepath in ls_files.splitlines()[:1000]:
             ext = Path(filepath).suffix
             if ext in ext_lang:
                 lang = ext_lang[ext]
@@ -184,6 +184,26 @@ def suggest_commands(
     return suggestions[:4]  # Max 4 suggestions
 
 
+# ── Context extraction ─────────────────────────────────────────────────────
+
+
+def extract_context(context: dict | None) -> dict:
+    """Extract rendering values from Tier 2 context with standalone fallbacks."""
+    def get(key: str, default):
+        return context.get(key, default) if context else default
+
+    workspace = get("workspace", os.getcwd())
+    return {
+        "session_id": get("session_id", "standalone"),
+        "version": get("version", os.environ.get("DOOTSABHA_VERSION", "")),
+        "workspace": workspace,
+        "project_name": Path(workspace).name,
+        "providers": get("providers", {}),
+        "capabilities": get("capabilities", {}),
+        "term_width": get("terminal_width", 80),
+    }
+
+
 # ── Rich rendering ──────────────────────────────────────────────────────────
 
 
@@ -193,15 +213,13 @@ def render(
     git: dict,
 ) -> None:
     """Render the full recap briefing."""
-    # Determine values from context or defaults
-    session_id = context.get("session_id", "standalone") if context else "standalone"
-    version = context.get("version", os.environ.get("DOOTSABHA_VERSION", "")) if context else os.environ.get("DOOTSABHA_VERSION", "")
-    workspace = context.get("workspace", os.getcwd()) if context else os.getcwd()
-    providers = context.get("providers", {}) if context else {}
-    capabilities = context.get("capabilities", {}) if context else {}
-    term_width = context.get("terminal_width", 80) if context else 80
-
-    project_name = Path(workspace).name
+    ctx = extract_context(context)
+    session_id = ctx["session_id"]
+    version = ctx["version"]
+    providers = ctx["providers"]
+    capabilities = ctx["capabilities"]
+    term_width = ctx["term_width"]
+    project_name = ctx["project_name"]
 
     # ── Header box (rounded rect, Go CommandHeader style) ──────────────
     name = "dootsabha Recap"
@@ -338,14 +356,13 @@ def render_plain(
     git: dict,
 ) -> None:
     """Render plain-text output for piped mode (no ANSI, no box chars)."""
-    session_id = context.get("session_id", "standalone") if context else "standalone"
-    version = context.get("version", os.environ.get("DOOTSABHA_VERSION", "")) if context else os.environ.get("DOOTSABHA_VERSION", "")
-    workspace = context.get("workspace", os.getcwd()) if context else os.getcwd()
-    providers = context.get("providers", {}) if context else {}
-    capabilities = context.get("capabilities", {}) if context else {}
-    term_width = context.get("terminal_width", 80) if context else 80
-
-    project_name = Path(workspace).name
+    ctx = extract_context(context)
+    session_id = ctx["session_id"]
+    version = ctx["version"]
+    providers = ctx["providers"]
+    capabilities = ctx["capabilities"]
+    term_width = ctx["term_width"]
+    project_name = ctx["project_name"]
 
     print("dootsabha Recap")
     print(f"Workspace Intelligence Briefing - {session_id}")

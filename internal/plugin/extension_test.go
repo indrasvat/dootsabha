@@ -201,20 +201,6 @@ func TestExtensionDirsOrder(t *testing.T) {
 	}
 }
 
-func TestExtensionDirsExtraDirsPrepended(t *testing.T) {
-	// Verify that extraDirs are prepended (first match wins = user-local wins).
-	dir1 := setupExtensionDir(t, "test-prepend")
-	dir2 := setupExtensionDir(t, "test-prepend")
-	ext, found := plugin.FindExtension("test-prepend", dir1, dir2)
-	if !found {
-		t.Fatal("expected to find extension")
-	}
-	// dir1 is passed first, so it should win.
-	if ext.Path != filepath.Join(dir1, "dootsabha-test-prepend") {
-		t.Errorf("expected dir1 to win, got path %q", ext.Path)
-	}
-}
-
 func TestExtensionEnv(t *testing.T) {
 	env := plugin.ExtensionEnv()
 	foundPlugin := false

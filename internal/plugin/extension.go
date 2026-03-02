@@ -27,17 +27,23 @@ type Extension struct {
 	Path string
 }
 
+// searchDirs builds the directory list for extension lookup: extraDirs first,
+// then $PATH entries. User-local directories win when extraDirs are prepended.
+func searchDirs(extraDirs []string) []string {
+	pathEnv := os.Getenv("PATH")
+	dirs := make([]string, 0, len(extraDirs)+len(pathEnv)/4)
+	dirs = append(dirs, extraDirs...)
+	dirs = append(dirs, filepath.SplitList(pathEnv)...)
+	return dirs
+}
+
 // DiscoverExtensions scans $PATH and optional plugin directories for binaries
 // named dootsabha-{name}. Returns deduplicated extensions (first match wins).
 func DiscoverExtensions(extraDirs ...string) []Extension {
 	seen := make(map[string]bool)
 	var extensions []Extension
 
-	// Prepend extra directories so user-local dirs win over $PATH.
-	pathEnv := os.Getenv("PATH")
-	dirs := make([]string, 0, len(extraDirs)+1)
-	dirs = append(dirs, extraDirs...)
-	dirs = append(dirs, filepath.SplitList(pathEnv)...)
+	dirs := searchDirs(extraDirs)
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
@@ -85,11 +91,7 @@ func DiscoverExtensions(extraDirs ...string) []Extension {
 // FindExtension searches for a specific extension by name.
 // Returns the extension and true if found, zero value and false otherwise.
 func FindExtension(name string, extraDirs ...string) (Extension, bool) {
-	// Prepend extra directories so user-local dirs win over $PATH.
-	pathEnv := os.Getenv("PATH")
-	dirs := make([]string, 0, len(extraDirs)+1)
-	dirs = append(dirs, extraDirs...)
-	dirs = append(dirs, filepath.SplitList(pathEnv)...)
+	dirs := searchDirs(extraDirs)
 
 	binaryName := extensionPrefix + name
 
