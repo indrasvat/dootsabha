@@ -81,7 +81,7 @@ All 4 items addressed in PRD v1.6.
 | 3.2 | Plugin Manager (Discovery, Loading, Registry) | DONE | — |
 | 3.3 | Extract Providers to Plugins | DONE | — |
 | 3.4 | Council Strategy Plugin | PENDING | — |
-| 3.5 | Extension Discovery | PENDING | — |
+| 3.5 | Extension Discovery | DONE | — |
 | 3.6 | Plugin Command (vistaarak) | PENDING | — |
 
 ### What Works End-to-End
@@ -102,4 +102,6 @@ All 4 items addressed in PRD v1.6.
 - Plugin smoke tests: 8/8 pass (binary existence, integration tests, no orphans)
 - `make build-plugins` target builds all 3 provider plugins
 - `make test-plugins` target runs plugin smoke tests
+- Extension discovery: `dootsabha-{name}` binaries on $PATH auto-discovered and executed
+- 12 extension discovery tests (discovery, dedup, edge cases, find, env)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests

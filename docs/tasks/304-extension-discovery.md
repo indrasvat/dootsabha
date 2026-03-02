@@ -1,6 +1,6 @@
 # Task 3.5: Extension Discovery ($PATH + plugins dir)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 3.2 (plugin manager)

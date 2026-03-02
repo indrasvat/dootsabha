@@ -4,12 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dootsabha/internal/plugin"
 	"github.com/indrasvat/dootsabha/internal/version"
 )
 
@@ -58,6 +60,11 @@ council-mode deliberation, peer review, and synthesis.
 		if len(args) == 0 {
 			return cmd.Help()
 		}
+		// Check for extension binary (dootsabha-{name} on $PATH or plugins/).
+		ext, found := plugin.FindExtension(args[0])
+		if found {
+			return execExtension(ext, args[1:])
+		}
 		return fmt.Errorf("unknown command %q — run 'dootsabha --help' for usage", args[0])
 	},
 	SilenceUsage: true,
@@ -73,6 +80,27 @@ func Execute() {
 		}
 		os.Exit(1)
 	}
+}
+
+// execExtension runs an extension binary, forwarding args and stdio.
+func execExtension(ext plugin.Extension, args []string) error {
+	cmd := exec.Command(ext.Path, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = plugin.ExtensionEnv()
+
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return &ExitError{
+				Code:    exitErr.ExitCode(),
+				Message: fmt.Sprintf("extension %q exited with code %d", ext.Name, exitErr.ExitCode()),
+			}
+		}
+		return fmt.Errorf("extension %q: %w", ext.Name, err)
+	}
+	return nil
 }
 
 // setupSIGPIPE catches SIGPIPE and exits 0 so commands piped to `head` work cleanly.
