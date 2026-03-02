@@ -47,6 +47,7 @@ _spikes/subprocess/subprocess
 _spikes/terminal-ux/terminal-ux
 _spikes/pty-pipe/pty-pipe
 _spikes/go-plugin-grpc/plugin/greeter-plugin
+testdata/mock-plugins/bin/
 
 # Coverage
 coverage/

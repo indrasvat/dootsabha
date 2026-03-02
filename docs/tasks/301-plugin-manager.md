@@ -1,6 +1,6 @@
 # Task 3.2: Plugin Manager (Discovery, Loading, Registry)
 
-## Status: PENDING
+## Status: DONE
 
 ## Depends On
 - Task 3.1 (proto definitions)

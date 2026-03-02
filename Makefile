@@ -44,7 +44,7 @@ clean: ## Remove build artifacts
 # ── Test ─────────────────────────────────────────────────────────────────────
 
 .PHONY: test
-test: ## Run unit tests (excludes _spikes)
+test: build-mock-plugins ## Run unit tests (excludes _spikes)
 	go test $(GO_DIRS)
 
 .PHONY: test-race
@@ -151,6 +151,20 @@ ci-fast: fmt vet test ## Fast CI: fmt+vet+test
 
 .PHONY: check
 check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+fix+lint+vet+test+smoke
+
+# ── Mock Plugins ─────────────────────────────────────────────────────────────
+
+MOCK_PLUGIN_DIR := testdata/mock-plugins
+MOCK_PLUGIN_BIN := $(MOCK_PLUGIN_DIR)/bin
+
+.PHONY: build-mock-plugins
+build-mock-plugins: ## Build mock plugin binaries for integration tests
+	@mkdir -p $(MOCK_PLUGIN_BIN)
+	@printf "$(COLOR_BLUE)>> Building mock plugins...$(COLOR_RESET)\n"
+	go build -o $(MOCK_PLUGIN_BIN)/mock-provider ./$(MOCK_PLUGIN_DIR)/mock-provider
+	go build -o $(MOCK_PLUGIN_BIN)/mock-strategy ./$(MOCK_PLUGIN_DIR)/mock-strategy
+	go build -o $(MOCK_PLUGIN_BIN)/mock-hook ./$(MOCK_PLUGIN_DIR)/mock-hook
+	@printf "$(COLOR_GREEN)>> Mock plugins built$(COLOR_RESET)\n"
 
 # ── Proto ─────────────────────────────────────────────────────────────────────
 

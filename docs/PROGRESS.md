@@ -72,3 +72,30 @@ All 4 items addressed in PRD v1.6.
 - `make ci` — 0 lint issues, all tests pass
 - `make test-binary` — 8/8 L3 smoke tests
 - L4 visual tests: 14/14 pass with 4 screenshots (refine, council, review, consult)
+
+## Phase 3: Plugin System (In Progress)
+
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 3.1 | Proto Definitions + Code Generation | DONE | — |
+| 3.2 | Plugin Manager (Discovery, Loading, Registry) | DONE | — |
+| 3.3 | Extract Providers to Plugins | PENDING | — |
+| 3.4 | Council Strategy Plugin | PENDING | — |
+| 3.5 | Extension Discovery | PENDING | — |
+| 3.6 | Plugin Command (vistaarak) | PENDING | — |
+
+### What Works End-to-End
+- `proto/provider.proto`, `strategy.proto`, `hook.proto` — full gRPC service contracts
+- `proto/gen/` — vendored generated Go code (48 L2 tests: message, serialization, edge cases)
+- `internal/plugin/convert.go` — Go type ↔ proto conversion helpers (13 L2 tests)
+- `internal/plugin/interfaces.go` — Go interfaces matching proto services
+- `internal/plugin/handshake.go` — distinct HandshakeConfig per plugin type with magic cookies
+- `internal/plugin/{provider,strategy,hook}_grpc.go` — GRPCServer/GRPCClient wrappers
+- `internal/plugin/manager.go` — plugin discovery, loading, registry, graceful shutdown
+- 3 mock plugin binaries (mock-provider, mock-strategy, mock-hook) — real go-plugin gRPC processes
+- 24 go-plugin integration tests — actual RPC calls against running plugin binaries
+- 21 manager tests — discovery, load, registry, remove, shutdown, end-to-end
+- Full pipeline test: hook rewrites prompt → provider invokes → hook redacts response
+- Crash recovery: kill plugin, detect error, relaunch succeeds
+- Handshake mismatch: wrong MagicCookieValue correctly rejected
+- `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
