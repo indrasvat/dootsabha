@@ -148,7 +148,7 @@ All 4 items addressed in PRD v1.6.
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
 - `make test-agent` — 27/27 L5 tests pass
 
-## Phase 5: Documentation & Release (In Progress)
+## Phase 5: Documentation & Release (All Complete)
 
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
@@ -156,7 +156,7 @@ All 4 items addressed in PRD v1.6.
 | 5.2 | Default Config + Embedded Docs | DONE | — |
 | 5.3 | Claude Code SKILL | DONE | — |
 | 5.4 | Build & Release CI | DONE | — |
-| 5.5 | Final Acceptance | PENDING | — |
+| 5.5 | Final Acceptance | DONE | — |
 
 ### What Works End-to-End
 - `configs/default.yaml` — comprehensive with inline YAML comments for all options
@@ -174,3 +174,9 @@ All 4 items addressed in PRD v1.6.
 - Release workflow: 4 cross-compile targets (darwin/linux × amd64/arm64), checksums, GitHub release
 - Cross-compilation verified: linux/amd64 (ELF x86-64), linux/arm64 (ELF aarch64)
 - Version injection verified: ldflags → `dootsabha version v0.1.0-test (abcd1234)`
+- Final acceptance: L1 (pre-commit) + L2 (all tests) + L3 (8/8 smoke) + L4 (117 screenshots) + L5 (27/27 agent tests)
+- All JSON outputs valid: consult, status, config, plugin
+- Zero ANSI in piped output: consult, status, config, plugin
+- All 7 bilingual aliases verified
+- Cross-compilation: 4 targets (darwin/linux × amd64/arm64)
+- All checklist items from Task 5.5 verified
