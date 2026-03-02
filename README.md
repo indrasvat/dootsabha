@@ -77,7 +77,7 @@ dootsabha review "Write a retry function with exponential backoff"
 dootsabha refine "Implement a concurrent-safe LRU cache"
 
 # JSON output for scripting/agents
-dootsabha council "question" --json | jq '.data.synthesis.content'
+dootsabha council "question" --json | jq -r '.synthesis.content'
 ```
 
 ---
@@ -313,6 +313,20 @@ dootsabha plugin list  # Shows both gRPC plugins and PATH extensions
 
 ---
 
+## Claude Code Skill
+
+दूतसभा ships with a [Claude Code skill](https://code.claude.com/docs/en/skills) in `skill/SKILL.md` that teaches AI agents how to use all commands, parse JSON output, and handle exit codes. Agents automatically discover the skill when working in this repo.
+
+The skill triggers when you ask for things like:
+- "get a second opinion from another LLM"
+- "do a final review with codex/gemini"
+- "run it by another model"
+- "validate and review this PRD"
+
+See `skill/` for the full skill with command reference, exit code patterns, and workflow examples.
+
+---
+
 ## Plugin System
 
 दूतसभा uses [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin) for gRPC-based plugins. Three plugin types:
@@ -373,6 +387,7 @@ internal/plugin/      go-plugin gRPC infrastructure
 internal/observability/ Structured logging + metrics
 proto/                gRPC service definitions
 plugins/              Built-in provider + strategy plugins
+skill/                Claude Code skill (SKILL.md + references + examples)
 configs/              Default configuration
 scripts/              Smoke tests, agent tests
 testdata/             Mock providers + plugins

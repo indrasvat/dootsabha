@@ -17,7 +17,11 @@ Create a Claude Code SKILL that enables agents to discover and use दूतस�
 - §6 (All commands — for SKILL examples)
 
 ## Files to Create
-- `.claude/skills/dootsabha.md` — SKILL definition
+- `skill/SKILL.md` — Main skill definition (with frontmatter)
+- `skill/references/command-reference.md` — All commands, flags, output schemas
+- `skill/references/exit-codes.md` — Exit code patterns for control flow
+- `skill/examples/council-deliberation.md` — Full council workflow example
+- `skill/examples/review-refine.md` — Review and refine walkthrough
 
 ## Execution Steps
 

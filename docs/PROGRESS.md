@@ -168,7 +168,10 @@ All 4 items addressed in PRD v1.6.
 - 11 config tests: defaults, file load, env override, unknown keys, redaction, reveal, duration parsing, merge order, comments keys, comments not empty, no-file defaults
 - README.md: hero, quick start, commands reference, config guide, output modes, exit codes, extensions guide, plugin system, bilingual interface, development guide
 - All README commands verified: --version, status --json, config show --commented, config show --json, all 7 bilingual aliases
-- `commands/dootsabha.md` — Claude Code SKILL with accurate JSON schemas for all commands
+- `skill/SKILL.md` — Claude Code SKILL with YAML frontmatter, trigger words, and accurate JSON schemas
+- `skill/references/` — command-reference.md, exit-codes.md
+- `skill/examples/` — council-deliberation.md, review-refine.md
+- SKILL follows gh-ghent structure: frontmatter + supporting files + progressive disclosure
 - SKILL jq patterns verified against actual binary output
 - CI workflow: fmt-check + fix-check + lint + vet + test + build + test-binary on all branches
 - Release workflow: 4 cross-compile targets (darwin/linux × amd64/arm64), checksums, GitHub release
