@@ -2,6 +2,7 @@ package observability
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
@@ -39,7 +40,7 @@ func TestMetricsRecordMultiple(t *testing.T) {
 	if claude.Invocations != 2 {
 		t.Errorf("claude invocations = %d, want 2", claude.Invocations)
 	}
-	if claude.CostUSD != 0.03 {
+	if math.Abs(claude.CostUSD-0.03) > 1e-9 {
 		t.Errorf("claude cost = %f, want 0.03", claude.CostUSD)
 	}
 	if claude.TokensIn != 110 {
@@ -77,7 +78,7 @@ func TestMetricsSummary(t *testing.T) {
 	if len(summary.Providers) != 3 {
 		t.Fatalf("providers count = %d, want 3", len(summary.Providers))
 	}
-	if summary.TotalCostUSD != 0.045 {
+	if math.Abs(summary.TotalCostUSD-0.045) > 1e-9 {
 		t.Errorf("total cost = %f, want 0.045", summary.TotalCostUSD)
 	}
 	if summary.TotalTokensIn != 150 {
