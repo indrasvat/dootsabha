@@ -96,7 +96,7 @@ lint-fix: ## Run golangci-lint with auto-fix (excludes _spikes)
 	golangci-lint run --fix $(GO_DIRS)
 
 # Directories to format/check (excludes _spikes — separate modules)
-GO_DIRS := ./cmd/... ./internal/... ./proto/...
+GO_DIRS := ./cmd/... ./internal/... ./proto/... ./plugins/...
 
 .PHONY: fmt
 fmt: ## Format code with gofumpt (excludes _spikes)
@@ -162,13 +162,14 @@ check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+
 PLUGIN_BIN := plugins/bin
 
 .PHONY: build-plugins
-build-plugins: ## Build provider plugin binaries
+build-plugins: ## Build plugin binaries (providers + strategy)
 	@mkdir -p $(PLUGIN_BIN)
-	@printf "$(COLOR_BLUE)>> Building provider plugins...$(COLOR_RESET)\n"
+	@printf "$(COLOR_BLUE)>> Building plugins...$(COLOR_RESET)\n"
 	go build -o $(PLUGIN_BIN)/claude-provider ./plugins/claude
 	go build -o $(PLUGIN_BIN)/codex-provider ./plugins/codex
 	go build -o $(PLUGIN_BIN)/gemini-provider ./plugins/gemini
-	@printf "$(COLOR_GREEN)>> Provider plugins built$(COLOR_RESET)\n"
+	go build -o $(PLUGIN_BIN)/council-strategy ./plugins/council-strategy
+	@printf "$(COLOR_GREEN)>> Plugins built$(COLOR_RESET)\n"
 
 # ── Mock Plugins ─────────────────────────────────────────────────────────────
 

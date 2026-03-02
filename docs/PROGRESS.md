@@ -80,7 +80,7 @@ All 4 items addressed in PRD v1.6.
 | 3.1 | Proto Definitions + Code Generation | DONE | — |
 | 3.2 | Plugin Manager (Discovery, Loading, Registry) | DONE | — |
 | 3.3 | Extract Providers to Plugins | DONE | — |
-| 3.4 | Council Strategy Plugin | PENDING | — |
+| 3.4 | Council Strategy Plugin | DONE | — |
 | 3.5 | Extension Discovery | DONE | — |
 | 3.6 | Plugin Command (vistaarak) | PENDING | — |
 
@@ -104,4 +104,7 @@ All 4 items addressed in PRD v1.6.
 - `make test-plugins` target runs plugin smoke tests
 - Extension discovery: `dootsabha-{name}` binaries on $PATH auto-discovered and executed
 - 12 extension discovery tests (discovery, dedup, edge cases, find, env)
+- Council strategy plugin: `plugins/council-strategy/` — wraps dispatch→review→synthesis pipeline
+- 12 strategy unit tests (response building, tokens, costs, errors, fallback, status map)
+- `make build-plugins` target builds all 4 plugins (3 provider + 1 strategy)
 - `make check` — 0 lint issues, all tests pass, 8/8 L3 smoke tests
