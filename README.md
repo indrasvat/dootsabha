@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="दूतसभा" width="700">
+</p>
+
 # दूतसभा (dootsabha)
 
 **The Council of AI Messengers** — a plugin-extensible Go CLI that orchestrates AI coding agents through council-mode deliberation, peer review, and synthesis.
