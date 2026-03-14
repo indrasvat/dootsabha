@@ -120,7 +120,7 @@ find_install_dir() {
         case "$dir" in
             "") continue ;;
             /usr/*|/bin|/sbin|/opt/homebrew/*|/nix/*) continue ;;
-            */.sdkman/*|*/.volta/*|*/.bun/*|*/.krew/*|*/.antigravity/*) continue ;;
+            */.sdkman/*|*/.volta/*|*/.bun/*|*/.krew/*|*/.antigravity/*|*/.cargo/*) continue ;;
             */Library/*|*/Applications/*|*/.npm/*|*/.pnpm*|*/.yarn/*) continue ;;
         esac
         if echo "$seen" | grep -q ":${dir}:" 2>/dev/null; then continue; fi
