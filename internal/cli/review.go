@@ -117,10 +117,16 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			totalStart := time.Now()
 			authorResult, err := authorProv.Invoke(ctx, prompt, invokeOpts)
 			if err != nil {
+				exitCode := 3
+				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					exitCode = 4
+					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
-				return &ExitError{Code: 3, Message: fmt.Sprintf("author (%s) failed: %s", author, err)}
+				if rc.IsJSON() {
+					_ = output.WriteErrorJSON(os.Stdout, author, msg)
+				}
+				return &ExitError{Code: exitCode, Message: msg}
 			}
 
 			// Step 2: Construct review prompt and invoke reviewer.

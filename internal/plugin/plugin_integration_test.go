@@ -371,6 +371,7 @@ func TestStrategyPluginExecuteRoundtrip(t *testing.T) {
 	// Synthesis.
 	if resp.Synthesis == nil {
 		t.Fatal("synthesis is nil")
+		return
 	}
 	if resp.Synthesis.Chair != "claude" {
 		t.Errorf("synthesis chair = %q, want claude", resp.Synthesis.Chair)
@@ -382,6 +383,7 @@ func TestStrategyPluginExecuteRoundtrip(t *testing.T) {
 	// Session metadata.
 	if resp.Metadata == nil {
 		t.Fatal("metadata is nil")
+		return
 	}
 	if resp.Metadata.TotalCostUsd <= 0 {
 		t.Errorf("total_cost_usd = %f, want > 0", resp.Metadata.TotalCostUsd)
@@ -457,6 +459,7 @@ func TestHookPluginPreInvokeModifiesRequest(t *testing.T) {
 	modified := resp.GetModifiedInvokeRequest()
 	if modified == nil {
 		t.Fatal("expected modified_invoke_request")
+		return
 	}
 	if modified.Prompt != "[hook] original prompt" {
 		t.Errorf("modified prompt = %q", modified.Prompt)
@@ -488,6 +491,7 @@ func TestHookPluginPostInvokeModifiesResponse(t *testing.T) {
 	modified := resp.GetModifiedInvokeResponse()
 	if modified == nil {
 		t.Fatal("expected modified_invoke_response")
+		return
 	}
 	if modified.Content != "sensitive output [redacted]" {
 		t.Errorf("modified content = %q", modified.Content)
@@ -682,6 +686,7 @@ func TestFullPipelineHookProviderRoundtrip(t *testing.T) {
 	modifiedReq := hookResp.GetModifiedInvokeRequest()
 	if modifiedReq == nil {
 		t.Fatal("expected modified request")
+		return
 	}
 
 	// Step 2: Provider invokes with modified prompt.
@@ -706,6 +711,7 @@ func TestFullPipelineHookProviderRoundtrip(t *testing.T) {
 	redacted := postResp.GetModifiedInvokeResponse()
 	if redacted == nil {
 		t.Fatal("expected modified response")
+		return
 	}
 	expected := "Mock response to: [hook] explain quantum computing [redacted]"
 	if redacted.Content != expected {

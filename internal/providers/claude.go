@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/indrasvat/dootsabha/internal/core"
@@ -68,8 +67,9 @@ func (p *ClaudeProvider) Invoke(ctx context.Context, prompt string, opts InvokeO
 	}
 
 	slog.Debug("claude invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
-	sanitized := core.SanitizeEnvForClaude(os.Environ())
-	res, err := p.runner.Run(ctx, pc.Binary, args, core.WithEnv(sanitized))
+	// No per-invocation env sanitization needed — CleanSessionEnv() is called
+	// once at startup in Execute(), so os.Environ() is already clean.
+	res, err := p.runner.Run(ctx, pc.Binary, args)
 	if err != nil {
 		return nil, fmt.Errorf("claude invoke: %w", err)
 	}

@@ -79,10 +79,17 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 				Timeout:  timeout,
 			})
 			if err != nil {
+				exitCode := 3
+				msg := fmt.Sprintf("provider error: %s", err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					exitCode = 4
+					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
-				return &ExitError{Code: 3, Message: fmt.Sprintf("provider error: %s", err)}
+				if rc.IsJSON() {
+					// Emit error JSON so programmatic callers can parse the failure.
+					_ = output.WriteErrorJSON(os.Stdout, agent, msg)
+				}
+				return &ExitError{Code: exitCode, Message: msg}
 			}
 
 			if rc.IsJSON() {

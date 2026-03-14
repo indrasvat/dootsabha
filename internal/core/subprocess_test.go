@@ -37,6 +37,7 @@ func TestSubprocessRunner_ExitCodeCapture(t *testing.T) {
 	_ = err
 	if result == nil {
 		t.Fatal("result is nil")
+		return
 	}
 	if result.ExitCode != 42 {
 		t.Errorf("exit code = %d, want 42", result.ExitCode)
@@ -79,6 +80,7 @@ func TestSubprocessRunner_ContextCancellation(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatal("result should not be nil even on cancellation")
+		return
 	}
 	if result.ExitCode != -1 {
 		t.Errorf("exit code = %d, want -1 on cancellation", result.ExitCode)
@@ -151,83 +153,90 @@ func TestSubprocessRunner_WithEnvOption(t *testing.T) {
 	}
 }
 
-func TestSanitizeEnvForClaude(t *testing.T) {
-	input := []string{
-		"HOME=/home/user",
-		"CLAUDECODE=1",
-		"PATH=/usr/bin:/bin",
-		"CLAUDE_CODE_ENTRYPOINT=cli",
-		"TERM=xterm-256color",
-		"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1",
-		"EDITOR=vim",
+func TestDetectAndCleanClaude_InsideSession(t *testing.T) {
+	// Simulate being inside a Claude Code session.
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_CODE_ENTRYPOINT", "cli")
+	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "1")
+
+	DetectAndCleanClaude()
+
+	if !InsideClaude {
+		t.Error("InsideClaude should be true when CLAUDECODE was set")
+	}
+	if os.Getenv("CLAUDECODE") != "" {
+		t.Error("CLAUDECODE should be unset after DetectAndCleanClaude")
+	}
+	// Other CLAUDE_CODE_* vars MUST be preserved.
+	if os.Getenv("CLAUDE_CODE_ENTRYPOINT") != "cli" {
+		t.Error("CLAUDE_CODE_ENTRYPOINT should be preserved")
+	}
+	if os.Getenv("CLAUDE_CODE_USE_BEDROCK") != "1" {
+		t.Error("CLAUDE_CODE_USE_BEDROCK should be preserved (Bedrock users need this)")
+	}
+}
+
+func TestDetectAndCleanClaude_OutsideSession(t *testing.T) {
+	// Simulate running standalone (not inside Claude Code).
+	t.Setenv("CLAUDECODE", "")
+	_ = os.Unsetenv("CLAUDECODE")
+
+	InsideClaude = false // reset
+	DetectAndCleanClaude()
+
+	if InsideClaude {
+		t.Error("InsideClaude should be false when CLAUDECODE was not set")
+	}
+}
+
+func TestDetectAndCleanClaude_PreservesAllRoutingVars(t *testing.T) {
+	// All CLAUDE_CODE_* routing/config vars must survive DetectAndCleanClaude.
+	t.Setenv("CLAUDECODE", "1")
+	routingVars := map[string]string{
+		"CLAUDE_CODE_USE_BEDROCK":                  "1",
+		"CLAUDE_CODE_USE_VERTEX":                   "1",
+		"CLAUDE_CODE_USE_FOUNDRY":                  "1",
+		"CLAUDE_CODE_SKIP_BEDROCK_AUTH":            "1",
+		"CLAUDE_CODE_SKIP_VERTEX_AUTH":             "1",
+		"CLAUDE_CODE_SKIP_FOUNDRY_AUTH":            "1",
+		"CLAUDE_CODE_MODEL":                        "claude-sonnet-4-6",
+		"CLAUDE_CODE_MAX_OUTPUT_TOKENS":            "4096",
+		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+		"CLAUDE_CODE_ENTRYPOINT":                   "cli",
+		"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS":     "1",
+	}
+	for k, v := range routingVars {
+		t.Setenv(k, v)
 	}
 
-	got := SanitizeEnvForClaude(input)
+	DetectAndCleanClaude()
 
-	// Check that CLAUDECODE* and CLAUDE_CODE* are removed.
-	for _, e := range got {
-		if strings.HasPrefix(e, "CLAUDECODE") || strings.HasPrefix(e, "CLAUDE_CODE") {
-			t.Errorf("SanitizeEnvForClaude left banned var in output: %q", e)
+	if os.Getenv("CLAUDECODE") != "" {
+		t.Error("CLAUDECODE should be unset")
+	}
+	for k, v := range routingVars {
+		if got := os.Getenv(k); got != v {
+			t.Errorf("%s = %q, want %q (must be preserved)", k, got, v)
 		}
 	}
-
-	// Check that safe vars are preserved.
-	safe := map[string]bool{
-		"HOME=/home/user":     true,
-		"PATH=/usr/bin:/bin":  true,
-		"TERM=xterm-256color": true,
-		"EDITOR=vim":          true,
-	}
-	for _, e := range got {
-		if !safe[e] {
-			t.Errorf("unexpected entry in sanitized env: %q", e)
-		}
-		delete(safe, e)
-	}
-	for missing := range safe {
-		t.Errorf("expected entry missing from sanitized env: %q", missing)
-	}
 }
 
-func TestSanitizeEnvForClaude_EmptyInput(t *testing.T) {
-	got := SanitizeEnvForClaude(nil)
-	if got == nil {
-		t.Error("expected non-nil slice from nil input")
-	}
-	if len(got) != 0 {
-		t.Errorf("expected empty slice, got %v", got)
-	}
-}
+func TestDetectAndCleanClaude_SubprocessInheritsCleanEnv(t *testing.T) {
+	// After DetectAndCleanClaude, subprocesses should not see CLAUDECODE
+	// but should see other CLAUDE_CODE_* vars.
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "1")
 
-func TestSanitizeEnvForClaude_AllBanned(t *testing.T) {
-	input := []string{
-		"CLAUDECODE=1",
-		"CLAUDE_CODE_ENTRYPOINT=cli",
-		"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1",
-	}
-	got := SanitizeEnvForClaude(input)
-	if len(got) != 0 {
-		t.Errorf("expected empty result, got %v", got)
-	}
-}
+	DetectAndCleanClaude()
 
-func TestSubprocessRunner_SubprocessDoesNotInheritClaudeEnv(t *testing.T) {
-	// Verify that when we sanitize the env, the subprocess doesn't see CLAUDECODE.
 	r := &SubprocessRunner{}
-	ctx := context.Background()
-
-	// Build an env with CLAUDECODE present, then sanitize it.
-	baseEnv := append(os.Environ(), "CLAUDECODE=1", "CLAUDE_CODE_ENTRYPOINT=cli")
-	cleanEnv := SanitizeEnvForClaude(baseEnv)
-
-	result, err := r.Run(ctx,
-		"sh", []string{"-c", `echo "CLAUDECODE=${CLAUDECODE:-ABSENT}"`},
-		WithEnv(cleanEnv))
+	result, err := r.Run(context.Background(),
+		"sh", []string{"-c", `echo "CC=${CLAUDECODE:-ABSENT} BR=${CLAUDE_CODE_USE_BEDROCK:-ABSENT}"`})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	got := strings.TrimSpace(string(result.Stdout))
-	if got != "CLAUDECODE=ABSENT" {
-		t.Errorf("stdout = %q, want CLAUDECODE=ABSENT (var should be absent from env)", got)
+	if got != "CC=ABSENT BR=1" {
+		t.Errorf("stdout = %q, want %q", got, "CC=ABSENT BR=1")
 	}
 }

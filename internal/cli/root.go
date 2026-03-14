@@ -13,7 +13,9 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/observability"
+	"github.com/indrasvat/dootsabha/internal/output"
 	"github.com/indrasvat/dootsabha/internal/plugin"
 	"github.com/indrasvat/dootsabha/internal/version"
 )
@@ -80,10 +82,26 @@ council-mode deliberation, peer review, and synthesis.
 // Execute runs the root command. Called from main().
 func Execute() {
 	setupSIGPIPE()
+	// Always silence Cobra's built-in "Error: ..." stderr line — we handle
+	// error display ourselves. This prevents unstructured stderr in JSON mode
+	// while still showing errors to TTY users (GitHub issue #4, bug 3).
+	rootCmd.SilenceErrors = true
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
+			if jsonOutput {
+				// Emit JSON error so automation always gets parseable stdout.
+				_ = output.WriteErrorJSON(os.Stdout, "", exitErr.Message)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: %s\n", exitErr.Message) //nolint:errcheck
+			}
 			os.Exit(exitErr.Code)
+		}
+		// Non-ExitError (e.g., unknown command, flag parse) — always show.
+		if jsonOutput {
+			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
 		}
 		os.Exit(1)
 	}
@@ -138,6 +156,10 @@ func setupSIGPIPE() {
 }
 
 func init() {
+	// Detect Claude Code session early — before command registration — so that
+	// commands can adjust their defaults (e.g., council agents).
+	core.DetectAndCleanClaude()
+
 	cobra.EnablePrefixMatching = true
 
 	f := rootCmd.PersistentFlags()
