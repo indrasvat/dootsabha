@@ -86,31 +86,56 @@ resolve_version() {
 
 # ── Install directory selection ──────────────────────────────────────
 #
-# Strategy: find directories already on $PATH that don't need sudo.
-# Priority: ~/.local/bin > ~/bin > /usr/local/bin (if writable)
+# Strategy: scan $PATH for writable directories that don't need sudo.
+# Preferred dirs (shown first if on PATH): ~/.local/bin, ~/bin, ~/go/bin, etc.
+# Then any other writable $PATH dirs. Fallback: ~/.local/bin.
 find_install_dir() {
     if [ -n "${INSTALL_DIR:-}" ]; then
         return
     fi
 
-    # Collect candidate dirs that are on PATH and writable (no sudo)
-    candidates=""
+    # Preferred dirs — shown first if they exist on PATH (in priority order)
+    preferred="$HOME/.local/bin $HOME/bin $HOME/go/bin $HOME/.cargo/bin"
 
-    # Check common user-local dirs
-    for dir in "$HOME/.local/bin" "$HOME/bin" "$HOME/.bin"; do
+    candidates=""
+    seen=""
+
+    # Pass 1: preferred dirs that are on PATH and writable (or creatable)
+    for dir in $preferred; do
         if echo ":$PATH:" | grep -q ":${dir}:" 2>/dev/null; then
             if [ -d "$dir" ] && [ -w "$dir" ]; then
                 candidates="${candidates}${dir}\n"
+                seen="${seen}:${dir}:"
             elif [ ! -e "$dir" ]; then
-                # Dir doesn't exist yet but is on PATH — we can create it
                 candidates="${candidates}${dir}\n"
+                seen="${seen}:${dir}:"
             fi
         fi
     done
 
-    # Check /usr/local/bin if writable
+    # Pass 2: scan PATH for other writable general-purpose bin dirs
+    # Skip system dirs, tool-specific dirs, and already-seen
+    IFS=':'
+    for dir in $PATH; do
+        case "$dir" in
+            "") continue ;;
+            /usr/*|/bin|/sbin|/opt/homebrew/*|/nix/*) continue ;;
+            */.sdkman/*|*/.volta/*|*/.bun/*|*/.krew/*|*/.antigravity/*) continue ;;
+            */Library/*|*/Applications/*|*/.npm/*|*/.pnpm*|*/.yarn/*) continue ;;
+        esac
+        if echo "$seen" | grep -q ":${dir}:" 2>/dev/null; then continue; fi
+        if [ -d "$dir" ] && [ -w "$dir" ]; then
+            candidates="${candidates}${dir}\n"
+            seen="${seen}:${dir}:"
+        fi
+    done
+    unset IFS
+
+    # Pass 3: /usr/local/bin if writable (common on macOS with Homebrew ownership)
     if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-        candidates="${candidates}/usr/local/bin\n"
+        if ! echo "$seen" | grep -q ":/usr/local/bin:" 2>/dev/null; then
+            candidates="${candidates}/usr/local/bin\n"
+        fi
     fi
 
     # Fallback: ~/.local/bin even if not on PATH (we'll warn)
