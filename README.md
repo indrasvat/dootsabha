@@ -55,11 +55,19 @@ gemini --version
 ## Install
 
 ```bash
+# One-liner (latest release)
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | sh
+
+# Non-interactive (CI/scripts)
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | NONINTERACTIVE=1 sh
+
+# Specific version
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.1.0 sh
+
 # From source
 git clone https://github.com/indrasvat/dootsabha.git
-cd dootsabha
-make build
-# Binary is at ./bin/dootsabha — add to your PATH
+cd dootsabha && make build
+cp bin/dootsabha ~/.local/bin/
 ```
 
 ## Quick Start
