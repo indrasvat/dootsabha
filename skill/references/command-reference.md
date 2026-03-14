@@ -23,7 +23,7 @@ dootsabha council [flags] "<prompt>"
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--agents` | | `claude,codex,gemini` | Comma-separated agent names |
+| `--agents` | | `codex,gemini` (inside Claude Code) / `claude,codex,gemini` (standalone) | Comma-separated agent names |
 | `--chair` | | from config (`claude`) | Agent for synthesis |
 | `--rounds` | | from config (`1`) | Number of deliberation rounds (max 5) |
 | `--parallel` | | `true` | Run dispatch in parallel |

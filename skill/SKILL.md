@@ -54,8 +54,9 @@ dootsabha <command> --json "<prompt>"
 dootsabha council --json "What's the best approach to implement rate limiting?"
 ```
 
-Dispatches to all configured agents (default: claude, codex, gemini), runs peer
-review, then synthesizes into a single answer. Exit 0 = success, 5 = partial result.
+Dispatches to all configured agents. When running inside a Claude Code session,
+defaults to codex and gemini (Claude is already the host). When running standalone,
+defaults to all three. Exit 0 = success, 5 = partial result.
 
 ### 2. Consult a single agent
 
@@ -156,6 +157,9 @@ Written directly (no envelope wrapper). All fields snake_case with json tags.
   }
 }
 ```
+
+**Note:** `synthesis` is `null` when all agents failed or synthesis was not reached.
+On error with `--json`, per-agent errors are in `dispatch[].error` and `meta.providers`.
 
 ### review
 
