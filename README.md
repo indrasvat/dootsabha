@@ -103,7 +103,7 @@ Aliases: `paraamarsh`, `परामर्श`
 Three-stage pipeline: **dispatch** (all agents answer) → **peer review** (each reviews the others) → **synthesis** (chair produces final answer).
 
 ```bash
-# Default: all 3 agents, parallel dispatch, claude as chair
+# Default: all 3 agents (or codex,gemini when running inside Claude Code)
 dootsabha council "What's the best way to handle errors in Go?"
 
 # Pick agents and chair
@@ -317,7 +317,14 @@ dootsabha plugin list  # Shows both gRPC plugins and PATH extensions
 
 ---
 
-## Claude Code Skill
+## Claude Code Integration
+
+When running inside a Claude Code session, दूतसभा automatically:
+- **Defaults council agents to `codex,gemini`** — Claude is already the host, no need to call it again
+- **Preserves all `CLAUDE_CODE_*` env vars** — Bedrock, Vertex, and Foundry routing works seamlessly
+- You can still explicitly add Claude with `--agents claude,codex,gemini` if needed
+
+### Skill
 
 दूतसभा ships with a [Claude Code skill](https://code.claude.com/docs/en/skills) in `skill/SKILL.md` that teaches AI agents how to use all commands, parse JSON output, and handle exit codes. Agents automatically discover the skill when working in this repo.
 
