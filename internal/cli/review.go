@@ -124,7 +124,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
-					_ = renderReviewJSON(nil, nil, author, reviewer, time.Since(totalStart))
+					_ = output.WriteErrorJSON(os.Stdout, author, msg)
 				}
 				return &ExitError{Code: exitCode, Message: msg}
 			}

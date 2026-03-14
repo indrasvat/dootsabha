@@ -15,6 +15,7 @@ import (
 
 	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/observability"
+	"github.com/indrasvat/dootsabha/internal/output"
 	"github.com/indrasvat/dootsabha/internal/plugin"
 	"github.com/indrasvat/dootsabha/internal/version"
 )
@@ -88,14 +89,20 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
-			// In non-JSON mode, print the error to stderr so TTY users see it.
-			if !jsonOutput {
+			if jsonOutput {
+				// Emit JSON error so automation always gets parseable stdout.
+				_ = output.WriteErrorJSON(os.Stdout, "", exitErr.Message)
+			} else {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", exitErr.Message) //nolint:errcheck
 			}
 			os.Exit(exitErr.Code)
 		}
 		// Non-ExitError (e.g., unknown command, flag parse) — always show.
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
+		if jsonOutput {
+			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
+		}
 		os.Exit(1)
 	}
 }
