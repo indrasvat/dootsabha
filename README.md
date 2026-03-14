@@ -55,20 +55,28 @@ gemini --version
 ## Install
 
 ```bash
-# One-liner (latest release)
 curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | sh
+```
 
-# Non-interactive (CI/scripts)
+Detects your OS/arch, downloads the latest release, verifies the checksum, and installs to a directory on your `$PATH`. Optionally installs the [Claude Code skill](#skill) for agent auto-discovery.
+
+<details>
+<summary>More options</summary>
+
+```bash
+# Non-interactive with defaults (CI/scripts)
 curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | NONINTERACTIVE=1 sh
 
-# Specific version
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.1.0 sh
+# Specific version or custom directory
+VERSION=v0.1.0 INSTALL_DIR=~/.local/bin curl -fsSL .../install.sh | sh
 
 # From source
 git clone https://github.com/indrasvat/dootsabha.git
 cd dootsabha && make build
 cp bin/dootsabha ~/.local/bin/
 ```
+
+</details>
 
 ## Quick Start
 
