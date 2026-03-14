@@ -39,3 +39,15 @@ func WriteJSON(w io.Writer, v any) error {
 	}
 	return nil
 }
+
+// errorJSON is the data payload for JSON error responses.
+type errorJSON struct {
+	Provider string `json:"provider"`
+	Error    string `json:"error"`
+}
+
+// WriteErrorJSON writes a structured JSON error to w so programmatic callers
+// can parse failure details from stdout even on non-zero exit (issue #4).
+func WriteErrorJSON(w io.Writer, provider, errMsg string) error {
+	return WriteJSON(w, errorJSON{Provider: provider, Error: errMsg})
+}

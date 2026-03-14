@@ -195,6 +195,29 @@ func TestCodexProviderHealthCheckBinaryMissing(t *testing.T) {
 	}
 }
 
+func TestCodexProviderInvokeLargeJSONLLine(t *testing.T) {
+	// Verify that lines >64KB (old bufio.Scanner limit) and >1MB parse correctly.
+	// This was the root cause of GitHub issue #4, bug 1.
+	for _, size := range []int{100_000, 2_000_000} {
+		t.Run(fmt.Sprintf("line_%dB", size), func(t *testing.T) {
+			// Build an agent_message with a large text field.
+			largeText := strings.Repeat("x", size)
+			stream := fmt.Sprintf(`{"type":"item.completed","item":{"id":"i1","type":"agent_message","text":"%s"}}`, largeText) + "\n" +
+				`{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}` + "\n"
+			runner := &mockRunner{stdout: []byte(stream)}
+			p := providers.NewCodexProvider(defaultConfig(t), runner)
+
+			result, err := p.Invoke(context.Background(), "hello", providers.InvokeOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error on %dB line: %v", size, err)
+			}
+			if len(result.Content) != size {
+				t.Errorf("Content length = %d, want %d", len(result.Content), size)
+			}
+		})
+	}
+}
+
 func TestCodexProviderHealthCheckNonZeroExit(t *testing.T) {
 	runner := &mockRunner{
 		stderr:   []byte("unknown flag: --version"),

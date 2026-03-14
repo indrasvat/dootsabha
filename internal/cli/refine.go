@@ -140,10 +140,17 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
 				}
+				exitCode := 3
+				msg := fmt.Sprintf("author (%s) failed on v1: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					exitCode = 4
+					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
-				return &ExitError{Code: 3, Message: fmt.Sprintf("author (%s) failed on v1: %s", author, err)}
+				if rc.IsJSON() {
+					totalDuration := time.Since(totalStart)
+					_ = renderRefineJSON(nil, 0, "", anonymous, totalDuration, 0, 0, 0, map[string]string{author: "error"})
+				}
+				return &ExitError{Code: exitCode, Message: msg}
 			}
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineDone(rc, author, "v1", v1Result.Duration)

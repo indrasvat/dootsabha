@@ -223,6 +223,7 @@ func TestManagerLoadAndGetHook(t *testing.T) {
 	modified := resp.GetModifiedInvokeRequest()
 	if modified == nil {
 		t.Fatal("expected modified request")
+		return
 	}
 	if modified.Prompt != "[hook] hook test" {
 		t.Errorf("prompt = %q", modified.Prompt)

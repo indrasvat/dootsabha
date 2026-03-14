@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -132,15 +131,18 @@ func (p *CodexProvider) providerConfig() core.ProviderConfig {
 // parseCodexJSONL extracts the agent message and usage from the Codex JSONL stream.
 // Robust: skips malformed lines and non-fatal error events; last agent_message wins.
 // All behaviors verified against codex 0.106.0 (Spike 0.1).
+//
+// Uses bytes.Split instead of bufio.Scanner because the data is already fully
+// buffered in memory (from SubprocessRunner) and Scanner's default 64KB token
+// limit causes failures on large JSONL lines (GitHub issue #4).
 func parseCodexJSONL(data []byte) (agentMsg string, usage *codexUsage, err error) {
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
+	for line := range bytes.SplitSeq(data, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if len(line) == 0 {
 			continue
 		}
 		var ev codexEvent
-		if jsonErr := json.Unmarshal([]byte(line), &ev); jsonErr != nil {
+		if jsonErr := json.Unmarshal(line, &ev); jsonErr != nil {
 			// Malformed line — skip and continue (defensive parsing).
 			continue
 		}
@@ -156,5 +158,5 @@ func parseCodexJSONL(data []byte) (agentMsg string, usage *codexUsage, err error
 			// Top-level reconnect/transport errors are non-fatal (Spike 0.1 §1).
 		}
 	}
-	return agentMsg, usage, scanner.Err()
+	return agentMsg, usage, nil
 }

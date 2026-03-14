@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -54,23 +53,22 @@ func WithGracePeriod(d time.Duration) RunOption {
 	}
 }
 
-// SanitizeEnvForClaude removes CLAUDECODE* and CLAUDE_CODE* vars from env.
+// InsideClaude reports whether dootsabha was launched from inside a Claude Code
+// session. Set by DetectAndCleanClaude at startup, before any subcommands run.
+var InsideClaude bool
+
+// DetectAndCleanClaude checks whether we're inside a Claude Code session and
+// unsets the CLAUDECODE env var so subprocesses can invoke `claude -p` without
+// hitting the nested session error.
 //
-// When spawning claude as a subprocess from inside a Claude Code session,
-// these env vars cause an immediate exit with a non-JSON error. The keys must
-// be ABSENT from the environment — setting them to "" is NOT sufficient.
-//
-// Known vars: CLAUDECODE=1, CLAUDE_CODE_ENTRYPOINT=cli,
-// CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-func SanitizeEnvForClaude(env []string) []string {
-	out := make([]string, 0, len(env))
-	for _, e := range env {
-		if strings.HasPrefix(e, "CLAUDECODE") || strings.HasPrefix(e, "CLAUDE_CODE") {
-			continue
-		}
-		out = append(out, e)
-	}
-	return out
+// Only CLAUDECODE needs to be unset — it is the sole var Claude CLI checks for
+// nested session detection (Spike 0.2, validated by env-minimal spike).
+// All other CLAUDE_CODE_* vars (CLAUDE_CODE_USE_BEDROCK, CLAUDE_CODE_USE_VERTEX,
+// CLAUDE_CODE_ENTRYPOINT, etc.) are left untouched. This is critical for
+// Bedrock/Vertex/Foundry users whose routing depends on these vars (issue #4).
+func DetectAndCleanClaude() {
+	InsideClaude = os.Getenv("CLAUDECODE") != ""
+	_ = os.Unsetenv("CLAUDECODE")
 }
 
 // Run executes binary with args, captures stdout/stderr, and enforces context timeout.

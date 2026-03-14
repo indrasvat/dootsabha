@@ -54,8 +54,17 @@ func VerbosityLevel(count int) slog.Level {
 }
 
 // SetupDefaultLogger configures the global slog default logger for the session.
+//
+// When jsonMode is true and no explicit verbosity (-v) is set, the log level
+// is raised to Error to suppress WARN-level log lines on stderr. This ensures
+// --json mode produces clean stdout JSON with no stderr noise (GitHub issue #4).
+// Users can opt back in with --json -v.
 func SetupDefaultLogger(verbosity int, jsonMode bool) *slog.Logger {
 	level := VerbosityLevel(verbosity)
+	// In JSON mode without explicit verbosity, suppress WARN to keep stderr clean.
+	if jsonMode && verbosity == 0 {
+		level = slog.LevelError
+	}
 	format := "text"
 	if jsonMode {
 		format = "json"

@@ -111,7 +111,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
-			// Progress rendering on stderr (TTY only).
+			// Progress rendering on stderr (TTY only, not JSON mode).
 			stderrIsTTY := isatty.IsTerminal(os.Stderr.Fd())
 
 			// Render command header.
@@ -136,12 +136,15 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
 					fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Dispatch", dispatchInfo)) //nolint:errcheck
 				}
-				if stderrIsTTY && !quiet {
+				if stderrIsTTY && !quiet && !rc.IsJSON() {
 					eng.SetProgress(stderrProgress("dispatch", rc.HasColor))
 				}
 
 				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, core.InvokeOptions{Timeout: timeout})
 				if dispErr != nil {
+					if rc.IsJSON() {
+						_ = renderCouncilJSON(allDispatches, nil, nil)
+					}
 					return &ExitError{Code: 1, Message: fmt.Sprintf("dispatch: %s", dispErr)}
 				}
 				allDispatches = dispatches
@@ -155,6 +158,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				}
 
 				if successes == 0 {
+					if rc.IsJSON() {
+						_ = renderCouncilJSON(allDispatches, nil, nil)
+					}
 					return &ExitError{Code: 1, Message: "all agents failed during dispatch"}
 				}
 
@@ -165,11 +171,14 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 						fmt.Fprintln(os.Stdout)                                               //nolint:errcheck
 						fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Peer Review", "")) //nolint:errcheck
 					}
-					if stderrIsTTY && !quiet {
+					if stderrIsTTY && !quiet && !rc.IsJSON() {
 						eng.SetProgress(stderrProgress("review", rc.HasColor))
 					}
 					reviews, err = eng.PeerReview(ctx, dispatches, core.InvokeOptions{Timeout: timeout})
 					if err != nil {
+						if rc.IsJSON() {
+							_ = renderCouncilJSON(allDispatches, allReviews, nil)
+						}
 						return &ExitError{Code: 3, Message: fmt.Sprintf("peer review: %s", err)}
 					}
 				}
@@ -182,6 +191,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				}
 				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, core.InvokeOptions{Timeout: timeout})
 				if err != nil {
+					if rc.IsJSON() {
+						_ = renderCouncilJSON(allDispatches, allReviews, nil)
+					}
 					return &ExitError{Code: 3, Message: fmt.Sprintf("synthesis: %s", err)}
 				}
 
@@ -194,7 +206,16 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			// Render output.
 			if rc.IsJSON() {
-				return renderCouncilJSON(allDispatches, allReviews, synthesis)
+				if err := renderCouncilJSON(allDispatches, allReviews, synthesis); err != nil {
+					return &ExitError{Code: 1, Message: fmt.Sprintf("write json: %s", err)}
+				}
+				// Return correct exit code even in JSON mode.
+				for _, d := range allDispatches {
+					if d.Error != nil {
+						return &ExitError{Code: 5, Message: "partial result: some agents failed"}
+					}
+				}
+				return nil
 			}
 
 			renderCouncilTTY(rc, allDispatches, allReviews, synthesis)
@@ -210,7 +231,11 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&agents, "agents", "claude,codex,gemini", "Comma-separated agent names")
+	defaultAgents := "claude,codex,gemini"
+	if core.InsideClaude {
+		defaultAgents = "codex,gemini" // Claude is already the host session
+	}
+	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names")
 	f.String("dootas", "", "Alias for --agents (दूत)")
 	_ = f.MarkHidden("dootas")
 	f.StringVar(&chair, "chair", "", "Chair agent for synthesis (default: from config)")
@@ -284,7 +309,7 @@ func stderrProgress(stage string, hasColor bool) core.ProgressFunc {
 type councilJSON struct {
 	Dispatch  []councilDispatchJSON `json:"dispatch"`
 	Reviews   []councilReviewJSON   `json:"reviews"`
-	Synthesis councilSynthesisJSON  `json:"synthesis"`
+	Synthesis *councilSynthesisJSON `json:"synthesis"`
 	Meta      councilMeta           `json:"meta"`
 }
 
@@ -373,7 +398,7 @@ func renderCouncilJSON(dispatches []core.DispatchResult, reviews []core.ReviewRe
 	}
 
 	if synth != nil {
-		out.Synthesis = councilSynthesisJSON{
+		out.Synthesis = &councilSynthesisJSON{
 			Chair:         synth.Chair,
 			ChairFallback: synth.ChairFallback,
 			Content:       synth.Content,
