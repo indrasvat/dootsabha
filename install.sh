@@ -95,7 +95,7 @@ find_install_dir() {
     fi
 
     # Preferred dirs — shown first if they exist on PATH (in priority order)
-    preferred="$HOME/.local/bin $HOME/bin $HOME/go/bin $HOME/.cargo/bin"
+    preferred="$HOME/.local/bin $HOME/bin $HOME/go/bin"
 
     candidates=""
     seen=""
@@ -131,8 +131,8 @@ find_install_dir() {
     done
     unset IFS
 
-    # Pass 3: /usr/local/bin if writable (common on macOS with Homebrew ownership)
-    if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    # Pass 3: /usr/local/bin — always offer if it exists (it's on PATH everywhere)
+    if [ -d "/usr/local/bin" ]; then
         if ! echo "$seen" | grep -q ":/usr/local/bin:" 2>/dev/null; then
             candidates="${candidates}/usr/local/bin\n"
         fi
@@ -163,13 +163,16 @@ find_install_dir() {
         if [ "$dir" = "$DEFAULT_DIR" ]; then
             marker=" ${GREEN}(recommended)${RESET}"
         fi
-        on_path=""
+        notes=""
         if echo ":$PATH:" | grep -q ":${dir}:" 2>/dev/null; then
-            on_path=" ${DIM}on PATH${RESET}"
+            notes=" ${DIM}on PATH${RESET}"
         else
-            on_path=" ${YELLOW}not on PATH${RESET}"
+            notes=" ${YELLOW}not on PATH${RESET}"
         fi
-        printf "    %s%s%d%s) %s%s  %s\n" "$BOLD" "$CYAN" "$i" "$RESET" "$dir" "$marker" "$on_path"
+        if [ -d "$dir" ] && ! [ -w "$dir" ]; then
+            notes="${notes}  ${YELLOW}needs sudo${RESET}"
+        fi
+        printf "    %s%s%d%s) %s%s  %s\n" "$BOLD" "$CYAN" "$i" "$RESET" "$dir" "$marker" "$notes"
         i=$((i + 1))
     done
 
@@ -246,17 +249,24 @@ download_and_install() {
         warn "Could not fetch checksums — skipping"
     fi
 
+    # Determine if we need elevated permissions
+    SUDO=""
+    if [ -d "$INSTALL_DIR" ] && ! [ -w "$INSTALL_DIR" ]; then
+        SUDO="sudo"
+        info "Elevated permissions required for ${INSTALL_DIR}"
+    fi
+
     # Create install dir if needed
     if [ ! -d "$INSTALL_DIR" ]; then
         step "Creating ${INSTALL_DIR}..."
-        mkdir -p "$INSTALL_DIR"
+        $SUDO mkdir -p "$INSTALL_DIR"
         ok "Created"
     fi
 
     # Install
     step "Installing..."
     chmod +x "${TMPDIR}/${BINARY_NAME}"
-    mv "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/dootsabha"
+    $SUDO mv "${TMPDIR}/${BINARY_NAME}" "${INSTALL_DIR}/dootsabha"
     ok "Installed to ${BOLD}${INSTALL_DIR}/dootsabha${RESET}"
 }
 
