@@ -147,7 +147,13 @@ find_install_dir() {
     DEFAULT_DIR=$(printf "%b" "$candidates" | head -1)
 
     if [ "${NONINTERACTIVE:-}" = "1" ]; then
-        INSTALL_DIR="$DEFAULT_DIR"
+        # In non-interactive mode, never default to a dir that needs sudo —
+        # it would hang or fail without a TTY. Fall back to ~/.local/bin.
+        if [ -d "$DEFAULT_DIR" ] && ! [ -w "$DEFAULT_DIR" ]; then
+            INSTALL_DIR="$HOME/.local/bin"
+        else
+            INSTALL_DIR="$DEFAULT_DIR"
+        fi
         return
     fi
 

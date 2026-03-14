@@ -68,7 +68,7 @@ Detects your OS/arch, downloads the latest release, verifies the checksum, and i
 curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | NONINTERACTIVE=1 sh
 
 # Specific version or custom directory
-VERSION=v0.1.0 INSTALL_DIR=~/.local/bin curl -fsSL .../install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.1.0 INSTALL_DIR=~/.local/bin sh
 
 # From source
 git clone https://github.com/indrasvat/dootsabha.git
