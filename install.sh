@@ -275,6 +275,9 @@ post_install() {
         ok "${INSTALLED_VERSION}"
     fi
 
+    # Offer Claude Code skill install
+    install_skill
+
     # Success
     printf "\n"
     rule
@@ -288,6 +291,54 @@ post_install() {
     printf "\n"
     dim "Docs: https://github.com/${REPO}"
     printf "\n"
+}
+
+# ── Claude Code skill install ────────────────────────────────────────
+install_skill() {
+    # Skip if npx not available or non-interactive without opt-in
+    if ! command -v npx >/dev/null 2>&1; then
+        return
+    fi
+
+    printf "\n"
+    rule
+    printf "\n"
+    step "Claude Code skill available"
+    dim "Teaches Claude Code how to use dootsabha commands,"
+    dim "parse JSON output, and handle exit codes automatically."
+    printf "\n"
+
+    INSTALL_SKILL=""
+    if [ "${NONINTERACTIVE:-}" = "1" ]; then
+        if [ "${INSTALL_SKILL_OPT:-}" = "1" ]; then
+            INSTALL_SKILL="y"
+        fi
+    else
+        printf "  %sInstall Claude Code skill? [y/N] %s" "$BOLD" "$RESET"
+        if [ -t 0 ]; then
+            read -r INSTALL_SKILL
+        elif [ -e /dev/tty ]; then
+            read -r INSTALL_SKILL </dev/tty
+        else
+            INSTALL_SKILL=""
+        fi
+    fi
+
+    case "$INSTALL_SKILL" in
+        [yY]*)
+            step "Installing skill..."
+            if npx --yes skills add --yes "${REPO}" 2>/dev/null; then
+                ok "Skill installed"
+                dim "Claude Code will auto-discover dootsabha commands"
+            else
+                warn "Skill install failed — you can add it later:"
+                dim "npx skills add ${REPO}"
+            fi
+            ;;
+        *)
+            dim "Skipped. Install later: npx skills add ${REPO}"
+            ;;
+    esac
 }
 
 # ── Main ─────────────────────────────────────────────────────────────
