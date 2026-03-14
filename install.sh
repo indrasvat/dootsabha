@@ -327,7 +327,7 @@ install_skill() {
     case "$INSTALL_SKILL" in
         [yY]*)
             step "Installing skill..."
-            if npx --yes skills add --yes "${REPO}" 2>/dev/null; then
+            if npx --yes skills add --yes --global "${REPO}" 2>/dev/null; then
                 ok "Skill installed"
                 dim "Claude Code will auto-discover dootsabha commands"
             else
