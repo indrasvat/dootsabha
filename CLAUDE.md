@@ -25,7 +25,10 @@ internal/cli/             Cobra commands (root, council, consult, ...)
 internal/core/            Engine, config, subprocess, retry
 internal/output/          Renderer, styles, formatters
 internal/version/         Version via ldflags
-internal/providers/       Claude/Codex/Gemini wrappers (Phase 1-2)
+internal/providers/       Claude/Codex/Gemini (Phase 1-2, mostly replaced by plugins)
+internal/plugin/          gRPC plugin manager & handshake logic
+plugins/                  Provider and Strategy plugins (Phase 3+)
+proto/                    gRPC service definitions (.proto + generated)
 testdata/mock-providers/  Mock CLIs for L3 tests
 scripts/                  Smoke tests, agent tests, gating hooks
 configs/default.yaml      Skeleton config
@@ -46,16 +49,45 @@ docs/PROGRESS.md          Phase/task status tracker
 
 **Never mark a task DONE without L1+L2+L3 passing. L4 required for output-visible changes.**
 
+## Exit Code Precedence (PRD §6.1)
+Precedence: `2 > 4 > 3 > 5 > 1 > 0`. Higher precedence overrides lower ones.
+- `2` (ExitUsage): Bad flags, missing args (Highest)
+- `4` (ExitTimeout): At least one agent timed out
+- `3` (ExitProvider): Provider error (CLI failed, auth invalid)
+- `5` (ExitPartial): Partial result (some agents failed)
+- `1` (ExitError): General error
+- `0` (ExitSuccess): Everything OK (Lowest)
+
+## Plugin Architecture
+- **gRPC based:** Uses `hashicorp/go-plugin`.
+- **Handshake Cookies:**
+  - Provider: `dootsabha-provider-v1`
+  - Strategy: `dootsabha-strategy-v1`
+  - Hook: `dootsabha-hook-v1`
+- **Plugin Registry:** Manager handles discovery and graceful shutdown.
+- **Extensions:** `dootsabha-{name}` binaries on $PATH or `~/.local/bin` (user-local wins).
+- **Extension Context:** JSON passed via `DOOTSABHA_CONTEXT_FILE` env var.
+
+## Bilingual Interface (Devanagari/Hindi)
+- **Aliases:** Every command MUST have a Hindi/Devanagari alias (e.g., `sabha` for `council`).
+- **Flags:** Key flags should have bilingual equivalents (e.g., `--dootas` for `--agents`).
+- **Discovery:** `cobra.ArbitraryArgs` required on root for extension discovery to trigger.
+
+## Observability
+- **Structured Logging:** Use `internal/observability.Logger` (wraps `slog`).
+- **Trace ID:** All logs include `ds_{random5}` session trace ID.
+- **Verbosity:** `-v` (Warn/Info), `-vv` (Debug), `-vvv` (Debug+Source).
+- **Metrics:** Thread-safe `InProcessCollector` for tokens, costs, and durations.
+
 ## Critical Spike Findings
 
-### CLAUDECODE env var stripping (Spike 0.2)
-When launching `claude -p` as subprocess, you MUST remove — not just empty — these env vars:
-```go
-for _, key := range []string{"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"} {
-    os.Unsetenv(key) // or filter from cmd.Env
-}
-```
-Setting to `""` is NOT sufficient — the key must be absent entirely.
+### CLAUDECODE env var (Spike 0.2 + env-minimal spike)
+Only `CLAUDECODE` needs to be unset — it is the sole var Claude CLI checks for
+nested session detection. All other `CLAUDE_CODE_*` vars (USE_BEDROCK, USE_VERTEX,
+ENTRYPOINT, etc.) are left untouched. This is done ONCE at startup via
+`core.DetectAndCleanClaude()` in `init()` — no per-invocation sanitization needed.
+When inside Claude Code, `core.InsideClaude` is true and council defaults to
+`codex,gemini` (Claude is already the host).
 
 ### No huh spinner — use raw goroutine (Spike 0.7)
 `huh v0.8.0` removed `NewSpinner()`. Use:
