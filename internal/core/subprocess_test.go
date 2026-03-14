@@ -164,10 +164,13 @@ func TestSanitizeEnvForClaude(t *testing.T) {
 
 	got := SanitizeEnvForClaude(input)
 
-	// Check that CLAUDECODE* and CLAUDE_CODE* are removed.
+	// Session-detection vars must be stripped.
+	banned := []string{"CLAUDECODE=", "CLAUDE_CODE_ENTRYPOINT=", "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS="}
 	for _, e := range got {
-		if strings.HasPrefix(e, "CLAUDECODE") || strings.HasPrefix(e, "CLAUDE_CODE") {
-			t.Errorf("SanitizeEnvForClaude left banned var in output: %q", e)
+		for _, b := range banned {
+			if strings.HasPrefix(e, b) {
+				t.Errorf("SanitizeEnvForClaude left banned var in output: %q", e)
+			}
 		}
 	}
 
@@ -186,6 +189,34 @@ func TestSanitizeEnvForClaude(t *testing.T) {
 	}
 	for missing := range safe {
 		t.Errorf("expected entry missing from sanitized env: %q", missing)
+	}
+}
+
+func TestSanitizeEnvForClaude_PreservesBedrockRouting(t *testing.T) {
+	input := []string{
+		"HOME=/home/user",
+		"CLAUDECODE=1",
+		"CLAUDE_CODE_ENTRYPOINT=cli",
+		"CLAUDE_CODE_USE_BEDROCK=1",
+		"CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1",
+		"PATH=/usr/bin",
+	}
+
+	got := SanitizeEnvForClaude(input)
+
+	// CLAUDE_CODE_USE_BEDROCK must survive sanitization.
+	found := false
+	for _, e := range got {
+		if e == "CLAUDE_CODE_USE_BEDROCK=1" {
+			found = true
+		}
+		// Session-detection vars must still be stripped.
+		if e == "CLAUDECODE=1" || e == "CLAUDE_CODE_ENTRYPOINT=cli" || e == "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1" {
+			t.Errorf("session var should be stripped: %q", e)
+		}
+	}
+	if !found {
+		t.Error("CLAUDE_CODE_USE_BEDROCK=1 was stripped — it must be preserved for Bedrock routing")
 	}
 }
 

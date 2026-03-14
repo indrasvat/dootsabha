@@ -21,6 +21,10 @@ func writeTempConfig(t *testing.T, content string) string {
 }
 
 func TestConfigDefaults(t *testing.T) {
+	// Isolate from user's real config by pointing HOME to a temp dir.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", "")
+
 	cfg, err := core.LoadConfig("")
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)

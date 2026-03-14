@@ -54,17 +54,29 @@ func WithGracePeriod(d time.Duration) RunOption {
 	}
 }
 
-// SanitizeEnvForClaude removes CLAUDECODE* and CLAUDE_CODE* vars from env.
+// SanitizeEnvForClaude removes session-detection CLAUDECODE* and CLAUDE_CODE*
+// vars from env while preserving provider-routing vars like CLAUDE_CODE_USE_BEDROCK.
 //
 // When spawning claude as a subprocess from inside a Claude Code session,
-// these env vars cause an immediate exit with a non-JSON error. The keys must
-// be ABSENT from the environment — setting them to "" is NOT sufficient.
+// session-detection env vars cause an immediate exit with a non-JSON error.
+// The keys must be ABSENT from the environment — setting them to "" is NOT sufficient.
 //
-// Known vars: CLAUDECODE=1, CLAUDE_CODE_ENTRYPOINT=cli,
+// Stripped vars: CLAUDECODE=1, CLAUDE_CODE_ENTRYPOINT=cli,
 // CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+//
+// Preserved vars: CLAUDE_CODE_USE_BEDROCK (routes API calls to AWS Bedrock)
 func SanitizeEnvForClaude(env []string) []string {
+	preserveKeys := map[string]bool{
+		"CLAUDE_CODE_USE_BEDROCK": true,
+	}
+
 	out := make([]string, 0, len(env))
 	for _, e := range env {
+		key, _, _ := strings.Cut(e, "=")
+		if preserveKeys[key] {
+			out = append(out, e)
+			continue
+		}
 		if strings.HasPrefix(e, "CLAUDECODE") || strings.HasPrefix(e, "CLAUDE_CODE") {
 			continue
 		}

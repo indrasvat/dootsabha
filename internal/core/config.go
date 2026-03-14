@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -63,11 +65,24 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	setDefaults(v)
 
 	if cfgFile != "" {
+		// Explicit config file from --config flag.
 		v.SetConfigFile(cfgFile)
 		v.SetConfigType("yaml")
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("read config %q: %w", cfgFile, err)
 		}
+	} else {
+		// Auto-discover config: XDG_CONFIG_HOME/dootsabha/ then ~/.config/dootsabha/
+		v.SetConfigName("config")
+		v.SetConfigType("yaml")
+		if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+			v.AddConfigPath(filepath.Join(xdg, "dootsabha"))
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			v.AddConfigPath(filepath.Join(home, ".config", "dootsabha"))
+		}
+		// Silently ignore missing config file — defaults are sufficient.
+		_ = v.ReadInConfig()
 	}
 
 	return buildConfig(v), nil
