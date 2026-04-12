@@ -68,10 +68,12 @@ func (p *CodexProvider) Invoke(ctx context.Context, prompt string, opts InvokeOp
 	if opts.Model != "" {
 		model = opts.Model
 	}
+	flags := pc.Flags
 	if model != "" {
+		flags = stripCodexModelFlags(flags)
 		args = append(args, "--model", model)
 	}
-	args = append(args, pc.Flags...)
+	args = append(args, flags...)
 	args = append(args, prompt)
 
 	slog.Debug("codex invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
@@ -184,4 +186,23 @@ func parseCodexJSONL(data []byte) (agentMsg string, usage *codexUsage, err error
 		return "", usage, fmt.Errorf("%s", fatalErr)
 	}
 	return agentMsg, usage, nil
+}
+
+func stripCodexModelFlags(flags []string) []string {
+	out := make([]string, 0, len(flags))
+	for i := 0; i < len(flags); i++ {
+		flag := flags[i]
+		switch {
+		case flag == "--model" || flag == "-m":
+			if i+1 < len(flags) {
+				i++
+			}
+			continue
+		case strings.HasPrefix(flag, "--model=") || strings.HasPrefix(flag, "-m="):
+			continue
+		default:
+			out = append(out, flag)
+		}
+	}
+	return out
 }

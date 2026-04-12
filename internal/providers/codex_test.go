@@ -110,6 +110,40 @@ func TestCodexProviderModelOverride(t *testing.T) {
 	}
 }
 
+func TestCodexProviderStripsModelFlagsFromConfig(t *testing.T) {
+	cfg := defaultConfig(t)
+	pc := cfg.Providers["codex"]
+	pc.Flags = append([]string{"--model", "legacy-model", "-m=older-model"}, pc.Flags...)
+	cfg.Providers["codex"] = pc
+
+	runner := &mockRunner{stdout: successJSONL("ok")}
+	p := providers.NewCodexProvider(cfg, runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != "gpt-5.4" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.4")
+	}
+
+	modelFlags := 0
+	for i, arg := range runner.capturedArgs {
+		switch {
+		case arg == "--model":
+			modelFlags++
+			if i+1 >= len(runner.capturedArgs) || runner.capturedArgs[i+1] != "gpt-5.4" {
+				t.Fatalf("expected --model gpt-5.4 in args, got %v", runner.capturedArgs)
+			}
+		case arg == "-m" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m="):
+			t.Fatalf("legacy model flag %q should have been removed from args: %v", arg, runner.capturedArgs)
+		}
+	}
+	if modelFlags != 1 {
+		t.Fatalf("expected exactly one --model flag, got %d in args: %v", modelFlags, runner.capturedArgs)
+	}
+}
+
 func TestCodexProviderInvokeMissingAgentMessage(t *testing.T) {
 	// Stream with no agent_message item → error.
 	noMsg := `{"type":"thread.started","thread_id":"abc"}` + "\n" +
