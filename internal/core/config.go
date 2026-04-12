@@ -82,7 +82,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.codex.model", "gpt-5.4")
 	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
 	v.SetDefault("providers.gemini.binary", "gemini")
-	v.SetDefault("providers.gemini.model", "gemini-3-pro")
+	v.SetDefault("providers.gemini.model", "gemini-3.1-pro-preview")
 	v.SetDefault("providers.gemini.flags", []string{"--approval-mode", "yolo"})
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)

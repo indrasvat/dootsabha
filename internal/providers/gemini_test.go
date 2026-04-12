@@ -12,7 +12,7 @@ import (
 
 // successGeminiJSON builds a minimal valid gemini JSON response.
 // Mirrors the dual-model architecture verified in Spike 0.3.
-func successGeminiJSON(t *testing.T, responseText string) []byte {
+func successGeminiJSON(t *testing.T, responseText, mainModel string) []byte {
 	t.Helper()
 	resp := map[string]any{
 		"session_id": "gemini-session-abc",
@@ -33,7 +33,7 @@ func successGeminiJSON(t *testing.T, responseText string) []byte {
 						},
 					},
 				},
-				"gemini-3-flash-preview": map[string]any{
+				mainModel: map[string]any{
 					"tokens": map[string]any{
 						"input": 803, "prompt": 803, "candidates": 35,
 						"total": 979, "cached": 0, "thoughts": 141, "tool": 0,
@@ -65,7 +65,7 @@ func TestGeminiProviderName(t *testing.T) {
 }
 
 func TestGeminiProviderInvokeSuccess(t *testing.T) {
-	runner := &mockRunner{stdout: successGeminiJSON(t, "PONG")}
+	runner := &mockRunner{stdout: successGeminiJSON(t, "PONG", "gemini-3.1-pro-preview")}
 	p := providers.NewGeminiProvider(defaultConfig(t), runner)
 
 	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
@@ -78,19 +78,22 @@ func TestGeminiProviderInvokeSuccess(t *testing.T) {
 	if result.SessionID != "gemini-session-abc" {
 		t.Errorf("SessionID = %q, want %q", result.SessionID, "gemini-session-abc")
 	}
+	if result.Model != "gemini-3.1-pro-preview" {
+		t.Errorf("Model = %q, want %q", result.Model, "gemini-3.1-pro-preview")
+	}
 }
 
 func TestGeminiProviderInvokeMainModelExtracted(t *testing.T) {
 	// Primary model is the one with "main" role; tokens from that role.
-	runner := &mockRunner{stdout: successGeminiJSON(t, "PONG")}
+	runner := &mockRunner{stdout: successGeminiJSON(t, "PONG", "gemini-3.1-pro-preview")}
 	p := providers.NewGeminiProvider(defaultConfig(t), runner)
 
 	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Model != "gemini-3-flash-preview" {
-		t.Errorf("Model = %q, want %q", result.Model, "gemini-3-flash-preview")
+	if result.Model != "gemini-3.1-pro-preview" {
+		t.Errorf("Model = %q, want %q", result.Model, "gemini-3.1-pro-preview")
 	}
 	if result.TokensIn != 803 {
 		t.Errorf("TokensIn = %d, want 803 (from main role)", result.TokensIn)
@@ -101,7 +104,7 @@ func TestGeminiProviderInvokeMainModelExtracted(t *testing.T) {
 }
 
 func TestGeminiProviderInvokeArgs(t *testing.T) {
-	runner := &mockRunner{stdout: successGeminiJSON(t, "ok")}
+	runner := &mockRunner{stdout: successGeminiJSON(t, "ok", "gemini-3.1-pro-preview")}
 	p := providers.NewGeminiProvider(defaultConfig(t), runner)
 
 	_, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
@@ -121,9 +124,80 @@ func TestGeminiProviderInvokeArgs(t *testing.T) {
 	if !foundFormat {
 		t.Errorf("--output-format json not found in args: %v", args)
 	}
+	foundModel := false
+	for i, arg := range args {
+		if arg == "--model" && i+1 < len(args) && args[i+1] == "gemini-3.1-pro-preview" {
+			foundModel = true
+			break
+		}
+	}
+	if !foundModel {
+		t.Errorf("--model gemini-3.1-pro-preview not found in args: %v", args)
+	}
 	// Verify prompt is the last arg.
 	if args[len(args)-1] != "Say PONG" {
 		t.Errorf("last arg = %q, want %q", args[len(args)-1], "Say PONG")
+	}
+}
+
+func TestGeminiProviderModelOverride(t *testing.T) {
+	const overrideModel = "gemini-3-flash-preview"
+	runner := &mockRunner{stdout: successGeminiJSON(t, "ok", overrideModel)}
+	p := providers.NewGeminiProvider(defaultConfig(t), runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{
+		Model: overrideModel,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != overrideModel {
+		t.Errorf("Model = %q, want %q", result.Model, overrideModel)
+	}
+
+	found := false
+	for i, arg := range runner.capturedArgs {
+		if arg == "--model" && i+1 < len(runner.capturedArgs) && runner.capturedArgs[i+1] == overrideModel {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--model %s not found in args: %v", overrideModel, runner.capturedArgs)
+	}
+}
+
+func TestGeminiProviderStripsModelFlagsFromConfig(t *testing.T) {
+	cfg := defaultConfig(t)
+	pc := cfg.Providers["gemini"]
+	pc.Flags = append([]string{"--model", "legacy-model", "-m=older-model"}, pc.Flags...)
+	cfg.Providers["gemini"] = pc
+
+	runner := &mockRunner{stdout: successGeminiJSON(t, "ok", "gemini-3.1-pro-preview")}
+	p := providers.NewGeminiProvider(cfg, runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != "gemini-3.1-pro-preview" {
+		t.Errorf("Model = %q, want %q", result.Model, "gemini-3.1-pro-preview")
+	}
+
+	modelFlags := 0
+	for i, arg := range runner.capturedArgs {
+		switch {
+		case arg == "--model":
+			modelFlags++
+			if i+1 >= len(runner.capturedArgs) || runner.capturedArgs[i+1] != "gemini-3.1-pro-preview" {
+				t.Fatalf("expected --model gemini-3.1-pro-preview in args, got %v", runner.capturedArgs)
+			}
+		case arg == "-m" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m="):
+			t.Fatalf("legacy model flag %q should have been removed from args: %v", arg, runner.capturedArgs)
+		}
+	}
+	if modelFlags != 1 {
+		t.Fatalf("expected exactly one --model flag, got %d in args: %v", modelFlags, runner.capturedArgs)
 	}
 }
 

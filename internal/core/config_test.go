@@ -65,6 +65,9 @@ func TestConfigDefaults(t *testing.T) {
 	if _, ok := cfg.Providers["gemini"]; !ok {
 		t.Error("providers.gemini missing from defaults")
 	}
+	if cfg.Providers["gemini"].Model != "gemini-3.1-pro-preview" {
+		t.Errorf("gemini.Model: got %q, want %q", cfg.Providers["gemini"].Model, "gemini-3.1-pro-preview")
+	}
 }
 
 func TestConfigFromFile(t *testing.T) {

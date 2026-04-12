@@ -106,7 +106,7 @@ Output structure (envelope format):
   "data": [
     { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-sonnet-4-6", "Auth": "\u2713" },
     { "Name": "codex", "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.4", "Auth": "\u2713" },
-    { "Name": "gemini", "Healthy": true, "Version": "0.30.0", "Model": "gemini-3-pro", "Auth": "\u2713" }
+    { "Name": "gemini", "Healthy": true, "Version": "0.30.0", "Model": "gemini-3.1-pro-preview", "Auth": "\u2713" }
   ]
 }
 ```

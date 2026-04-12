@@ -207,4 +207,4 @@ All 4 items addressed in PRD v1.6.
 
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
-| 702 | Codex default model → `gpt-5.4` | DONE | — |
+| 702 | Provider default model refresh | DONE | — |

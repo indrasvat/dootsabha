@@ -58,17 +58,27 @@ type geminiTokenUsage struct {
 	Tool       int `json:"tool"`
 }
 
-// Invoke runs `gemini --approval-mode yolo --output-format json <prompt>` and returns the
+// Invoke runs `gemini --model <model> --approval-mode yolo --output-format json <prompt>` and returns the
 // parsed response. Prompt is passed as a positional argument (Spike 0.3 §2).
 func (p *GeminiProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
 
 	// Build args: config flags + "--output-format json" + prompt (positional last)
-	args := append([]string{}, pc.Flags...)
+	args := make([]string, 0, len(pc.Flags)+5)
+	model := pc.Model
+	if opts.Model != "" {
+		model = opts.Model
+	}
+	flags := pc.Flags
+	if model != "" {
+		flags = stripGeminiModelFlags(flags)
+		args = append(args, "--model", model)
+	}
+	args = append(args, flags...)
 	args = append(args, "--output-format", "json")
 	args = append(args, prompt)
 
-	slog.Debug("gemini invoke", "binary", pc.Binary, "model", pc.Model, "prompt_len", len(prompt))
+	slog.Debug("gemini invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
 	res, err := p.runner.Run(ctx, pc.Binary, args)
 	if err != nil {
 		return nil, fmt.Errorf("gemini invoke: %w", err)
@@ -92,7 +102,7 @@ func (p *GeminiProvider) Invoke(ctx context.Context, prompt string, opts InvokeO
 		Content:   resp.Response,
 		SessionID: resp.SessionID,
 		Duration:  res.Duration,
-		Model:     pc.Model,
+		Model:     model,
 	}
 
 	// Extract token counts from the "main" role model (Spike 0.3 §5).
@@ -144,9 +154,28 @@ func (p *GeminiProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "gemini",
-		Model:  "gemini-3-pro",
+		Model:  "gemini-3.1-pro-preview",
 		Flags:  []string{"--approval-mode", "yolo"},
 	}
+}
+
+func stripGeminiModelFlags(flags []string) []string {
+	out := make([]string, 0, len(flags))
+	for i := 0; i < len(flags); i++ {
+		flag := flags[i]
+		switch {
+		case flag == "--model" || flag == "-m":
+			if i+1 < len(flags) {
+				i++
+			}
+			continue
+		case strings.HasPrefix(flag, "--model=") || strings.HasPrefix(flag, "-m="):
+			continue
+		default:
+			out = append(out, flag)
+		}
+	}
+	return out
 }
 
 // parseGeminiJSON decodes the single JSON object from gemini's stdout.

@@ -270,7 +270,7 @@ providers:
     model: gpt-5.4
   gemini:
     binary: gemini
-    model: gemini-3-pro
+    model: gemini-3.1-pro-preview
 
 council:
   chair: claude
