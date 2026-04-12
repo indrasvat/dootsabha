@@ -63,7 +63,7 @@ dootsabha review --json "Write a retry function with exponential backoff" --auth
 Output structure:
 ```json
 {
-  "author": { "provider": "codex", "model": "gpt-5.3-codex", "content": "...", "duration_ms": 4000 },
+  "author": { "provider": "codex", "model": "gpt-5.4", "content": "...", "duration_ms": 4000 },
   "review": { "provider": "claude", "model": "claude-sonnet-4-6", "content": "...", "duration_ms": 3000 },
   "meta": { "schema_version": 1, "strategy": "review", "duration_ms": 7000, "total_cost_usd": 0.02, "providers": { "codex": "ok", "claude": "ok" } }
 }
@@ -105,7 +105,7 @@ Output structure (envelope format):
   "meta": { "schema_version": 1 },
   "data": [
     { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-sonnet-4-6", "Auth": "\u2713" },
-    { "Name": "codex", "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.3-codex", "Auth": "\u2713" },
+    { "Name": "codex", "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.4", "Auth": "\u2713" },
     { "Name": "gemini", "Healthy": true, "Version": "0.30.0", "Model": "gemini-3-pro", "Auth": "\u2713" }
   ]
 }

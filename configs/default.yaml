@@ -21,7 +21,7 @@ providers:
       - --no-session-persistence
   codex:
     binary: codex
-    model: gpt-5.3-codex
+    model: gpt-5.4
     flags:
       - --sandbox
       - danger-full-access

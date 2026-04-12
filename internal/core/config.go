@@ -79,7 +79,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.claude.model", "claude-sonnet-4-6")
 	v.SetDefault("providers.claude.flags", []string{"--dangerously-skip-permissions", "--no-session-persistence"})
 	v.SetDefault("providers.codex.binary", "codex")
-	v.SetDefault("providers.codex.model", "gpt-5.3-codex")
+	v.SetDefault("providers.codex.model", "gpt-5.4")
 	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
 	v.SetDefault("providers.gemini.binary", "gemini")
 	v.SetDefault("providers.gemini.model", "gemini-3-pro")

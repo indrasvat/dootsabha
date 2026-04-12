@@ -17,7 +17,7 @@ dootsabha status --json | jq '.data[] | {Name, Healthy, Model}'
 Output (status uses envelope + PascalCase):
 ```json
 {"Name":"claude","Healthy":true,"Model":"claude-sonnet-4-6"}
-{"Name":"codex","Healthy":true,"Model":"gpt-5.3-codex"}
+{"Name":"codex","Healthy":true,"Model":"gpt-5.4"}
 {"Name":"gemini","Healthy":true,"Model":"gemini-3-pro"}
 ```
 

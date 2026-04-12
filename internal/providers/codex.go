@@ -34,6 +34,7 @@ type codexEvent struct {
 	Item     *codexItem  `json:"item,omitempty"`
 	Usage    *codexUsage `json:"usage,omitempty"`
 	Message  string      `json:"message,omitempty"`
+	Error    *codexError `json:"error,omitempty"`
 }
 
 // codexItem is embedded in item.completed events.
@@ -52,17 +53,28 @@ type codexUsage struct {
 	OutputTokens      int `json:"output_tokens"`
 }
 
-// Invoke runs `codex exec --json --sandbox danger-full-access --ephemeral --skip-git-repo-check <prompt>`
+type codexError struct {
+	Message string `json:"message"`
+}
+
+// Invoke runs `codex exec --json --model <model> --sandbox danger-full-access --ephemeral --skip-git-repo-check <prompt>`
 // and returns the parsed response from the JSONL event stream.
 func (p *CodexProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
 
 	// Build args: "exec --json" + config flags + prompt (positional last)
 	args := []string{"exec", "--json"}
+	model := pc.Model
+	if opts.Model != "" {
+		model = opts.Model
+	}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
 	args = append(args, pc.Flags...)
 	args = append(args, prompt)
 
-	slog.Debug("codex invoke", "binary", pc.Binary, "model", pc.Model, "prompt_len", len(prompt))
+	slog.Debug("codex invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
 	res, err := p.runner.Run(ctx, pc.Binary, args)
 	if err != nil {
 		return nil, fmt.Errorf("codex invoke: %w", err)
@@ -78,7 +90,7 @@ func (p *CodexProvider) Invoke(ctx context.Context, prompt string, opts InvokeOp
 
 	result := &ProviderResult{
 		Content:  agentMsg,
-		Model:    pc.Model,
+		Model:    model,
 		Duration: res.Duration,
 	}
 	if usage != nil {
@@ -123,19 +135,21 @@ func (p *CodexProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "codex",
-		Model:  "gpt-5.3-codex",
+		Model:  "gpt-5.4",
 		Flags:  []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"},
 	}
 }
 
 // parseCodexJSONL extracts the agent message and usage from the Codex JSONL stream.
-// Robust: skips malformed lines and non-fatal error events; last agent_message wins.
+// Robust: skips malformed lines, preserves fatal error messages, and last
+// agent_message wins.
 // All behaviors verified against codex 0.106.0 (Spike 0.1).
 //
 // Uses bytes.Split instead of bufio.Scanner because the data is already fully
 // buffered in memory (from SubprocessRunner) and Scanner's default 64KB token
 // limit causes failures on large JSONL lines (GitHub issue #4).
 func parseCodexJSONL(data []byte) (agentMsg string, usage *codexUsage, err error) {
+	var fatalErr string
 	for line := range bytes.SplitSeq(data, []byte("\n")) {
 		line = bytes.TrimSpace(line)
 		if len(line) == 0 {
@@ -154,9 +168,20 @@ func parseCodexJSONL(data []byte) (agentMsg string, usage *codexUsage, err error
 			// item.type=="error" and item.type=="reasoning" are skipped (non-fatal)
 		case "turn.completed":
 			usage = ev.Usage
+		case "turn.failed":
+			if ev.Error != nil && ev.Error.Message != "" {
+				fatalErr = ev.Error.Message
+			}
 		case "error":
 			// Top-level reconnect/transport errors are non-fatal (Spike 0.1 §1).
+			// Preserve other errors in case the turn never yields an agent_message.
+			if ev.Message != "" && !strings.Contains(ev.Message, "Reconnecting") {
+				fatalErr = ev.Message
+			}
 		}
+	}
+	if agentMsg == "" && fatalErr != "" {
+		return "", usage, fmt.Errorf("%s", fatalErr)
 	}
 	return agentMsg, usage, nil
 }

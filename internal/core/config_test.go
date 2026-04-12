@@ -59,6 +59,9 @@ func TestConfigDefaults(t *testing.T) {
 	if _, ok := cfg.Providers["codex"]; !ok {
 		t.Error("providers.codex missing from defaults")
 	}
+	if cfg.Providers["codex"].Model != "gpt-5.4" {
+		t.Errorf("codex.Model: got %q, want %q", cfg.Providers["codex"].Model, "gpt-5.4")
+	}
 	if _, ok := cfg.Providers["gemini"]; !ok {
 		t.Error("providers.gemini missing from defaults")
 	}
