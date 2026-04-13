@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 if [ "$FORMAT" = "json" ]; then
-  echo '{"result":"Mock: '"$PROMPT"'","model":"gemini-3-pro","duration_ms":120}'
+  echo '{"result":"Mock: '"$PROMPT"'","model":"gemini-3.1-pro-preview","duration_ms":120}'
 else
   echo "Mock response to: $PROMPT"
 fi

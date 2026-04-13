@@ -48,6 +48,9 @@ func TestCodexProviderInvokeSuccess(t *testing.T) {
 	if result.TokensOut != 79 {
 		t.Errorf("TokensOut = %d, want 79", result.TokensOut)
 	}
+	if result.Model != "gpt-5.4" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.4")
+	}
 }
 
 func TestCodexProviderInvokeArgs(t *testing.T) {
@@ -64,9 +67,80 @@ func TestCodexProviderInvokeArgs(t *testing.T) {
 	if len(args) < 2 || args[0] != "exec" || args[1] != "--json" {
 		t.Errorf("args[0:2] = %v, want [exec --json]", args[:min(2, len(args))])
 	}
+	found := false
+	for i, arg := range args {
+		if arg == "--model" && i+1 < len(args) && args[i+1] == "gpt-5.4" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--model gpt-5.4 not found in args: %v", args)
+	}
 	// Verify prompt is the last arg.
 	if args[len(args)-1] != "Say PONG" {
 		t.Errorf("last arg = %q, want %q", args[len(args)-1], "Say PONG")
+	}
+}
+
+func TestCodexProviderModelOverride(t *testing.T) {
+	const overrideModel = "gpt-5.4-mini"
+	runner := &mockRunner{stdout: successJSONL("ok")}
+	p := providers.NewCodexProvider(defaultConfig(t), runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{
+		Model: overrideModel,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != overrideModel {
+		t.Errorf("Model = %q, want %q", result.Model, overrideModel)
+	}
+
+	found := false
+	for i, arg := range runner.capturedArgs {
+		if arg == "--model" && i+1 < len(runner.capturedArgs) && runner.capturedArgs[i+1] == overrideModel {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--model %s not found in args: %v", overrideModel, runner.capturedArgs)
+	}
+}
+
+func TestCodexProviderStripsModelFlagsFromConfig(t *testing.T) {
+	cfg := defaultConfig(t)
+	pc := cfg.Providers["codex"]
+	pc.Flags = append([]string{"--model", "legacy-model", "-m=older-model"}, pc.Flags...)
+	cfg.Providers["codex"] = pc
+
+	runner := &mockRunner{stdout: successJSONL("ok")}
+	p := providers.NewCodexProvider(cfg, runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != "gpt-5.4" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.4")
+	}
+
+	modelFlags := 0
+	for i, arg := range runner.capturedArgs {
+		switch {
+		case arg == "--model":
+			modelFlags++
+			if i+1 >= len(runner.capturedArgs) || runner.capturedArgs[i+1] != "gpt-5.4" {
+				t.Fatalf("expected --model gpt-5.4 in args, got %v", runner.capturedArgs)
+			}
+		case arg == "-m" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m="):
+			t.Fatalf("legacy model flag %q should have been removed from args: %v", arg, runner.capturedArgs)
+		}
+	}
+	if modelFlags != 1 {
+		t.Fatalf("expected exactly one --model flag, got %d in args: %v", modelFlags, runner.capturedArgs)
 	}
 }
 
@@ -132,6 +206,23 @@ func TestCodexProviderInvokeMalformedLines(t *testing.T) {
 	}
 	if result.Content != "ok" {
 		t.Errorf("Content = %q, want %q", result.Content, "ok")
+	}
+}
+
+func TestCodexProviderInvokeTurnFailedError(t *testing.T) {
+	stream := `{"type":"error","message":"{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"invalid model\"}}"}` + "\n" +
+		`{"type":"turn.failed","error":{"message":"{\"type\":\"error\",\"status\":400,\"error\":{\"type\":\"invalid_request_error\",\"message\":\"invalid model\"}}"}}` + "\n"
+	runner := &mockRunner{stdout: []byte(stream), exitCode: 1}
+	p := providers.NewCodexProvider(defaultConfig(t), runner)
+
+	_, err := p.Invoke(context.Background(), "hello", providers.InvokeOptions{
+		Model: "definitely-invalid-model",
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "invalid model") {
+		t.Errorf("error %q should contain %q", err.Error(), "invalid model")
 	}
 }
 

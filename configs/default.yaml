@@ -21,7 +21,7 @@ providers:
       - --no-session-persistence
   codex:
     binary: codex
-    model: gpt-5.3-codex
+    model: gpt-5.4
     flags:
       - --sandbox
       - danger-full-access
@@ -31,7 +31,7 @@ providers:
       - model_reasoning_effort=medium
   gemini:
     binary: gemini
-    model: gemini-3-pro
+    model: gemini-3.1-pro-preview
     flags:
       - --approval-mode
       - yolo

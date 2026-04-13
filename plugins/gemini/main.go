@@ -82,8 +82,8 @@ func (s *geminiPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesR
 	return &gen.CapabilitiesResponse{
 		SupportsJson:      true,
 		SupportsStreaming: false,
-		SupportedModels:   []string{"gemini-3-pro", "gemini-2.5-flash"},
-		DefaultModel:      "gemini-3-pro",
+		SupportedModels:   []string{"gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-2.5-flash"},
+		DefaultModel:      "gemini-3.1-pro-preview",
 		MaxContextTokens:  1000000,
 	}, nil
 }

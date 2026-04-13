@@ -202,3 +202,9 @@ All 4 items addressed in PRD v1.6.
 - Git analysis: branch, recent commits, staged/unstaged counts, language detection, topic extraction
 - Suggestion engine: cross-references workspace + providers + capabilities → actionable commands
 - L4 visual tests: 10/10 pass with 2 screenshots (TTY, piped)
+
+## Phase 7: Maintenance
+
+| Task | Description | Status | Agent |
+|------|-------------|--------|-------|
+| 702 | Provider default model refresh | DONE | — |
