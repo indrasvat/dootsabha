@@ -148,7 +148,7 @@ type InvokeResponse struct {
 	RawJson []byte `protobuf:"bytes,2,opt,name=raw_json,json=rawJson,proto3" json:"raw_json,omitempty"`
 	// Provider name that generated this response (e.g., "claude").
 	Provider string `protobuf:"bytes,3,opt,name=provider,proto3" json:"provider,omitempty"`
-	// Model that was used (e.g., "claude-sonnet-4-6").
+	// Model that was used (e.g., "claude-opus-4-6").
 	Model string `protobuf:"bytes,4,opt,name=model,proto3" json:"model,omitempty"`
 	// Session identifier from the agent CLI.
 	SessionId string `protobuf:"bytes,5,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -411,7 +411,7 @@ type HealthCheckResponse struct {
 	Healthy bool `protobuf:"varint,1,opt,name=healthy,proto3" json:"healthy,omitempty"`
 	// Version of the agent CLI (e.g., "2.1.63").
 	CliVersion string `protobuf:"bytes,2,opt,name=cli_version,json=cliVersion,proto3" json:"cli_version,omitempty"`
-	// Default model name (e.g., "claude-sonnet-4-6").
+	// Default model name (e.g., "claude-opus-4-6").
 	Model string `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	// Whether authentication is valid.
 	AuthValid bool `protobuf:"varint,4,opt,name=auth_valid,json=authValid,proto3" json:"auth_valid,omitempty"`

@@ -117,7 +117,7 @@ Wrapped in an envelope. Fields are PascalCase (no json tags on struct).
   "meta": { "schema_version": 1 },
   "data": {
     "Content": "Agent's response text",
-    "Model": "claude-sonnet-4-6",
+    "Model": "claude-opus-4-6",
     "Duration": 3200000000,
     "CostUSD": 0.012,
     "TokensIn": 150,
@@ -197,7 +197,7 @@ Wrapped in an envelope. Fields are PascalCase (no json tags on struct).
 {
   "meta": { "schema_version": 1 },
   "data": [
-    { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-sonnet-4-6", "Auth": "✓", "Error": "" },
+    { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-opus-4-6", "Auth": "✓", "Error": "" },
     { "Name": "codex",  "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.4", "Auth": "✓", "Error": "" },
     { "Name": "gemini", "Healthy": false, "Version": "", "Model": "", "Auth": "", "Error": "binary not found" }
   ]
@@ -264,7 +264,7 @@ Default config at `~/.config/dootsabha/config.yaml` or via `--config`:
 providers:
   claude:
     binary: claude
-    model: claude-sonnet-4-6
+    model: claude-opus-4-6
   codex:
     binary: codex
     model: gpt-5.4

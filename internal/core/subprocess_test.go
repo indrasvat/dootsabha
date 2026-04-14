@@ -199,7 +199,7 @@ func TestDetectAndCleanClaude_PreservesAllRoutingVars(t *testing.T) {
 		"CLAUDE_CODE_SKIP_BEDROCK_AUTH":            "1",
 		"CLAUDE_CODE_SKIP_VERTEX_AUTH":             "1",
 		"CLAUDE_CODE_SKIP_FOUNDRY_AUTH":            "1",
-		"CLAUDE_CODE_MODEL":                        "claude-sonnet-4-6",
+		"CLAUDE_CODE_MODEL":                        "claude-opus-4-6",
 		"CLAUDE_CODE_MAX_OUTPUT_TOKENS":            "4096",
 		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
 		"CLAUDE_CODE_ENTRYPOINT":                   "cli",

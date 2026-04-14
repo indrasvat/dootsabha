@@ -61,7 +61,7 @@ message InvokeResponse {
   // Provider name that generated this response (e.g., "claude").
   string provider = 3;
 
-  // Model that was used (e.g., "claude-sonnet-4-6").
+  // Model that was used (e.g., "claude-opus-4-6").
   string model = 4;
 
   // Session identifier from the agent CLI.
@@ -109,7 +109,7 @@ message HealthCheckResponse {
   // Version of the agent CLI (e.g., "2.1.63").
   string cli_version = 2;
 
-  // Default model name (e.g., "claude-sonnet-4-6").
+  // Default model name (e.g., "claude-opus-4-6").
   string model = 3;
 
   // Whether authentication is valid.

@@ -17,7 +17,7 @@ import (
 func TestProviderResultRoundtrip(t *testing.T) {
 	original := &providers.ProviderResult{
 		Content:   "Go is a statically typed language.",
-		Model:     "claude-sonnet-4-6",
+		Model:     "claude-opus-4-6",
 		Duration:  150 * time.Millisecond,
 		CostUSD:   0.001,
 		TokensIn:  10,
@@ -56,7 +56,7 @@ func TestHealthStatusRoundtrip(t *testing.T) {
 		original := &providers.HealthStatus{
 			Healthy:    true,
 			CLIVersion: "2.1.63",
-			Model:      "claude-sonnet-4-6",
+			Model:      "claude-opus-4-6",
 			AuthValid:  true,
 			Error:      "",
 		}
@@ -124,7 +124,7 @@ func TestDispatchResultRoundtrip(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		original := &core.DispatchResult{
 			Provider:  "claude",
-			Model:     "claude-sonnet-4-6",
+			Model:     "claude-opus-4-6",
 			Content:   "API design proposal",
 			Duration:  3 * time.Second,
 			CostUSD:   0.005,

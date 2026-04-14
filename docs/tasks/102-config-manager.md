@@ -31,7 +31,7 @@
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: ["-p", "--output-format", "json", "--dangerously-skip-permissions"]
   codex:
     binary: codex

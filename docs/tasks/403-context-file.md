@@ -32,7 +32,7 @@ Extensions need rich context beyond env vars. Tier 2 provides a JSON context fil
   "workspace": "/path/to/workspace",
   "config": { ... },
   "providers": {
-    "claude": {"healthy": true, "model": "sonnet-4-6"},
+    "claude": {"healthy": true, "model": "opus-4-6"},
     "codex": {"healthy": true, "model": "gpt-5.3-codex"}
   },
   "capabilities": {"council": true, "review": true, "plugins": true},

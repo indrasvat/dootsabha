@@ -12,7 +12,7 @@ func TestWriteContextFileCreatesValidJSON(t *testing.T) {
 		SessionID: "ds_test1",
 		Workspace: "/tmp/test",
 		Providers: map[string]ContextProvider{
-			"claude": {Healthy: true, Model: "sonnet-4-6"},
+			"claude": {Healthy: true, Model: "opus-4-6"},
 		},
 		Capabilities: ContextCapabilities{
 			Council: true,
@@ -57,7 +57,7 @@ func TestWriteContextFileContainsAllFields(t *testing.T) {
 		SessionID: "ds_abcde",
 		Workspace: "/home/user/project",
 		Providers: map[string]ContextProvider{
-			"claude": {Healthy: true, Model: "sonnet-4-6"},
+			"claude": {Healthy: true, Model: "opus-4-6"},
 			"codex":  {Healthy: false, Model: "o4-mini"},
 		},
 		Capabilities: ContextCapabilities{
@@ -124,7 +124,7 @@ func TestWriteContextFileCleanup(t *testing.T) {
 func TestWriteContextFileProviders(t *testing.T) {
 	ctx := ContextFile{
 		Providers: map[string]ContextProvider{
-			"claude": {Healthy: true, Model: "sonnet-4-6"},
+			"claude": {Healthy: true, Model: "opus-4-6"},
 			"codex":  {Healthy: false, Model: "o4-mini"},
 			"gemini": {Healthy: true, Model: "gemini-2.5-flash"},
 		},

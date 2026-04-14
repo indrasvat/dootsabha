@@ -73,7 +73,7 @@ func DefaultContextFile(sessionID string, isTTY bool, termWidth int) ContextFile
 		SessionID: sessionID,
 		Workspace: wd,
 		Providers: map[string]ContextProvider{
-			"claude": {Healthy: true, Model: "sonnet-4-6"},
+			"claude": {Healthy: true, Model: "opus-4-6"},
 			"codex":  {Healthy: true, Model: "o4-mini"},
 			"gemini": {Healthy: true, Model: "gemini-2.5-flash"},
 		},

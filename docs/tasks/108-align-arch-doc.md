@@ -12,7 +12,7 @@
 
 Cross-reference audit of `docs/dootsabha-architecture.html` vs code revealed 3 discrepancies:
 
-1. **Claude model name** — Architecture uses `sonnet-4-6` (short form). Code had `claude-sonnet-4-6` (full API ID). Architecture §4.1 confirms short names work via `--model sonnet-4-6`.
+1. **Claude model name** — Architecture uses `opus-4-6` (short form). Code had `claude-opus-4-6` (full API ID). Architecture §4.1 confirms short names work via `--model opus-4-6`.
 2. **Codex missing `--ephemeral`** — Architecture §4.1 specifies `--ephemeral` flag for codex. Code omitted it. Confirmed working via `codex exec --ephemeral` test.
 3. **Gemini `--yolo` bug** — Architecture §4.1 warns: "Gotcha: `--yolo` shorthand has known bug (#13561). Always use `--approval-mode yolo`." Code used `--yolo`.
 
@@ -36,7 +36,7 @@ Cross-reference audit of `docs/dootsabha-architecture.html` vs code revealed 3 d
 
 ## Execution Steps
 
-### Step 1: Claude model `claude-sonnet-4-6` → `sonnet-4-6`
+### Step 1: Claude model `claude-opus-4-6` → `opus-4-6`
 - Updated viper default, provider fallback, configs/default.yaml
 - Updated config_test.go assertions and YAML fixtures
 - L4 test expected models updated
@@ -69,7 +69,7 @@ bash scripts/test-binary.sh
 
 ## Completion Criteria
 
-1. `dootsabha status` shows `sonnet-4-6` (not `claude-sonnet-4-6`)
+1. `dootsabha status` shows `opus-4-6` (not `claude-opus-4-6`)
 2. JSON output has correct model for all 3 providers
 3. Codex flags include `--ephemeral`
 4. Gemini flags use `--approval-mode yolo` (not `--yolo`)
@@ -81,7 +81,7 @@ bash scripts/test-binary.sh
 ```
 fix: align provider configs with architecture doc
 
-- Claude model: claude-sonnet-4-6 → sonnet-4-6 (short form per arch §4.1)
+- Claude model: claude-opus-4-6 → opus-4-6 (short form per arch §4.1)
 - Codex: add --ephemeral flag (confirmed working, per arch §4.1)
 - Gemini: --yolo → --approval-mode yolo (bug #13561, per arch §4.1)
 - Update mocks, tests, and config fixtures to match

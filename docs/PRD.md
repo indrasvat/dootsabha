@@ -405,7 +405,7 @@ agents: claude ✓ · codex ✓ · gemini ✓
 ```json
 {
   "dispatch": [
-    {"provider": "claude", "model": "sonnet-4-6", "content": "...", "duration_ms": 3100, "cost_usd": 0.003, "tokens_in": 847, "tokens_out": 234},
+    {"provider": "claude", "model": "opus-4-6", "content": "...", "duration_ms": 3100, "cost_usd": 0.003, "tokens_in": 847, "tokens_out": 234},
     {"provider": "codex", "model": "gpt-5.3-codex", "content": "...", "duration_ms": 2800},
     {"provider": "gemini", "model": "gemini-3-pro", "content": "...", "duration_ms": 2200}
   ],
@@ -465,7 +465,7 @@ agents: claude ✓ · codex ✓ · gemini ✓
 
 **Terminal output (TTY):**
 ```
-● claude · sonnet-4-6                                    ⏱ 2.3s · $0.003
+● claude · opus-4-6                                    ⏱ 2.3s · $0.003
 
 A goroutine is a lightweight thread of execution managed by the Go runtime...
 
@@ -477,7 +477,7 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 ```json
 {
   "provider": "claude",
-  "model": "sonnet-4-6",
+  "model": "opus-4-6",
   "content": "...",
   "duration_ms": 2300,
   "cost_usd": 0.003,
@@ -532,7 +532,7 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 दूतसभा · status                                              v0.1.0
 
 PROVIDER   MODEL           STATUS    VERSION    LATENCY
-● claude   sonnet-4-6      ✓ ready   2.1.63     —
+● claude   opus-4-6      ✓ ready   2.1.63     —
 ● codex    gpt-5.3-codex   ✓ ready   0.106.0    —
 ● gemini   gemini-3-pro    ✗ auth    0.30.0     —
                             ↳ OAuth token expired — run: gemini auth login
@@ -546,7 +546,7 @@ Extensions: bench, cost, tui
 {
   "version": "0.1.0",
   "providers": {
-    "claude": {"healthy": true, "model": "sonnet-4-6", "cli_version": "2.1.63", "auth_valid": true},
+    "claude": {"healthy": true, "model": "opus-4-6", "cli_version": "2.1.63", "auth_valid": true},
     "codex": {"healthy": true, "model": "gpt-5.3-codex", "cli_version": "0.106.0", "auth_valid": true},
     "gemini": {"healthy": false, "model": "gemini-3-pro", "cli_version": "0.30.0", "auth_valid": false, "error": "OAuth token expired"}
   },
