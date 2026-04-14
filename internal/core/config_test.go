@@ -49,8 +49,8 @@ func TestConfigDefaults(t *testing.T) {
 	if claude.Binary != "claude" {
 		t.Errorf("claude.Binary: got %q, want %q", claude.Binary, "claude")
 	}
-	if claude.Model != "claude-sonnet-4-6" {
-		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-sonnet-4-6")
+	if claude.Model != "claude-opus-4-6" {
+		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-opus-4-6")
 	}
 	if len(claude.Flags) == 0 {
 		t.Error("claude.Flags: want at least one flag")
@@ -117,7 +117,7 @@ func TestConfigEnvOverride(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: []
 council:
   chair: claude
@@ -145,7 +145,7 @@ func TestConfigUnknownKeys(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: []
 unknown_key: should_be_ignored
 future_feature:
@@ -169,7 +169,7 @@ func TestConfigRedaction(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: []
     api_key: secret-api-key-value
 council:
@@ -227,7 +227,7 @@ func TestConfigReveal(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: []
     auth_token: my-secret-token
 council:
@@ -271,7 +271,7 @@ council:
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: opus-4-6
     flags: []
 `)
 
@@ -291,7 +291,7 @@ providers:
 
 func TestConfigMergeOrder(t *testing.T) {
 	// Verify precedence: env > file > default
-	// Default: providers.claude.model = "claude-sonnet-4-6"
+	// Default: providers.claude.model = "claude-opus-4-6"
 	// File: providers.claude.model = "claude-haiku-4-5"
 	// Env:  DOOTSABHA_PROVIDERS_CLAUDE_MODEL = "opus-4-6"
 	// Result should be "opus-4-6"

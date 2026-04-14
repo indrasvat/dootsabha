@@ -862,7 +862,7 @@ flowchart LR
     },
     "providers": {
       "claude": {
-        "model": "sonnet-4-6",
+        "model": "opus-4-6",
         "yolo": true,
         "session_persistence": false,
         "extra_args": []
@@ -896,7 +896,7 @@ flowchart LR
         "supports_json": true,
         "supports_streaming": true,
         "supported_models": ["opus-4-6", "sonnet-4-6", "haiku-4-5"],
-        "default_model": "sonnet-4-6",
+        "default_model": "opus-4-6",
         "max_context_tokens": 1000000
       }
     },
@@ -1361,7 +1361,7 @@ sequenceDiagram
   </div>
   <div class="table-wrap" style="margin-top:12px;">
   <table>
-  <tr><td><strong>Default Model</strong></td><td><code>sonnet-4-6</code></td></tr>
+  <tr><td><strong>Default Model</strong></td><td><code>opus-4-6</code></td></tr>
   <tr><td><strong>Available</strong></td><td><code>opus-4-6</code>, <code>sonnet-4-6</code>, <code>haiku-4-5</code></td></tr>
   <tr><td><strong>Aliases</strong></td><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td></tr>
   <tr><td><strong>Context</strong></td><td>1M tokens (beta) for opus/sonnet 4.6</td></tr>
@@ -1376,7 +1376,7 @@ sequenceDiagram
   </div>
   <pre>claude -p "prompt" \
   --output-format json \
-  --model sonnet-4-6 \
+  --model opus-4-6 \
   --dangerously-skip-permissions \
   --no-session-persistence \
   --max-turns 10</pre>
@@ -1545,7 +1545,7 @@ sequenceDiagram
     Note over C: ═══ Stage 1: Dispatch ═══
 
     par Parallel Invocation
-        C->>CL: Invoke(prompt, json, sonnet-4-6)
+        C->>CL: Invoke(prompt, json, opus-4-6)
         activate CL
         C->>CX: Invoke(prompt, json, gpt-5.3-codex)
         activate CX
@@ -1662,7 +1662,7 @@ sequenceDiagram
 // Every log line includes:
 slog.Info("agent invoked",
     "provider", "claude",
-    "model", "sonnet-4-6",
+    "model", "opus-4-6",
     "session_id", req.SessionID,
     "trace_id", ctx.Value(traceIDKey),
     "duration_ms", elapsed.Milliseconds(),
@@ -2202,7 +2202,7 @@ defaults:
 # Provider configurations
 providers:
   claude:
-    model: sonnet-4-6            # Default model
+    model: opus-4-6            # Default model
     yolo: true                   # --dangerously-skip-permissions
     session_persistence: false   # --no-session-persistence
     max_turns: 0                 # 0 = unlimited

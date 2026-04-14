@@ -15,7 +15,7 @@
 providers:
   claude:
     binary: claude                    # CLI executable name (must be on $PATH)
-    model: claude-sonnet-4-6          # Default model for invocations
+    model: claude-opus-4-6          # Default model for invocations
     flags:                            # Flags passed to every invocation
       - --dangerously-skip-permissions
       - --no-session-persistence

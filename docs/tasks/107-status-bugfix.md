@@ -120,7 +120,7 @@ fix(status): version parsing, dot column merge, default provider models
 | version_correctness | PASS | Found semver versions: 2.1.63, 0.106.0, 0.30.0 |
 | dot_merged | UNVERIFIED | Lipgloss box-drawing chars prevented automated column detection; screenshot confirms dot is in PROVIDER column |
 | screenshot_healthy | PASS | `dootsabha_status_healthy.png` captured |
-| models_populated | PASS | All models present: sonnet-4-6, gpt-5.3-codex, gemini-3-pro |
+| models_populated | PASS | All models present: opus-4-6, gpt-5.3-codex, gemini-3-pro |
 | table_layout | PASS | All providers and columns present |
 | no_ansi_piped | PASS | No ANSI codes in piped output |
 | json_valid | PASS | Valid JSON with correct providers, versions, models |

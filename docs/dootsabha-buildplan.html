@@ -514,7 +514,7 @@ done
 
 if [ "$FORMAT" = "json" ]; then
   cat &lt;&lt;EOF
-{"result":"Mock response to: $PROMPT","session_id":"mock_123","cost_usd":0.001,"model":"${MODEL:-sonnet-4-6}","duration_ms":150}
+{"result":"Mock response to: $PROMPT","session_id":"mock_123","cost_usd":0.001,"model":"${MODEL:-opus-4-6}","duration_ms":150}
 EOF
 else
   echo "Mock response to: $PROMPT"
@@ -591,7 +591,7 @@ $ dootsabha status
   दूतसभा · status                                              v0.1.0
 
   PROVIDER   MODEL           STATUS    VERSION    LATENCY
-  ● claude   sonnet-4-6      ✓ ready   1.0.24     —
+  ● claude   opus-4-6      ✓ ready   1.0.24     —
   ● codex    gpt-5.3-codex   ✓ ready   0.9.3      —
   ● gemini   gemini-3-pro    ✗ auth    0.18.1     —
                               ↳ OAuth token expired — run: gemini auth login
@@ -603,7 +603,7 @@ $ dootsabha status
 <pre>
 $ dootsabha consult "explain goroutines briefly"
 
-  ● claude · sonnet-4-6                                    ⏱ 2.3s · $0.003
+  ● claude · opus-4-6                                    ⏱ 2.3s · $0.003
 
   A goroutine is a lightweight thread of execution managed by the Go runtime.
   Unlike OS threads, goroutines start with only ~2KB of stack space and are

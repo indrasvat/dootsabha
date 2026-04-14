@@ -14,7 +14,7 @@ import (
 func TestInvokeRequestConstruction(t *testing.T) {
 	req := &gen.InvokeRequest{
 		Prompt:       "explain concurrency in Go",
-		Model:        "claude-sonnet-4-6",
+		Model:        "claude-opus-4-6",
 		MaxTurns:     3,
 		Temperature:  0.7,
 		OutputFormat: "json",
@@ -27,8 +27,8 @@ func TestInvokeRequestConstruction(t *testing.T) {
 	if req.GetPrompt() != "explain concurrency in Go" {
 		t.Errorf("Prompt = %q, want %q", req.GetPrompt(), "explain concurrency in Go")
 	}
-	if req.GetModel() != "claude-sonnet-4-6" {
-		t.Errorf("Model = %q, want %q", req.GetModel(), "claude-sonnet-4-6")
+	if req.GetModel() != "claude-opus-4-6" {
+		t.Errorf("Model = %q, want %q", req.GetModel(), "claude-opus-4-6")
 	}
 	if req.GetMaxTurns() != 3 {
 		t.Errorf("MaxTurns = %d, want 3", req.GetMaxTurns())
@@ -58,7 +58,7 @@ func TestInvokeResponseConstruction(t *testing.T) {
 		Content:    "Concurrency in Go uses goroutines...",
 		RawJson:    []byte(`{"result":"test"}`),
 		Provider:   "claude",
-		Model:      "claude-sonnet-4-6",
+		Model:      "claude-opus-4-6",
 		SessionId:  "sess_abc123",
 		CostUsd:    0.0042,
 		TokensIn:   150,
@@ -77,7 +77,7 @@ func TestInvokeResponseConstruction(t *testing.T) {
 	if resp.GetProvider() != "claude" {
 		t.Errorf("Provider = %q", resp.GetProvider())
 	}
-	if resp.GetModel() != "claude-sonnet-4-6" {
+	if resp.GetModel() != "claude-opus-4-6" {
 		t.Errorf("Model = %q", resp.GetModel())
 	}
 	if resp.GetSessionId() != "sess_abc123" {
@@ -108,7 +108,7 @@ func TestHealthCheckResponseConstruction(t *testing.T) {
 		resp := &gen.HealthCheckResponse{
 			Healthy:    true,
 			CliVersion: "2.1.63",
-			Model:      "claude-sonnet-4-6",
+			Model:      "claude-opus-4-6",
 			AuthValid:  true,
 			Error:      "",
 		}
@@ -141,8 +141,8 @@ func TestCapabilitiesResponseConstruction(t *testing.T) {
 	resp := &gen.CapabilitiesResponse{
 		SupportsJson:      true,
 		SupportsStreaming: false,
-		SupportedModels:   []string{"claude-sonnet-4-6", "claude-haiku-4-5"},
-		DefaultModel:      "claude-sonnet-4-6",
+		SupportedModels:   []string{"claude-opus-4-6", "claude-haiku-4-5"},
+		DefaultModel:      "claude-opus-4-6",
 		MaxContextTokens:  200000,
 	}
 
@@ -155,10 +155,10 @@ func TestCapabilitiesResponseConstruction(t *testing.T) {
 	if len(resp.GetSupportedModels()) != 2 {
 		t.Errorf("SupportedModels len = %d, want 2", len(resp.GetSupportedModels()))
 	}
-	if resp.GetSupportedModels()[0] != "claude-sonnet-4-6" {
+	if resp.GetSupportedModels()[0] != "claude-opus-4-6" {
 		t.Errorf("SupportedModels[0] = %q", resp.GetSupportedModels()[0])
 	}
-	if resp.GetDefaultModel() != "claude-sonnet-4-6" {
+	if resp.GetDefaultModel() != "claude-opus-4-6" {
 		t.Errorf("DefaultModel = %q", resp.GetDefaultModel())
 	}
 	if resp.GetMaxContextTokens() != 200000 {
@@ -232,7 +232,7 @@ func TestInvokeResponseSerializationRoundtrip(t *testing.T) {
 		Content:    "The code looks correct.",
 		RawJson:    []byte(`{"is_error":false,"result":"OK","session_id":"s1"}`),
 		Provider:   "claude",
-		Model:      "claude-sonnet-4-6",
+		Model:      "claude-opus-4-6",
 		SessionId:  "s1",
 		CostUsd:    0.003,
 		TokensIn:   200,
@@ -265,7 +265,7 @@ func TestExecuteRequestSerializationRoundtrip(t *testing.T) {
 	original := &gen.ExecuteRequest{
 		Prompt: "design a REST API",
 		Agents: []*gen.AgentConfig{
-			{Name: "claude", Model: "claude-sonnet-4-6", TimeoutMs: 30000},
+			{Name: "claude", Model: "claude-opus-4-6", TimeoutMs: 30000},
 			{Name: "codex", Model: "codex-mini", TimeoutMs: 45000, ExtraArgs: []string{"--sandbox", "full"}},
 			{Name: "gemini", Model: "gemini-3-pro", TimeoutMs: 30000},
 		},
@@ -302,7 +302,7 @@ func TestExecuteRequestSerializationRoundtrip(t *testing.T) {
 func TestExecuteResponseSerializationRoundtrip(t *testing.T) {
 	original := &gen.ExecuteResponse{
 		DispatchResults: []*gen.DispatchResult{
-			{Provider: "claude", Model: "claude-sonnet-4-6", Content: "API design v1", DurationMs: 3000, CostUsd: 0.005, TokensIn: 100, TokensOut: 200},
+			{Provider: "claude", Model: "claude-opus-4-6", Content: "API design v1", DurationMs: 3000, CostUsd: 0.005, TokensIn: 100, TokensOut: 200},
 			{Provider: "codex", Model: "codex-mini", Content: "API design v2", DurationMs: 4000, CostUsd: 0.003, TokensIn: 100, TokensOut: 180},
 			{Provider: "gemini", Content: "", Error: "timeout after 30s"},
 		},

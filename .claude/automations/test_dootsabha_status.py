@@ -357,7 +357,7 @@ async def main(connection):
 
         # ── Test 3: Models populated ─────────────────────────────
         print_test_header("models_populated", 3)
-        expected_models = ["claude-sonnet-4-6", "gpt-5.3-codex", "gemini-3-pro"]
+        expected_models = ["claude-opus-4-6", "gpt-5.3-codex", "gemini-3-pro"]
         found_models = []
         missing_models = []
 

@@ -15,7 +15,7 @@ Mock providers are tiny bash scripts that simulate CLI behavior for offline test
 #!/usr/bin/env bash
 # Simulates claude CLI for smoke tests — no API calls
 set -euo pipefail
-PROMPT="" FORMAT="" MODEL="sonnet-4-6" ERROR=""
+PROMPT="" FORMAT="" MODEL="opus-4-6" ERROR=""
 while [[ $# -gt 0 ]]; do
   case $1 in
     -p) PROMPT="$2"; shift 2 ;;

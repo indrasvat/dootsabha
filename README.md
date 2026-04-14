@@ -199,7 +199,7 @@ To customize, create `~/.config/dootsabha/config.yaml`:
 providers:
   claude:
     binary: claude
-    model: claude-sonnet-4-6
+    model: claude-opus-4-6
     flags:
       - --dangerously-skip-permissions
       - --no-session-persistence
