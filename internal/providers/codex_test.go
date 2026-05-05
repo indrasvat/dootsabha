@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/providers"
 )
 
@@ -48,8 +49,8 @@ func TestCodexProviderInvokeSuccess(t *testing.T) {
 	if result.TokensOut != 79 {
 		t.Errorf("TokensOut = %d, want 79", result.TokensOut)
 	}
-	if result.Model != "gpt-5.4" {
-		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.4")
+	if result.Model != "gpt-5.5" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.5")
 	}
 }
 
@@ -69,13 +70,13 @@ func TestCodexProviderInvokeArgs(t *testing.T) {
 	}
 	found := false
 	for i, arg := range args {
-		if arg == "--model" && i+1 < len(args) && args[i+1] == "gpt-5.4" {
+		if arg == "--model" && i+1 < len(args) && args[i+1] == "gpt-5.5" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Errorf("--model gpt-5.4 not found in args: %v", args)
+		t.Errorf("--model gpt-5.5 not found in args: %v", args)
 	}
 	// Verify prompt is the last arg.
 	if args[len(args)-1] != "Say PONG" {
@@ -123,8 +124,8 @@ func TestCodexProviderStripsModelFlagsFromConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Model != "gpt-5.4" {
-		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.4")
+	if result.Model != "gpt-5.5" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.5")
 	}
 
 	modelFlags := 0
@@ -132,8 +133,8 @@ func TestCodexProviderStripsModelFlagsFromConfig(t *testing.T) {
 		switch {
 		case arg == "--model":
 			modelFlags++
-			if i+1 >= len(runner.capturedArgs) || runner.capturedArgs[i+1] != "gpt-5.4" {
-				t.Fatalf("expected --model gpt-5.4 in args, got %v", runner.capturedArgs)
+			if i+1 >= len(runner.capturedArgs) || runner.capturedArgs[i+1] != "gpt-5.5" {
+				t.Fatalf("expected --model gpt-5.5 in args, got %v", runner.capturedArgs)
 			}
 		case arg == "-m" || strings.HasPrefix(arg, "--model=") || strings.HasPrefix(arg, "-m="):
 			t.Fatalf("legacy model flag %q should have been removed from args: %v", arg, runner.capturedArgs)
@@ -141,6 +142,30 @@ func TestCodexProviderStripsModelFlagsFromConfig(t *testing.T) {
 	}
 	if modelFlags != 1 {
 		t.Fatalf("expected exactly one --model flag, got %d in args: %v", modelFlags, runner.capturedArgs)
+	}
+}
+
+func TestCodexProviderFallbackConfigUsesLatestDefaultModel(t *testing.T) {
+	runner := &mockRunner{stdout: successJSONL("ok")}
+	p := providers.NewCodexProvider(&core.Config{Providers: map[string]core.ProviderConfig{}}, runner)
+
+	result, err := p.Invoke(context.Background(), "Say PONG", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Model != "gpt-5.5" {
+		t.Errorf("Model = %q, want %q", result.Model, "gpt-5.5")
+	}
+
+	found := false
+	for i, arg := range runner.capturedArgs {
+		if arg == "--model" && i+1 < len(runner.capturedArgs) && runner.capturedArgs[i+1] == "gpt-5.5" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("--model gpt-5.5 not found in args: %v", runner.capturedArgs)
 	}
 }
 
