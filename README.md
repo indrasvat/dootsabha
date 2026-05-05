@@ -108,7 +108,7 @@ dootsabha council "question" --json | jq -r '.synthesis.content'
 
 ```bash
 dootsabha consult "What is a goroutine?" --agent claude
-dootsabha consult "Explain channels" --agent codex --model gpt-5.4
+dootsabha consult "Explain channels" --agent codex --model gpt-5.5
 dootsabha consult "What is a mutex?" --agent gemini --json
 ```
 
@@ -205,7 +205,7 @@ providers:
       - --no-session-persistence
   codex:
     binary: codex
-    model: gpt-5.4
+    model: gpt-5.5
     flags:
       - --sandbox
       - danger-full-access

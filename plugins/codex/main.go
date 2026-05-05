@@ -82,9 +82,9 @@ func (s *codexPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesRe
 	return &gen.CapabilitiesResponse{
 		SupportsJson:      true,
 		SupportsStreaming: false,
-		SupportedModels:   []string{"gpt-5.4", "gpt-5-codex", "o4-mini"},
-		DefaultModel:      "gpt-5.4",
-		MaxContextTokens:  128000,
+		SupportedModels:   []string{"gpt-5.5", "gpt-5.5-pro", "gpt-5.4", "gpt-5-codex", "o4-mini"},
+		DefaultModel:      "gpt-5.5",
+		MaxContextTokens:  1000000,
 	}, nil
 }
 
