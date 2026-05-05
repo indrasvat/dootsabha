@@ -10,7 +10,7 @@
 The repo still defaults provider models that have moved forward in upstream
 vendor docs.
 
-Per current official OpenAI docs, `gpt-5.4` is the GPT-5 flagship starting
+Per current official OpenAI docs, `gpt-5.5` is the GPT-5 flagship starting
 point for complex reasoning and coding. Per current official Google Gemini API
 docs, the current Gemini 3 Pro API model string is `gemini-3.1-pro-preview`.
 
@@ -41,7 +41,7 @@ defaults.
 5. Verify with `make check` and real binary runs
 
 ## Done Criteria
-- [x] Default Codex model is `gpt-5.4`
+- [x] Default Codex model is `gpt-5.5`
 - [x] `codex exec` receives the configured model when no override is provided
 - [x] Codex `--model` override still wins over the configured default
 - [x] Default Gemini model is `gemini-3.1-pro-preview`
@@ -52,11 +52,11 @@ defaults.
 - [x] Real binary validation confirms the visible Gemini default is refreshed
 
 ## Visual Test Results
-- `./bin/dootsabha status --json` reported Codex as healthy with model `gpt-5.4`
-- `./bin/dootsabha consult --agent codex --json "Say exactly PONG"` succeeded and returned `"Model": "gpt-5.4"`
+- `./bin/dootsabha status --json` reported Codex as healthy with model `gpt-5.5`
+- `./bin/dootsabha consult --agent codex --json "Say exactly PONG"` succeeded and returned `"Model": "gpt-5.5"`
 - `DOOTSABHA_PROVIDERS_CODEX_MODEL=definitely-invalid-model ./bin/dootsabha consult --agent codex "Say exactly PONG"` failed with the real Codex 400 invalid-model error, proving configured-model passthrough
-- `./bin/dootsabha council --json --agents codex,gemini --chair codex "Write a Go function func Add(a, b int) int and mention one table-driven test case."` succeeded; Codex dispatch and Codex chair synthesis both used `gpt-5.4`
-- `./bin/dootsabha review --json "Write a Go function func Add(a, b int) int and keep the answer concise."` succeeded; Codex author used `gpt-5.4`
+- `./bin/dootsabha council --json --agents codex,gemini --chair codex "Write a Go function func Add(a, b int) int and mention one table-driven test case."` succeeded; Codex dispatch and Codex chair synthesis both used `gpt-5.5`
+- `./bin/dootsabha review --json "Write a Go function func Add(a, b int) int and keep the answer concise."` succeeded; Codex author used `gpt-5.5`
 - `./bin/dootsabha refine --json "Write a Go function func Clamp(n, min, max int) int and keep it concise."` succeeded; Codex review stage completed successfully inside the real refine pipeline
 - `./bin/dootsabha status --json` reported Gemini as healthy with model `gemini-3.1-pro-preview`
 - `./bin/dootsabha consult --agent gemini --json "Say exactly PONG"` succeeded and returned `"Model": "gemini-3.1-pro-preview"`

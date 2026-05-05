@@ -137,7 +137,7 @@ func (p *CodexProvider) providerConfig() core.ProviderConfig {
 	}
 	return core.ProviderConfig{
 		Binary: "codex",
-		Model:  "gpt-5.4",
+		Model:  core.DefaultCodexModel,
 		Flags:  []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"},
 	}
 }
