@@ -1,0 +1,197 @@
++ set -euo pipefail
++ export PATH=/home/ubuntu/go/bin:/usr/local/go/bin:/home/ubuntu/.local/bin:/home/ubuntu/.codex/tmp/arg0/codex-arg0aKo5Yl:/home/ubuntu/.npm-global/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/path:/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin
++ PATH=/home/ubuntu/go/bin:/usr/local/go/bin:/home/ubuntu/.local/bin:/home/ubuntu/.codex/tmp/arg0/codex-arg0aKo5Yl:/home/ubuntu/.npm-global/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/x86_64-unknown-linux-musl/path:/home/ubuntu/.local/bin:/home/ubuntu/.npm-global/bin:/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin
++ cd /srv/kartaa/worktrees/_pending_ecd806fe
++ echo '=== dootsabha Kasm visual verification ==='
+=== dootsabha Kasm visual verification ===
++ date -u +%Y-%m-%dT%H:%M:%SZ
+2026-05-05T06:44:57Z
++ printf '\n=== repo ===\n'
+
+=== repo ===
++ git status --short --branch
+## codex-default-gpt-5-5...origin/codex-default-gpt-5-5
++ git log --oneline --decorate -2
+1b52818 (HEAD -> codex-default-gpt-5-5, origin/codex-default-gpt-5-5) feat: default codex to gpt-5.5
+188f16e (tag: v0.3.0, main) feat: refresh codex and gemini defaults (#8)
++ printf '\n=== toolchain ===\n'
+
+=== toolchain ===
++ go version
+go version go1.26.2 linux/amd64
++ codex --version
+codex-cli 0.128.0
++ golangci-lint --version
++ head -1
+golangci-lint has version 2.9.0 built with go1.26.2 from (unknown, modified: ?, mod sum: "h1:x5RRwa/jpNEjOnbSQSTam47QBsB50NMzCCUKe4GY/0U=") on (unknown)
++ lefthook version
+1.13.6
++ printf '\n=== make check ===\n'
+
+=== make check ===
++ make check
+[32m>> Formatting OK[0m
+[32m>> go fix: no changes needed[0m
+golangci-lint run ./cmd/... ./internal/... ./proto/... ./plugins/...
+0 issues.
+go vet ./cmd/... ./internal/... ./proto/... ./plugins/...
+[34m>> Building mock plugins...[0m
+go build -o testdata/mock-plugins/bin/mock-provider ./testdata/mock-plugins/mock-provider
+go build -o testdata/mock-plugins/bin/mock-strategy ./testdata/mock-plugins/mock-strategy
+go build -o testdata/mock-plugins/bin/mock-hook ./testdata/mock-plugins/mock-hook
+[32m>> Mock plugins built[0m
+go test ./cmd/... ./internal/... ./proto/... ./plugins/...
+?   	github.com/indrasvat/dootsabha/cmd/dootsabha	[no test files]
+ok  	github.com/indrasvat/dootsabha/internal/cli	(cached)
+ok  	github.com/indrasvat/dootsabha/internal/core	(cached)
+ok  	github.com/indrasvat/dootsabha/internal/observability	(cached)
+ok  	github.com/indrasvat/dootsabha/internal/output	(cached)
+ok  	github.com/indrasvat/dootsabha/internal/plugin	0.365s
+ok  	github.com/indrasvat/dootsabha/internal/providers	(cached)
+ok  	github.com/indrasvat/dootsabha/internal/version	(cached)
+ok  	github.com/indrasvat/dootsabha/proto/gen	(cached)
+?   	github.com/indrasvat/dootsabha/plugins/claude	[no test files]
+ok  	github.com/indrasvat/dootsabha/plugins/codex	(cached)
+ok  	github.com/indrasvat/dootsabha/plugins/council-strategy	(cached)
+?   	github.com/indrasvat/dootsabha/plugins/gemini	[no test files]
+[34m>> Installing git hooks...[0m
+sync hooks: ✔️ (pre-push, pre-commit)
+[34m>> Building dootsabha...[0m
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/indrasvat/dootsabha/internal/version.Version=v0.3.0-1-g1b52818 -X github.com/indrasvat/dootsabha/internal/version.Commit=1b52818 -X github.com/indrasvat/dootsabha/internal/version.Date=2026-05-05T06:44:57Z" -o bin/dootsabha ./cmd/dootsabha
+[32m>> Built: bin/dootsabha[0m
+[34m>> Running L3 smoke tests...[0m
+Running L3 smoke tests...
+  ✓ binary exists and is executable
+  ✓ --help exits 0
+  ✓ --version exits 0
+  ✓ --version shows version string
+  ✓ unknown command exits non-zero
+  ✓ mock-claude produces JSON
+  ✓ mock-codex produces JSONL
+  ✓ mock-gemini produces JSON
+
+Results: 8 passed, 0 failed
++ printf '\n=== race tests ===\n'
+
+=== race tests ===
++ go test -race -shuffle=on ./cmd/... ./internal/... ./proto/... ./plugins/...
+?   	github.com/indrasvat/dootsabha/cmd/dootsabha	[no test files]
+ok  	github.com/indrasvat/dootsabha/internal/cli	1.019s
+ok  	github.com/indrasvat/dootsabha/internal/core	1.785s
+ok  	github.com/indrasvat/dootsabha/internal/observability	1.018s
+ok  	github.com/indrasvat/dootsabha/internal/output	1.017s
+ok  	github.com/indrasvat/dootsabha/internal/plugin	1.455s
+ok  	github.com/indrasvat/dootsabha/internal/providers	1.154s
+ok  	github.com/indrasvat/dootsabha/internal/version	1.010s
+ok  	github.com/indrasvat/dootsabha/proto/gen	1.021s
+?   	github.com/indrasvat/dootsabha/plugins/claude	[no test files]
+ok  	github.com/indrasvat/dootsabha/plugins/codex	1.016s
+ok  	github.com/indrasvat/dootsabha/plugins/council-strategy	1.015s
+?   	github.com/indrasvat/dootsabha/plugins/gemini	[no test files]
++ printf '\n=== codex default in config/status ===\n'
+
+=== codex default in config/status ===
++ ./bin/dootsabha config show --json
++ sed -n 1,90p
+{
+  "meta": {
+    "schema_version": 1
+  },
+  "data": {
+    "council": {
+      "chair": "claude",
+      "parallel": true,
+      "rounds": 1
+    },
+    "providers": {
+      "claude": {
+        "binary": "claude",
+        "flags": [
+          "--dangerously-skip-permissions",
+          "--no-session-persistence"
+        ],
+        "model": "claude-sonnet-4-6"
+      },
+      "codex": {
+        "binary": "codex",
+        "flags": [
+          "--sandbox",
+          "danger-full-access",
+          "--ephemeral",
+          "--skip-git-repo-check",
+          "-c",
+          "model_reasoning_effort=medium"
+        ],
+        "model": "gpt-5.5"
+      },
+      "gemini": {
+        "binary": "gemini",
+        "flags": [
+          "--approval-mode",
+          "yolo"
+        ],
+        "model": "gemini-3.1-pro-preview"
+      }
+    },
+    "session_timeout": "30m",
+    "timeout": "5m"
+  }
+}
++ ./bin/dootsabha status --json
++ sed -n 1,90p
+{
+  "meta": {
+    "schema_version": 1
+  },
+  "data": [
+    {
+      "Name": "claude",
+      "Healthy": false,
+      "Version": "",
+      "Model": "",
+      "Auth": "—",
+      "Error": "subprocess start \"claude\": exec: \"claude\": executable file not found in $PATH"
+    },
+    {
+      "Name": "codex",
+      "Healthy": true,
+      "Version": "0.128.0",
+      "Model": "gpt-5.5",
+      "Auth": "✓",
+      "Error": ""
+    },
+    {
+      "Name": "gemini",
+      "Healthy": false,
+      "Version": "",
+      "Model": "",
+      "Auth": "—",
+      "Error": "subprocess start \"gemini\": exec: \"gemini\": executable file not found in $PATH"
+    }
+  ]
+}
++ printf '\n=== real codex consult ===\n'
+
+=== real codex consult ===
++ timeout 180s ./bin/dootsabha consult --agent codex --json 'Say exactly PONG'
+{
+  "meta": {
+    "schema_version": 1
+  },
+  "data": {
+    "Content": "PONG",
+    "Model": "gpt-5.5",
+    "Duration": 3553953196,
+    "CostUSD": 0,
+    "TokensIn": 13737,
+    "TokensOut": 6,
+    "SessionID": ""
+  }
+}
++ printf '\n=== PR checks/reviews ===\n'
+
+=== PR checks/reviews ===
++ gh pr view 13 --json url,state,mergeStateStatus,reviewDecision,reviews,comments,statusCheckRollup
+{"comments":[{"id":"IC_kwDORa4HCM8AAAABBOPhFg","author":{"login":"kartaa-bot"},"authorAssociation":"NONE","body":"<!-- kartaa-session-link: 019df6d0-390d-7360-adb9-3dd8b5fcea3a -->\n_[Open this agent session in Kartā ↗](https://kartaa-aws.tailc7ec16.ts.net/session/019df6d0-390d-7360-adb9-3dd8b5fcea3a)_\n\n<sub><i>Live access to the agent's reasoning, terminal, and follow-up turns.</i></sub>","createdAt":"2026-05-05T06:35:28Z","includesCreatedEdit":false,"isMinimized":false,"minimizedReason":"","reactionGroups":[],"url":"https://github.com/indrasvat/dootsabha/pull/13#issuecomment-4377010454","viewerDidAuthor":true}],"mergeStateStatus":"UNKNOWN","reviewDecision":"","reviews":[],"state":"OPEN","statusCheckRollup":[{"__typename":"CheckRun","completedAt":"2026-05-05T06:37:36Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/indrasvat/dootsabha/actions/runs/25361590072/job/74362216695","name":"Lint + Test","startedAt":"2026-05-05T06:35:28Z","status":"COMPLETED","workflowName":"CI"},{"__typename":"CheckRun","completedAt":"2026-05-05T06:37:45Z","conclusion":"SUCCESS","detailsUrl":"https://github.com/indrasvat/dootsabha/actions/runs/25361584531/job/74362199720","name":"Lint + Test","startedAt":"2026-05-05T06:35:24Z","status":"COMPLETED","workflowName":"CI"}],"url":"https://github.com/indrasvat/dootsabha/pull/13"}
++ echo '=== verification complete ==='
+=== verification complete ===
