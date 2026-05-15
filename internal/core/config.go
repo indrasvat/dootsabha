@@ -2,6 +2,8 @@ package core
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +23,8 @@ var ConfigComments = map[string]string{
 	"providers.gemini.binary": "CLI executable name (must be on $PATH)",
 	"providers.gemini.model":  "Default model for gemini invocations",
 	"providers.gemini.flags":  "Flags passed to every gemini invocation",
+	"config_source.type":      "Where the base configuration was loaded from",
+	"config_source.path":      "Configuration file path when type is file",
 	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
 	"council.parallel":        "Run dispatch phase in parallel (false = sequential)",
 	"council.rounds":          "Number of deliberation rounds (max 5)",
@@ -34,7 +38,14 @@ type Config struct {
 	Council        CouncilConfig
 	Timeout        time.Duration
 	SessionTimeout time.Duration
+	Source         ConfigSource
 	v              *viper.Viper // unexported; used by RedactedView
+}
+
+// ConfigSource describes where the base configuration came from.
+type ConfigSource struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
 }
 
 // ProviderConfig holds per-provider settings.
@@ -62,7 +73,19 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	setDefaults(v)
 
+	source := ConfigSource{Type: "built-in"}
+	if cfgFile == "" {
+		defaultPath, err := defaultConfigPath()
+		if err != nil {
+			return nil, err
+		}
+		if defaultPath != "" {
+			cfgFile = defaultPath
+		}
+	}
+
 	if cfgFile != "" {
+		source = ConfigSource{Type: "file", Path: cfgFile}
 		v.SetConfigFile(cfgFile)
 		v.SetConfigType("yaml")
 		if err := v.ReadInConfig(); err != nil {
@@ -70,7 +93,22 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		}
 	}
 
-	return buildConfig(v), nil
+	return buildConfig(v, source), nil
+}
+
+// defaultConfigPath returns the standard user config file when it exists.
+func defaultConfigPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", nil
+	}
+	path := filepath.Join(home, ".config", "dootsabha", "config.yaml")
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("stat default config %q: %w", path, err)
+	}
+	return "", nil
 }
 
 // setDefaults sets default values for all known configuration keys.
@@ -119,7 +157,7 @@ func collectProviderNames(v *viper.Viper) []string {
 }
 
 // buildConfig constructs a Config from the Viper instance.
-func buildConfig(v *viper.Viper) *Config {
+func buildConfig(v *viper.Viper, source ConfigSource) *Config {
 	cfg := &Config{
 		Timeout:        v.GetDuration("timeout"),
 		SessionTimeout: v.GetDuration("session_timeout"),
@@ -129,6 +167,7 @@ func buildConfig(v *viper.Viper) *Config {
 			Rounds:   v.GetInt("council.rounds"),
 		},
 		Providers: make(map[string]ProviderConfig),
+		Source:    source,
 		v:         v,
 	}
 
@@ -149,6 +188,10 @@ func buildConfig(v *viper.Viper) *Config {
 // with "[REDACTED]" unless reveal is true.
 func (c *Config) RedactedView(reveal bool) map[string]any {
 	raw := c.v.AllSettings()
+	raw["config_source"] = map[string]any{
+		"type": c.Source.Type,
+		"path": c.Source.Path,
+	}
 	if reveal {
 		return raw
 	}
