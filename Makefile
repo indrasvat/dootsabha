@@ -68,6 +68,11 @@ test-binary: build ## L3: Binary smoke tests (mock providers)
 	@printf "$(COLOR_BLUE)>> Running L3 smoke tests...$(COLOR_RESET)\n"
 	@bash scripts/test-binary.sh
 
+.PHONY: test-install
+test-install: build ## L3: Installer smoke tests (mock GitHub + npx)
+	@printf "$(COLOR_BLUE)>> Running installer smoke tests...$(COLOR_RESET)\n"
+	@bash scripts/test-install.sh
+
 .PHONY: test-plugins
 test-plugins: build-mock-plugins build-plugins ## L3: Plugin smoke tests (mock + provider plugins)
 	@printf "$(COLOR_BLUE)>> Running plugin smoke tests...$(COLOR_RESET)\n"
@@ -156,7 +161,7 @@ ci: lint vet test ## Full CI gate: lint+vet+test (<30s)
 ci-fast: fmt vet test ## Fast CI: fmt+vet+test
 
 .PHONY: check
-check: fmt-check fix-check lint vet test test-binary ## Full quality suite: fmt+fix+lint+vet+test+smoke
+check: fmt-check fix-check lint vet test test-binary test-install ## Full quality suite: fmt+fix+lint+vet+test+smoke
 
 # ── Extensions ───────────────────────────────────────────────────────────────
 
