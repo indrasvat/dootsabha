@@ -101,7 +101,7 @@ Exit 0 = all healthy, 3 = one or more unhealthy.
 | `review` | Author + reviewer pipeline | `--author`, `--reviewer`, `--model` |
 | `refine` | Sequential review + incorporation | `--author`, `--reviewers`, `--anonymous`, `--model` |
 | `status` | Agent health check | (no command-specific flags) |
-| `config show` | View configuration | `--reveal`, `--commented` |
+| `config show` | View configuration and source | `--reveal`, `--commented` |
 | `plugin list` | Discover extensions | (no command-specific flags) |
 
 For complete flag reference, see [references/command-reference.md](references/command-reference.md).
@@ -258,7 +258,18 @@ Requires at least one AI CLI installed: `claude`, `codex`, or `gemini`.
 
 ## Configuration
 
-Default config at `~/.config/dootsabha/config.yaml` or via `--config`:
+दूतसभा works with built-in defaults. If `~/.config/dootsabha/config.yaml`
+exists, it is auto-loaded as the default user config; otherwise the built-ins
+are used. An explicit `--config <path>` overrides the auto-loaded default file.
+
+`dootsabha config show` reports `config_source` so agents can distinguish
+`built-in` configuration from a loaded file:
+
+```bash
+dootsabha config show --json | jq '.data.config_source'
+```
+
+Default user config path:
 
 ```yaml
 providers:

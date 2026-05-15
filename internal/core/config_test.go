@@ -20,7 +20,18 @@ func writeTempConfig(t *testing.T, content string) string {
 	return path
 }
 
+// isolateHome keeps tests independent of the developer's real
+// ~/.config/dootsabha/config.yaml.
+func isolateHome(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	return home
+}
+
 func TestConfigDefaults(t *testing.T) {
+	isolateHome(t)
+
 	cfg, err := core.LoadConfig("")
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
@@ -31,6 +42,9 @@ func TestConfigDefaults(t *testing.T) {
 	}
 	if cfg.SessionTimeout != 30*time.Minute {
 		t.Errorf("SessionTimeout: got %v, want 30m", cfg.SessionTimeout)
+	}
+	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
+		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
 	}
 	if cfg.Council.Chair != "claude" {
 		t.Errorf("Council.Chair: got %q, want %q", cfg.Council.Chair, "claude")
@@ -70,6 +84,96 @@ func TestConfigDefaults(t *testing.T) {
 	}
 }
 
+func TestConfigAutoLoadsDefaultUserFile(t *testing.T) {
+	home := isolateHome(t)
+	configDir := filepath.Join(home, ".config", "dootsabha")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	path := filepath.Join(configDir, "config.yaml")
+	if err := os.WriteFile(path, []byte(`
+providers:
+  gemini:
+    binary: gemini
+    model: gemini-from-home-config
+    flags: ["--approval-mode", "yolo"]
+timeout: 10m
+`), 0o600); err != nil {
+		t.Fatalf("write default config: %v", err)
+	}
+
+	cfg, err := core.LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.Timeout != 10*time.Minute {
+		t.Errorf("Timeout: got %v, want 10m", cfg.Timeout)
+	}
+	if cfg.Source.Type != "file" || cfg.Source.Path != path {
+		t.Errorf("Source: got %+v, want file %q", cfg.Source, path)
+	}
+	if cfg.Providers["gemini"].Model != "gemini-from-home-config" {
+		t.Errorf("gemini.Model: got %q, want gemini-from-home-config", cfg.Providers["gemini"].Model)
+	}
+}
+
+func TestConfigExplicitFileOverridesDefaultUserFile(t *testing.T) {
+	home := isolateHome(t)
+	configDir := filepath.Join(home, ".config", "dootsabha")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(`
+timeout: 10m
+providers:
+  gemini:
+    model: gemini-from-home-config
+`), 0o600); err != nil {
+		t.Fatalf("write default config: %v", err)
+	}
+	explicit := writeTempConfig(t, `
+timeout: 20m
+providers:
+  gemini:
+    model: gemini-from-explicit-config
+`)
+
+	cfg, err := core.LoadConfig(explicit)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.Timeout != 20*time.Minute {
+		t.Errorf("Timeout: got %v, want 20m", cfg.Timeout)
+	}
+	if cfg.Source.Type != "file" || cfg.Source.Path != explicit {
+		t.Errorf("Source: got %+v, want file %q", cfg.Source, explicit)
+	}
+	if cfg.Providers["gemini"].Model != "gemini-from-explicit-config" {
+		t.Errorf("gemini.Model: got %q, want gemini-from-explicit-config", cfg.Providers["gemini"].Model)
+	}
+}
+
+func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
+	isolateHome(t)
+
+	cfg, err := core.LoadConfig("")
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+
+	if cfg.Timeout != 5*time.Minute {
+		t.Errorf("Timeout: got %v, want built-in 5m", cfg.Timeout)
+	}
+	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
+		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
+	}
+	if cfg.Providers["gemini"].Model != "gemini-3.1-pro-preview" {
+		t.Errorf("gemini.Model: got %q, want built-in gemini-3.1-pro-preview", cfg.Providers["gemini"].Model)
+	}
+}
+
 func TestConfigFromFile(t *testing.T) {
 	path := writeTempConfig(t, `
 providers:
@@ -104,6 +208,9 @@ session_timeout: 1h
 	}
 	if cfg.SessionTimeout != time.Hour {
 		t.Errorf("SessionTimeout: got %v, want 1h", cfg.SessionTimeout)
+	}
+	if cfg.Source.Type != "file" || cfg.Source.Path != path {
+		t.Errorf("Source: got %+v, want file %q", cfg.Source, path)
 	}
 
 	claude := cfg.Providers["claude"]
@@ -220,6 +327,14 @@ auth_token: my-auth-token
 			t.Error("model should not be redacted")
 		}
 	}
+
+	source, ok := view["config_source"].(map[string]any)
+	if !ok {
+		t.Fatal("config_source missing or wrong type in view")
+	}
+	if source["type"] != "file" || source["path"] != path {
+		t.Errorf("config_source = %#v, want file %q", source, path)
+	}
 }
 
 func TestConfigReveal(t *testing.T) {
@@ -328,6 +443,7 @@ func TestConfigCommentsKeys(t *testing.T) {
 		"providers.claude.binary", "providers.claude.model", "providers.claude.flags",
 		"providers.codex.binary", "providers.codex.model", "providers.codex.flags",
 		"providers.gemini.binary", "providers.gemini.model", "providers.gemini.flags",
+		"config_source.type", "config_source.path",
 		"council.chair", "council.parallel", "council.rounds",
 		"timeout", "session_timeout",
 	}
@@ -347,6 +463,8 @@ func TestConfigCommentsNotEmpty(t *testing.T) {
 }
 
 func TestConfigNoFileStillWorks(t *testing.T) {
+	isolateHome(t)
+
 	// LoadConfig("") should work with zero-config (embedded defaults).
 	cfg, err := core.LoadConfig("")
 	if err != nil {

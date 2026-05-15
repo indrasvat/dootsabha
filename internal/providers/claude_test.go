@@ -41,6 +41,7 @@ func (m *mockRunner) Run(ctx context.Context, binary string, args []string, opts
 // defaultConfig returns a Config loaded with defaults only (no YAML file).
 func defaultConfig(t *testing.T) *core.Config {
 	t.Helper()
+	t.Setenv("HOME", t.TempDir())
 	cfg, err := core.LoadConfig("")
 	if err != nil {
 		t.Fatalf("LoadConfig: %v", err)
