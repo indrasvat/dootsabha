@@ -134,7 +134,17 @@ func TestGeminiProviderInvokeArgs(t *testing.T) {
 	if !foundModel {
 		t.Errorf("--model gemini-3.1-pro-preview not found in args: %v", args)
 	}
-	// Verify prompt is the last arg.
+	foundPrompt := false
+	for i, arg := range args {
+		if arg == "-p" && i+1 < len(args) && args[i+1] == "Say PONG" {
+			foundPrompt = true
+			break
+		}
+	}
+	if !foundPrompt {
+		t.Errorf("-p Say PONG not found in args: %v", args)
+	}
+	// Keep the prompt last to make the generated headless invocation easy to inspect.
 	if args[len(args)-1] != "Say PONG" {
 		t.Errorf("last arg = %q, want %q", args[len(args)-1], "Say PONG")
 	}
