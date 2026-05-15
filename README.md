@@ -175,6 +175,10 @@ dootsabha config show --json       # JSON output
 dootsabha config show --reveal     # Show sensitive values
 ```
 
+`config show` includes a `config_source` entry so you can tell whether the
+effective configuration came from the built-in defaults, an auto-loaded default
+file, or an explicit `--config` path.
+
 Aliases: `vinyaas`, `विन्यास`
 
 ### `plugin` — Plugin & extension management
@@ -191,9 +195,12 @@ Aliases: `vistaarak`, `विस्तारक`
 
 ## Configuration
 
-दूतसभा works with zero configuration — sensible defaults are built in.
+दूतसभा works with zero configuration — sensible defaults are built in. On
+startup, it auto-loads `~/.config/dootsabha/config.yaml` when that file exists.
+If the file does not exist, it falls back to the built-in defaults. Passing
+`--config <path>` uses that explicit file instead of the default user config.
 
-To customize, create `~/.config/dootsabha/config.yaml`:
+To customize the default user config, create `~/.config/dootsabha/config.yaml`:
 
 ```yaml
 providers:
@@ -229,7 +236,13 @@ session_timeout: 30m  # Max total pipeline duration
 
 ### Config merge order
 
-**defaults → config file → env vars → CLI flags**
+**built-in defaults → auto-loaded `~/.config/dootsabha/config.yaml` or explicit `--config` file → env vars → CLI flags**
+
+Check the active source at any time:
+
+```bash
+dootsabha config show --json | jq '.data.config_source'
+```
 
 Environment variables use `DOOTSABHA_` prefix with `_` separators:
 
