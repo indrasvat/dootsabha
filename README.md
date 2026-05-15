@@ -58,7 +58,7 @@ gemini --version
 curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | sh
 ```
 
-Detects your OS/arch, downloads the latest release, verifies the checksum, and installs to a directory on your `$PATH`. Optionally installs the [Claude Code skill](#skill) for agent auto-discovery.
+Detects your OS/arch, downloads the latest release, verifies the checksum, and installs to a directory on your `$PATH`. The installer resolves the latest release through GitHub's public web redirect first, so normal installs do not spend anonymous GitHub API quota. It also installs the [agent skill](#skill) with `npx skills add indrasvat/dootsabha --global --yes` when `npx` is available.
 
 <details>
 <summary>More options</summary>
@@ -69,6 +69,12 @@ curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh
 
 # Specific version or custom directory
 curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.1.0 INSTALL_DIR=~/.local/bin sh
+
+# Skip the agent skill install
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | INSTALL_SKILL=0 sh
+
+# If your network blocks GitHub redirects, pin a version to skip latest lookup
+curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.4.2 sh
 
 # From source
 git clone https://github.com/indrasvat/dootsabha.git
@@ -218,6 +224,8 @@ providers:
       - danger-full-access
       - --ephemeral
       - --skip-git-repo-check
+      - -c
+      - model_reasoning_effort=medium
   gemini:
     binary: gemini
     model: gemini-3.1-pro-preview
@@ -226,9 +234,9 @@ providers:
       - yolo
 
 council:
-  chair: claude       # Agent that synthesizes final output
-  parallel: true      # Run dispatch in parallel
-  rounds: 1           # Deliberation rounds (max 5)
+  chair: claude       # Agent that synthesizes final output (fallback: first healthy non-chair)
+  parallel: true      # Run dispatch phase in parallel
+  rounds: 1           # Number of deliberation rounds (max 5)
 
 timeout: 5m           # Per-agent invocation timeout
 session_timeout: 30m  # Max total pipeline duration
@@ -355,7 +363,13 @@ When running inside a Claude Code session, दूतसभा automatically:
 
 ### Skill
 
-दूतसभा ships with a [Claude Code skill](https://code.claude.com/docs/en/skills) in `skill/SKILL.md` that teaches AI agents how to use all commands, parse JSON output, and handle exit codes. Agents automatically discover the skill when working in this repo.
+दूतसभा ships with a [Claude Code skill](https://code.claude.com/docs/en/skills) in `skill/SKILL.md` that teaches AI agents how to use all commands, parse JSON output, and handle exit codes. The installer adds the global skill automatically when `npx` is available:
+
+```bash
+npx skills add indrasvat/dootsabha --global --yes
+```
+
+Agents also discover the checked-in skill when working directly in this repo.
 
 The skill triggers when you ask for things like:
 - "get a second opinion from another LLM"

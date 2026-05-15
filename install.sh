@@ -6,9 +6,12 @@
 #   INSTALL_DIR=/path    Override install directory
 #   VERSION=v0.1.0       Install specific version (default: latest)
 #   NONINTERACTIVE=1     Skip prompts, use defaults
+#   INSTALL_SKILL=0      Skip agent skill install (default: install if npx exists)
+#   GITHUB_TOKEN=token   Optional token for GitHub API fallback
 set -eu
 
 REPO="indrasvat/dootsabha"
+SKILL_PACKAGE="indrasvat/dootsabha"
 
 # ── Colors ───────────────────────────────────────────────────────────
 setup_colors() {
@@ -71,15 +74,79 @@ detect_platform() {
 }
 
 # ── Version resolution ───────────────────────────────────────────────
+latest_version_from_web() {
+    url=$(curl -fsSI -o /dev/null -w '%{redirect_url}' \
+        "https://github.com/${REPO}/releases/latest" 2>/dev/null) || return 1
+    case "$url" in
+        */tag/*) ;;
+        *) return 1 ;;
+    esac
+    tag=${url##*/tag/}
+    tag=${tag%%[!A-Za-z0-9._+-]*}
+    [ -n "$tag" ] || return 1
+    printf "%s\n" "$tag"
+}
+
+github_api_fetch() {
+    outfile="$1"
+    url="$2"
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        code=$(curl -sSL -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -o "$outfile" -w '%{http_code}' "$url" 2>/dev/null) || code=""
+    else
+        code=$(curl -sSL -o "$outfile" -w '%{http_code}' "$url" 2>/dev/null) || code=""
+    fi
+    printf "%s\n" "${code:-000}"
+}
+
+parse_first_tag() {
+    sed -n '/"tag_name":/ { s/.*"tag_name": *"\([^"]*\)".*/\1/p; q; }'
+}
+
 resolve_version() {
     if [ -n "${VERSION:-}" ]; then
         return
     fi
-    step "Fetching latest release..."
-    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-        | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')
-    if [ -z "$VERSION" ]; then
+
+    step "Resolving latest release..."
+
+    web_tag=$(latest_version_from_web 2>/dev/null) || web_tag=""
+    if [ -n "$web_tag" ]; then
+        VERSION="$web_tag"
+        return
+    fi
+
+    tmp_api=$(mktemp "${TMPDIR:-/tmp}/dootsabha-api.XXXXXX" 2>/dev/null || mktemp)
+    status=$(github_api_fetch "$tmp_api" "https://api.github.com/repos/${REPO}/releases/latest")
+
+    case "$status" in
+        200)
+            VERSION=$(parse_first_tag < "$tmp_api" || true)
+            ;;
+        403|429)
+            rm -f "$tmp_api"
+            err "GitHub API rate-limited while resolving latest release."
+            dim "Retry with VERSION=vX.Y.Z to skip latest lookup, or set GITHUB_TOKEN."
+            exit 1
+            ;;
+        000)
+            rm -f "$tmp_api"
+            err "Network error while resolving latest release"
+            exit 1
+            ;;
+        *)
+            rm -f "$tmp_api"
+            err "GitHub API returned HTTP ${status} while resolving latest release"
+            dim "Retry with VERSION=vX.Y.Z to skip latest lookup."
+            exit 1
+            ;;
+    esac
+
+    rm -f "$tmp_api"
+    if [ -z "${VERSION:-}" ]; then
         err "Could not determine latest version"
+        dim "Retry with VERSION=vX.Y.Z to skip latest lookup."
         exit 1
     fi
 }
@@ -334,52 +401,31 @@ post_install() {
     printf "\n"
 }
 
-# ── Claude Code skill install ────────────────────────────────────────
+# ── Agent skill install ───────────────────────────────────────────────
 install_skill() {
-    # Skip if npx not available or non-interactive without opt-in
+    if [ "${INSTALL_SKILL:-1}" = "0" ]; then
+        dim "Skipped skill install because INSTALL_SKILL=0"
+        return
+    fi
+
     if ! command -v npx >/dev/null 2>&1; then
+        warn "npx not found — skipping agent skill"
+        dim "Install later: npx skills add ${SKILL_PACKAGE} --global --yes"
         return
     fi
 
     printf "\n"
     rule
     printf "\n"
-    step "Claude Code skill available"
-    dim "Teaches Claude Code how to use dootsabha commands,"
-    dim "parse JSON output, and handle exit codes automatically."
-    printf "\n"
-
-    INSTALL_SKILL=""
-    if [ "${NONINTERACTIVE:-}" = "1" ]; then
-        if [ "${INSTALL_SKILL_OPT:-}" = "1" ]; then
-            INSTALL_SKILL="y"
-        fi
+    step "Installing agent skill"
+    dim "Running: npx skills add ${SKILL_PACKAGE} --global --yes"
+    if npx --yes skills add "${SKILL_PACKAGE}" --global --yes >/dev/null 2>&1; then
+        ok "Skill installed"
+        dim "AI agents can auto-discover dootsabha commands"
     else
-        printf "  %sInstall Claude Code skill? [y/N] %s" "$BOLD" "$RESET"
-        if [ -t 0 ]; then
-            read -r INSTALL_SKILL
-        elif [ -e /dev/tty ]; then
-            read -r INSTALL_SKILL </dev/tty
-        else
-            INSTALL_SKILL=""
-        fi
+        warn "Skill install failed — you can add it later:"
+        dim "npx skills add ${SKILL_PACKAGE} --global --yes"
     fi
-
-    case "$INSTALL_SKILL" in
-        [yY]*)
-            step "Installing skill..."
-            if npx --yes skills add --yes --global "${REPO}" 2>/dev/null; then
-                ok "Skill installed"
-                dim "Claude Code will auto-discover dootsabha commands"
-            else
-                warn "Skill install failed — you can add it later:"
-                dim "npx skills add ${REPO}"
-            fi
-            ;;
-        *)
-            dim "Skipped. Install later: npx skills add ${REPO}"
-            ;;
-    esac
 }
 
 # ── Main ─────────────────────────────────────────────────────────────
