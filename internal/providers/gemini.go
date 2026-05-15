@@ -25,7 +25,7 @@ func NewGeminiProvider(cfg *core.Config, runner Runner) *GeminiProvider {
 // Name returns the provider identifier.
 func (p *GeminiProvider) Name() string { return "gemini" }
 
-// geminiResponse is the JSON envelope from `gemini --approval-mode yolo --output-format json`.
+// geminiResponse is the JSON envelope from `gemini --approval-mode yolo --output-format json -p`.
 // All fields verified against gemini 0.30.0 (Spike 0.3).
 type geminiResponse struct {
 	SessionID string      `json:"session_id"`
@@ -58,13 +58,13 @@ type geminiTokenUsage struct {
 	Tool       int `json:"tool"`
 }
 
-// Invoke runs `gemini --model <model> --approval-mode yolo --output-format json <prompt>` and returns the
-// parsed response. Prompt is passed as a positional argument (Spike 0.3 §2).
+// Invoke runs `gemini --model <model> --approval-mode yolo --output-format json -p <prompt>` and returns the
+// parsed response. The -p/--prompt flag keeps Gemini 0.42+ in non-interactive mode.
 func (p *GeminiProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
 
-	// Build args: config flags + "--output-format json" + prompt (positional last)
-	args := make([]string, 0, len(pc.Flags)+5)
+	// Build args: config flags + "--output-format json" + "-p <prompt>".
+	args := make([]string, 0, len(pc.Flags)+6)
 	model := pc.Model
 	if opts.Model != "" {
 		model = opts.Model
@@ -76,7 +76,7 @@ func (p *GeminiProvider) Invoke(ctx context.Context, prompt string, opts InvokeO
 	}
 	args = append(args, flags...)
 	args = append(args, "--output-format", "json")
-	args = append(args, prompt)
+	args = append(args, "-p", prompt)
 
 	slog.Debug("gemini invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
 	res, err := p.runner.Run(ctx, pc.Binary, args)
