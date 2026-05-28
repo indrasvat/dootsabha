@@ -212,7 +212,7 @@ To customize the default user config, create `~/.config/dootsabha/config.yaml`:
 providers:
   claude:
     binary: claude
-    model: claude-sonnet-4-6
+    model: claude-opus-4-8
     flags:
       - --dangerously-skip-permissions
       - --no-session-persistence
@@ -255,7 +255,7 @@ dootsabha config show --json | jq '.data.config_source'
 Environment variables use `DOOTSABHA_` prefix with `_` separators:
 
 ```bash
-export DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-6
+export DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-8
 export DOOTSABHA_COUNCIL_CHAIR=codex
 export DOOTSABHA_TIMEOUT=10m
 ```

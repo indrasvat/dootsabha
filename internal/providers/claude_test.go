@@ -107,7 +107,7 @@ func TestClaudeProviderName(t *testing.T) {
 
 func TestClaudeProviderInvokeSuccess(t *testing.T) {
 	runner := &mockRunner{
-		stdout: successJSON(t, "PONG", "claude-sonnet-4-6"),
+		stdout: successJSON(t, "PONG", "claude-opus-4-8"),
 	}
 	p := providers.NewClaudeProvider(defaultConfig(t), runner)
 
@@ -124,8 +124,8 @@ func TestClaudeProviderInvokeSuccess(t *testing.T) {
 	if result.CostUSD != 0.001 {
 		t.Errorf("CostUSD = %f, want 0.001", result.CostUSD)
 	}
-	if result.Model != "claude-sonnet-4-6" {
-		t.Errorf("Model = %q, want %q", result.Model, "claude-sonnet-4-6")
+	if result.Model != "claude-opus-4-8" {
+		t.Errorf("Model = %q, want %q", result.Model, "claude-opus-4-8")
 	}
 	if result.TokensIn != 10 {
 		t.Errorf("TokensIn = %d, want 10", result.TokensIn)

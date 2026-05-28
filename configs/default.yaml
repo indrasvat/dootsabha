@@ -5,7 +5,7 @@
 # Override order: defaults → this file → env vars (DOOTSABHA_*) → CLI flags
 #
 # Env var convention: DOOTSABHA_{SECTION}_{KEY}
-#   Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=opus-4-6
+#   Example: DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-8
 #
 # Copy this file to ~/.config/dootsabha/config.yaml to customize.
 # ─────────────────────────────────────────────────────────────
@@ -15,7 +15,7 @@
 providers:
   claude:
     binary: claude                    # CLI executable name (must be on $PATH)
-    model: claude-sonnet-4-6          # Default model for invocations
+    model: claude-opus-4-8            # Default model for invocations
     flags:                            # Flags passed to every invocation
       - --dangerously-skip-permissions
       - --no-session-persistence

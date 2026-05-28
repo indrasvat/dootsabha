@@ -84,9 +84,9 @@ func (s *claudePluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesR
 	return &gen.CapabilitiesResponse{
 		SupportsJson:      true,
 		SupportsStreaming: false,
-		SupportedModels:   []string{"claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001"},
-		DefaultModel:      "claude-sonnet-4-6",
-		MaxContextTokens:  200000,
+		SupportedModels:   []string{"claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"},
+		DefaultModel:      "claude-opus-4-8",
+		MaxContextTokens:  1000000,
 	}, nil
 }
 

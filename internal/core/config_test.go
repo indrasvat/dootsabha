@@ -63,8 +63,8 @@ func TestConfigDefaults(t *testing.T) {
 	if claude.Binary != "claude" {
 		t.Errorf("claude.Binary: got %q, want %q", claude.Binary, "claude")
 	}
-	if claude.Model != "claude-sonnet-4-6" {
-		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-sonnet-4-6")
+	if claude.Model != "claude-opus-4-8" {
+		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-opus-4-8")
 	}
 	if len(claude.Flags) == 0 {
 		t.Error("claude.Flags: want at least one flag")
@@ -179,7 +179,7 @@ func TestConfigFromFile(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: claude-opus-4-6
+    model: claude-opus-4-7
     flags: ["--dangerously-skip-permissions"]
 council:
   chair: codex
@@ -214,8 +214,8 @@ session_timeout: 1h
 	}
 
 	claude := cfg.Providers["claude"]
-	if claude.Model != "claude-opus-4-6" {
-		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-opus-4-6")
+	if claude.Model != "claude-opus-4-7" {
+		t.Errorf("claude.Model: got %q, want %q", claude.Model, "claude-opus-4-7")
 	}
 }
 
@@ -224,7 +224,7 @@ func TestConfigEnvOverride(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: claude-sonnet-4-6
     flags: []
 council:
   chair: claude
@@ -234,7 +234,7 @@ timeout: 5m
 session_timeout: 30m
 `)
 
-	t.Setenv("DOOTSABHA_PROVIDERS_CLAUDE_MODEL", "opus-4-6")
+	t.Setenv("DOOTSABHA_PROVIDERS_CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
 	cfg, err := core.LoadConfig(path)
 	if err != nil {
@@ -242,8 +242,8 @@ session_timeout: 30m
 	}
 
 	claude := cfg.Providers["claude"]
-	if claude.Model != "opus-4-6" {
-		t.Errorf("claude.Model: got %q, want %q (env should override file)", claude.Model, "opus-4-6")
+	if claude.Model != "claude-haiku-4-5-20251001" {
+		t.Errorf("claude.Model: got %q, want %q (env should override file)", claude.Model, "claude-haiku-4-5-20251001")
 	}
 }
 
@@ -252,7 +252,7 @@ func TestConfigUnknownKeys(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: claude-sonnet-4-6
     flags: []
 unknown_key: should_be_ignored
 future_feature:
@@ -276,7 +276,7 @@ func TestConfigRedaction(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: claude-sonnet-4-6
     flags: []
     api_key: secret-api-key-value
 council:
@@ -342,7 +342,7 @@ func TestConfigReveal(t *testing.T) {
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: claude-sonnet-4-6
     flags: []
     auth_token: my-secret-token
 council:
@@ -386,7 +386,7 @@ council:
 providers:
   claude:
     binary: claude
-    model: sonnet-4-6
+    model: claude-sonnet-4-6
     flags: []
 `)
 
@@ -406,10 +406,10 @@ providers:
 
 func TestConfigMergeOrder(t *testing.T) {
 	// Verify precedence: env > file > default
-	// Default: providers.claude.model = "claude-sonnet-4-6"
+	// Default: providers.claude.model = "claude-opus-4-8"
 	// File: providers.claude.model = "claude-haiku-4-5"
-	// Env:  DOOTSABHA_PROVIDERS_CLAUDE_MODEL = "opus-4-6"
-	// Result should be "opus-4-6"
+	// Env:  DOOTSABHA_PROVIDERS_CLAUDE_MODEL = "claude-haiku-4-5-20251001"
+	// Result should be "claude-haiku-4-5-20251001"
 	path := writeTempConfig(t, `
 providers:
   claude:
@@ -424,7 +424,7 @@ timeout: 5m
 session_timeout: 30m
 `)
 
-	t.Setenv("DOOTSABHA_PROVIDERS_CLAUDE_MODEL", "opus-4-6")
+	t.Setenv("DOOTSABHA_PROVIDERS_CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
 	cfg, err := core.LoadConfig(path)
 	if err != nil {
@@ -432,8 +432,8 @@ session_timeout: 30m
 	}
 
 	// Env takes precedence over file
-	if cfg.Providers["claude"].Model != "opus-4-6" {
-		t.Errorf("merge order: got %q, want %q (env > file > default)", cfg.Providers["claude"].Model, "opus-4-6")
+	if cfg.Providers["claude"].Model != "claude-haiku-4-5-20251001" {
+		t.Errorf("merge order: got %q, want %q (env > file > default)", cfg.Providers["claude"].Model, "claude-haiku-4-5-20251001")
 	}
 }
 
