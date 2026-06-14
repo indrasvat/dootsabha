@@ -124,8 +124,8 @@ func warnIfNeedsMigration() {
 	if err != nil || !core.NeedsMigration(cfg) {
 		return
 	}
-	fmt.Fprintln(os.Stderr, "⚠ Config references the retired 'gemini' provider — the Gemini CLI was sunset 2026-06-18.") //nolint:errcheck
-	fmt.Fprintln(os.Stderr, "  Run `dootsabha config migrate` to switch to Antigravity (agy).")                          //nolint:errcheck
+	fmt.Fprintln(os.Stderr, "⚠ Config references the 'gemini' provider — the Gemini CLI is being retired (sunset 2026-06-18).") //nolint:errcheck
+	fmt.Fprintln(os.Stderr, "  Run `dootsabha config migrate` to switch to Antigravity (agy).")                                 //nolint:errcheck
 }
 
 // execExtension runs an extension binary, forwarding args and stdio.

@@ -34,10 +34,7 @@ func newConfigCmd() *cobra.Command {
 
 // newConfigMigrateCmd migrates a config file off the retired gemini provider.
 func newConfigMigrateCmd() *cobra.Command {
-	var (
-		migrateJSON bool
-		dryRun      bool
-	)
+	var dryRun bool
 
 	cmd := &cobra.Command{
 		Use:     "migrate",
@@ -45,14 +42,21 @@ func newConfigMigrateCmd() *cobra.Command {
 		Short:   "Migrate config off the retired gemini provider to Antigravity (agy)",
 		Long: `Detect and rewrite gemini references in your dootsabha config.
 
-Google sunset the Gemini CLI on 2026-06-18; the Antigravity CLI (agy) replaces it.
+Google is retiring the Gemini CLI on 2026-06-18; the Antigravity CLI (agy) replaces it.
 This rewrites providers.gemini → providers.agy and council.chair: gemini → agy,
-writing a "<config>.bak" backup before any change.
+backing up the original before any change. The gemini provider's binary/model/flags
+do not carry over to agy and are replaced with agy defaults (the backup preserves them).
 
 स्थानांतरण (sthaanaantaran) — gemini से agy में विन्यास स्थानांतरित करें।`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Resolve the bilingual --pareekshan alias for --dry-run.
+			if p, _ := cmd.Flags().GetBool("pareekshan"); p {
+				dryRun = true
+			}
+
+			explicit := configFile != ""
 			path := configFile
 			if path == "" {
 				p, err := core.UserConfigPath()
@@ -62,10 +66,15 @@ writing a "<config>.bak" backup before any change.
 				path = p
 			}
 
-			rc := output.NewRenderContext(os.Stdout, migrateJSON || jsonOutput)
+			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if _, err := os.Stat(path); err != nil {
 				if os.IsNotExist(err) {
+					// An explicitly-named --config that doesn't exist is an error;
+					// a missing default user file just means there's nothing to migrate.
+					if explicit {
+						return &ExitError{Code: 1, Message: fmt.Sprintf("config file not found: %s", path)}
+					}
 					return emitMigrateResult(rc, migrateResultView{
 						Path:    path,
 						Status:  "no-config",
@@ -76,17 +85,26 @@ writing a "<config>.bak" backup before any change.
 			}
 
 			if dryRun {
-				cfg, err := core.LoadConfig(path)
+				// Plan against the raw file (not the merged/env config) so the preview
+				// matches what an actual migration would do.
+				plan, err := core.PlanMigrationFile(path)
 				if err != nil {
-					return &ExitError{Code: 1, Message: fmt.Sprintf("load config: %s", err)}
+					return &ExitError{Code: 1, Message: fmt.Sprintf("inspect config: %s", err)}
 				}
-				status := "already-migrated"
-				msg := "no gemini references found — nothing to migrate"
-				if core.NeedsMigration(cfg) {
-					status = "needs-migration"
-					msg = "gemini references found — run `dootsabha config migrate` to fix"
+				view := migrateResultView{
+					Path:            path,
+					DryRun:          true,
+					ProviderRenamed: plan.ProviderRenamed,
+					ChairUpdated:    plan.ChairUpdated,
 				}
-				return emitMigrateResult(rc, migrateResultView{Path: path, Status: status, Message: msg, DryRun: true})
+				if plan.Changed() {
+					view.Status = "needs-migration"
+					view.Message = "gemini references found — run `dootsabha config migrate` to fix"
+				} else {
+					view.Status = "already-migrated"
+					view.Message = "no gemini references found — nothing to migrate"
+				}
+				return emitMigrateResult(rc, view)
 			}
 
 			res, err := core.MigrateConfigFile(path)
@@ -112,7 +130,6 @@ writing a "<config>.bak" backup before any change.
 	}
 
 	f := cmd.Flags()
-	f.BoolVar(&migrateJSON, "json", false, "Output as JSON")
 	f.BoolVar(&dryRun, "dry-run", false, "Report what would change without modifying the file")
 	f.Bool("pareekshan", false, "Alias for --dry-run (परीक्षण)")
 	_ = f.MarkHidden("pareekshan")
@@ -139,14 +156,14 @@ func emitMigrateResult(rc *output.RenderContext, v migrateResultView) error {
 	switch v.Status {
 	case "migrated":
 		fmt.Fprintf(os.Stdout, "%s %s\n", output.StatusOK(rc), v.Message) //nolint:errcheck
-		if v.ProviderRenamed {
-			fmt.Fprintln(os.Stdout, "  · providers.gemini → providers.agy") //nolint:errcheck
-		}
-		if v.ChairUpdated {
-			fmt.Fprintln(os.Stdout, "  · council.chair: gemini → agy") //nolint:errcheck
-		}
-		fmt.Fprintf(os.Stdout, "  · backup written to %s\n", v.BackupPath) //nolint:errcheck
-		fmt.Fprintf(os.Stdout, "  · config: %s\n", v.Path)                 //nolint:errcheck
+		printMigrationChanges(v)
+		fmt.Fprintf(os.Stdout, "  · prior gemini settings preserved in %s\n", v.BackupPath) //nolint:errcheck
+		fmt.Fprintf(os.Stdout, "  · config: %s\n", v.Path)                                  //nolint:errcheck
+	case "needs-migration":
+		fmt.Fprintf(os.Stdout, "%s\n", v.Message)            //nolint:errcheck
+		fmt.Fprintln(os.Stdout, "  would change (dry-run):") //nolint:errcheck
+		printMigrationChanges(v)
+		fmt.Fprintf(os.Stdout, "  · config: %s\n", v.Path) //nolint:errcheck
 	default:
 		fmt.Fprintf(os.Stdout, "%s\n", v.Message) //nolint:errcheck
 		if v.Path != "" {
@@ -154,6 +171,16 @@ func emitMigrateResult(rc *output.RenderContext, v migrateResultView) error {
 		}
 	}
 	return nil
+}
+
+// printMigrationChanges lists the per-key changes (applied or planned).
+func printMigrationChanges(v migrateResultView) {
+	if v.ProviderRenamed {
+		fmt.Fprintln(os.Stdout, "  · providers.gemini → providers.agy") //nolint:errcheck
+	}
+	if v.ChairUpdated {
+		fmt.Fprintln(os.Stdout, "  · council.chair: gemini → agy") //nolint:errcheck
+	}
 }
 
 func newConfigShowCmd() *cobra.Command {

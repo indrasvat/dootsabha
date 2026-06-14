@@ -11,8 +11,8 @@ import (
 
 // AgyProvider invokes the Antigravity CLI (`agy`) and captures its plain-text output.
 //
-// Antigravity is Google's agent-first replacement for the Gemini CLI (sunset
-// 2026-06-18). Unlike `gemini`, its print mode (`-p`) emits plain text only — there
+// Antigravity is Google's agent-first replacement for the Gemini CLI (scheduled
+// sunset 2026-06-18). Unlike `gemini`, its print mode (`-p`) emits plain text only — there
 // is no `--output-format json`, so no session ID, token counts, or cost are
 // available. The provider populates Content and Duration; token/cost fields stay 0.
 type AgyProvider struct {
@@ -67,6 +67,10 @@ func (p *AgyProvider) Invoke(ctx context.Context, prompt string, opts InvokeOpti
 
 	content := strings.TrimSpace(string(res.Stdout))
 	if content == "" {
+		// Surface any stderr tail to make an empty (but exit-0) response debuggable.
+		if msg := strings.TrimSpace(string(res.Stderr)); msg != "" {
+			return nil, fmt.Errorf("agy invoke: empty response (stderr: %s)", core.TruncateString(msg, 200))
+		}
 		return nil, fmt.Errorf("agy invoke: empty response")
 	}
 

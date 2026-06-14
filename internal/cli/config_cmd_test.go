@@ -87,3 +87,50 @@ func TestConfigMigrateCmdDryRun(t *testing.T) {
 		t.Error("config unexpectedly changed")
 	}
 }
+
+func TestConfigMigrateCmdPareekshanAliasIsDryRun(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	original := "providers:\n  gemini:\n    binary: gemini\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	prev := configFile
+	configFile = path
+	t.Cleanup(func() { configFile = prev })
+
+	cmd := newConfigMigrateCmd()
+	cmd.SetArgs([]string{"--pareekshan"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("pareekshan run failed: %v", err)
+	}
+
+	// --pareekshan must behave like --dry-run: no write, no backup.
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(got) != original {
+		t.Error("--pareekshan modified the config (should be dry-run)")
+	}
+	if _, err := os.Stat(path + ".bak"); !os.IsNotExist(err) {
+		t.Error("--pareekshan should not write a backup")
+	}
+}
+
+func TestConfigMigrateCmdExplicitMissingConfigErrors(t *testing.T) {
+	prev := configFile
+	configFile = filepath.Join(t.TempDir(), "does-not-exist.yaml")
+	t.Cleanup(func() { configFile = prev })
+
+	cmd := newConfigMigrateCmd()
+	cmd.SetArgs([]string{})
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected an error for an explicit --config that does not exist")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error %q should mention the missing file", err.Error())
+	}
+}

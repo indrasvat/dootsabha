@@ -207,6 +207,100 @@ func TestMigrateConfigFileDropsGeminiWhenAgyExists(t *testing.T) {
 	}
 }
 
+func TestPlanMigrationFileDoesNotWrite(t *testing.T) {
+	original := `providers:
+  gemini:
+    binary: gemini
+council:
+  chair: gemini
+`
+	path := writeConfig(t, original)
+
+	plan, err := core.PlanMigrationFile(path)
+	if err != nil {
+		t.Fatalf("PlanMigrationFile: %v", err)
+	}
+	if !plan.ProviderRenamed || !plan.ChairUpdated {
+		t.Errorf("plan should report both changes, got %+v", plan)
+	}
+	if plan.BackupPath != "" {
+		t.Error("plan must not write a backup")
+	}
+
+	// File must be untouched, and no backup created.
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != original {
+		t.Error("PlanMigrationFile modified the file")
+	}
+	if _, err := os.Stat(path + ".bak"); !os.IsNotExist(err) {
+		t.Error("PlanMigrationFile must not create a backup")
+	}
+}
+
+func TestMigrateConfigFileDoesNotClobberExistingBackup(t *testing.T) {
+	path := writeConfig(t, "providers:\n  gemini:\n    binary: gemini\n")
+	// A pre-existing backup must not be overwritten.
+	if err := os.WriteFile(path+".bak", []byte("PRECIOUS"), 0o600); err != nil {
+		t.Fatalf("seed backup: %v", err)
+	}
+
+	res, err := core.MigrateConfigFile(path)
+	if err != nil {
+		t.Fatalf("MigrateConfigFile: %v", err)
+	}
+	if res.BackupPath == path+".bak" {
+		t.Error("must not reuse the pre-existing .bak path")
+	}
+	// The original .bak content must survive.
+	if b, _ := os.ReadFile(path + ".bak"); string(b) != "PRECIOUS" {
+		t.Errorf("pre-existing backup was clobbered: %q", b)
+	}
+	// The new backup must contain the migrated file's original (gemini) content.
+	nb, err := os.ReadFile(res.BackupPath)
+	if err != nil {
+		t.Fatalf("read new backup: %v", err)
+	}
+	if !strings.Contains(string(nb), "gemini") {
+		t.Errorf("new backup %q should hold the original gemini config", res.BackupPath)
+	}
+}
+
+func TestMigrateConfigFilePreservesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "real.yaml")
+	if err := os.WriteFile(real, []byte("providers:\n  gemini:\n    binary: gemini\n"), 0o600); err != nil {
+		t.Fatalf("write real: %v", err)
+	}
+	link := filepath.Join(dir, "config.yaml")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("symlinks unsupported: %v", err)
+	}
+
+	if _, err := core.MigrateConfigFile(link); err != nil {
+		t.Fatalf("MigrateConfigFile via symlink: %v", err)
+	}
+
+	// The link must still be a symlink (not replaced by a regular file)...
+	fi, err := os.Lstat(link)
+	if err != nil {
+		t.Fatalf("lstat link: %v", err)
+	}
+	if fi.Mode()&os.ModeSymlink == 0 {
+		t.Error("symlink was replaced by a regular file")
+	}
+	// ...and the real target must be migrated.
+	cfg, err := core.LoadConfig(real)
+	if err != nil {
+		t.Fatalf("reload real: %v", err)
+	}
+	if _, ok := cfg.Providers["agy"]; !ok {
+		t.Error("real target was not migrated to agy")
+	}
+}
+
 func TestMigrateConfigFileMissing(t *testing.T) {
 	_, err := core.MigrateConfigFile(filepath.Join(t.TempDir(), "nope.yaml"))
 	if err == nil {
