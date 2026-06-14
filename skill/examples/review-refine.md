@@ -33,8 +33,8 @@ jq -r '.review.content' result.json
 ### Step 4: Override Author/Reviewer
 
 ```bash
-# Gemini authors, claude reviews
-dootsabha review --json --author gemini --reviewer claude "Your prompt"
+# Agy authors, claude reviews
+dootsabha review --json --author agy --reviewer claude "Your prompt"
 
 # Claude authors, codex reviews
 dootsabha review --json --author claude --reviewer codex "Your prompt"
@@ -49,6 +49,10 @@ jq '{
   total: .meta.total_cost_usd
 }' result.json
 ```
+
+> **Note:** If either role is `agy` (Antigravity CLI), its `cost_usd` and token
+> counts are always `0` — `agy` runs in plain-text mode and reports no usage
+> data. Only `claude` and `codex` contribute to `total_cost_usd`.
 
 ---
 
@@ -66,7 +70,7 @@ dootsabha refine --json \
   > result.json
 ```
 
-Default pipeline: claude authors, codex and gemini review in order.
+Default pipeline: claude authors, codex and agy review in order.
 
 ### Step 2: See the Evolution
 
@@ -94,8 +98,8 @@ jq -r '.versions[] | select(.review) | "--- \(.reviewer) ---\n\(.review)\n"' res
 ### Step 5: Custom Author and Reviewer Order
 
 ```bash
-# Codex authors, reviewed by claude then gemini
-dootsabha refine --json --author codex --reviewers claude,gemini "Your prompt"
+# Codex authors, reviewed by claude then agy
+dootsabha refine --json --author codex --reviewers claude,agy "Your prompt"
 
 # Single reviewer
 dootsabha refine --json --author claude --reviewers codex "Your prompt"

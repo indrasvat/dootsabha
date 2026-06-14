@@ -288,7 +288,7 @@ async def main(connection):
         await session.async_send_text("clear\n")
         await asyncio.sleep(0.3)
         await session.async_send_text(
-            f'{BINARY} refine "Say PONG" --author claude --reviewers codex,gemini\n'
+            f'{BINARY} refine "Say PONG" --author claude --reviewers codex,agy\n'
         )
 
         # -- Test 1: refine_header_box --

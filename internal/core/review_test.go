@@ -14,14 +14,14 @@ func TestPeerReviewThreeAgents(t *testing.T) {
 	agents := []core.Agent{
 		okAgent("claude", "c-out"),
 		okAgent("codex", "x-out"),
-		okAgent("gemini", "g-out"),
+		okAgent("agy", "g-out"),
 	}
 	eng := core.NewEngine(agents, defaultCfg())
 
 	dispatches := []core.DispatchResult{
 		{Provider: "claude", Content: "claude output"},
 		{Provider: "codex", Content: "codex output"},
-		{Provider: "gemini", Content: "gemini output"},
+		{Provider: "agy", Content: "agy output"},
 	}
 
 	reviews, err := eng.PeerReview(context.Background(), dispatches, core.InvokeOptions{})
@@ -88,21 +88,21 @@ func TestPeerReviewExcludesFailedDispatches(t *testing.T) {
 	agents := []core.Agent{
 		okAgent("claude", "c-out"),
 		okAgent("codex", "x-out"),
-		okAgent("gemini", "g-out"),
+		okAgent("agy", "g-out"),
 	}
 	eng := core.NewEngine(agents, defaultCfg())
 
 	dispatches := []core.DispatchResult{
 		{Provider: "claude", Content: "claude output"},
 		{Provider: "codex", Error: fmt.Errorf("codex failed")},
-		{Provider: "gemini", Content: "gemini output"},
+		{Provider: "agy", Content: "agy output"},
 	}
 
 	reviews, err := eng.PeerReview(context.Background(), dispatches, core.InvokeOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Only claude and gemini succeeded → 2 reviews
+	// Only claude and agy succeeded → 2 reviews
 	if len(reviews) != 2 {
 		t.Fatalf("got %d reviews, want 2", len(reviews))
 	}

@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Short: "dootsabha (दूतसभा) — AI council orchestrator",
 	Long: `दूतसभा (dootsabha) — Council of AI Messengers
 
-Orchestrate multiple AI coding agents (Claude, Codex, Gemini) in
+Orchestrate multiple AI coding agents (Claude, Codex, Antigravity) in
 council-mode deliberation, peer review, and synthesis.
 
 दूतसभा — AI दूतों की सभा (Council of AI Messengers)
@@ -63,6 +63,12 @@ council-mode deliberation, peer review, and synthesis.
 		logger := observability.SetupDefaultLogger(verbosity, jsonOutput)
 		traceID := observability.NewTraceID()
 		slog.SetDefault(logger.With("session_id", traceID))
+
+		// Nudge users whose config still references the retired gemini provider.
+		// Skipped for the migrate command itself (it does the fixing).
+		if cmd.Name() != "migrate" {
+			warnIfNeedsMigration()
+		}
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -105,6 +111,21 @@ func Execute() {
 		}
 		os.Exit(1)
 	}
+}
+
+// warnIfNeedsMigration prints a one-line stderr nudge when the user's config still
+// references the retired gemini provider. Silent in JSON mode and when stderr is not
+// a TTY, so piped/agent invocations stay clean.
+func warnIfNeedsMigration() {
+	if jsonOutput || !isatty.IsTerminal(os.Stderr.Fd()) {
+		return
+	}
+	cfg, err := core.LoadConfig(configFile)
+	if err != nil || !core.NeedsMigration(cfg) {
+		return
+	}
+	fmt.Fprintln(os.Stderr, "⚠ Config references the 'gemini' provider — the Gemini CLI is being retired (sunset 2026-06-18).") //nolint:errcheck
+	fmt.Fprintln(os.Stderr, "  Run `dootsabha config migrate` to switch to Antigravity (agy).")                                 //nolint:errcheck
 }
 
 // execExtension runs an extension binary, forwarding args and stdio.

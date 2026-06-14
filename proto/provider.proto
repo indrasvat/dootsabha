@@ -5,7 +5,7 @@ package dootsabha;
 option go_package = "github.com/indrasvat/dootsabha/proto/gen";
 
 // Provider is the gRPC service that agent provider plugins implement.
-// Each provider wraps a coding agent CLI (Claude, Codex, Gemini, or custom).
+// Each provider wraps a coding agent CLI (Claude, Codex, Antigravity, or custom).
 service Provider {
   // Invoke sends a prompt to the agent and returns structured output.
   rpc Invoke(InvokeRequest) returns (InvokeResponse);

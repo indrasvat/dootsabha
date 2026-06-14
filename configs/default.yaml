@@ -29,12 +29,11 @@ providers:
       - --skip-git-repo-check
       - -c
       - model_reasoning_effort=medium
-  gemini:
-    binary: gemini
-    model: gemini-3.1-pro-preview
+  agy:                                # Antigravity CLI — replaces the sunset Gemini CLI
+    binary: agy
+    model: Gemini 3.5 Flash (High)    # Display-name model id (see `agy models`)
     flags:
-      - --approval-mode
-      - yolo
+      - --dangerously-skip-permissions  # yolo equivalent — auto-approve tool permissions
 
 # Council deliberation settings.
 council:

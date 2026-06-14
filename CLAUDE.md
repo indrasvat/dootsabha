@@ -18,6 +18,27 @@ make pre-commit   # Fast gate: fmt-check+vet+fix-check (<3s)
 make help         # All targets
 ```
 
+## PR Review Workflow (MANDATORY)
+**As soon as a PR is created — and after every review-fix push — load the
+`gh-ghent` skill and run the PR review loop.** This is a required step of this
+repo's development workflow, not optional.
+
+1. Invoke the `gh-ghent` skill (Skill tool) to load the current command contract.
+2. Run the single blessed command (personal repo → keep `--solo`):
+   ```bash
+   PR=$(gh pr view --json number -q .number)
+   gh ghent status --pr "$PR" --await-review --solo --logs --format json --no-tui
+   ```
+   It waits for CI + bounded review monitoring (understands Codex PR-body
+   signals) and returns threads, checks, reviews, and `is_merge_ready` in one shot.
+3. Act on the **first** matching condition (skill's decision order): fix CI
+   failures → answer/​resolve bot threads (`gh ghent reply --resolve`) → dismiss
+   stale blockers → re-run the **same** command after each fix push.
+4. Repeat until `is_merge_ready == true` with non-low `review_monitor.confidence`.
+
+Do NOT hand-roll `gh pr`/`gh api` polling or switch to bare `--watch` while
+review comments may still arrive — always re-run the `--await-review` command.
+
 ## Directory Structure
 ```
 cmd/dootsabha/main.go     Entry point → cli.Execute()
@@ -25,7 +46,7 @@ internal/cli/             Cobra commands (root, council, consult, ...)
 internal/core/            Engine, config, subprocess, retry
 internal/output/          Renderer, styles, formatters
 internal/version/         Version via ldflags
-internal/providers/       Claude/Codex/Gemini (Phase 1-2, mostly replaced by plugins)
+internal/providers/       Claude/Codex/Agy (Phase 1-2, mostly replaced by plugins)
 internal/plugin/          gRPC plugin manager & handshake logic
 plugins/                  Provider and Strategy plugins (Phase 3+)
 proto/                    gRPC service definitions (.proto + generated)
@@ -87,7 +108,7 @@ nested session detection. All other `CLAUDE_CODE_*` vars (USE_BEDROCK, USE_VERTE
 ENTRYPOINT, etc.) are left untouched. This is done ONCE at startup via
 `core.DetectAndCleanClaude()` in `init()` — no per-invocation sanitization needed.
 When inside Claude Code, `core.InsideClaude` is true and council defaults to
-`codex,gemini` (Claude is already the host).
+`codex,agy` (Claude is already the host).
 
 ### No huh spinner — use raw goroutine (Spike 0.7)
 `huh v0.8.0` removed `NewSpinner()`. Use:

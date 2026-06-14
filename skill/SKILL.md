@@ -3,31 +3,36 @@ name: dootsabha
 description: >
   Multi-agent AI council orchestrator for coding tasks. Use when you need a
   second opinion from multiple LLMs, want to consult another AI agent (Claude,
-  Codex, Gemini), do a final review with codex or gemini, run a multi-perspective
+  Codex, Antigravity), do a final review with codex or agy, run a multi-perspective
   code review, get peer review from multiple agents, have another LLM validate
   and review something, identify gaps in a PRD or design, refine output through
   iterative agent feedback, run it by another model, deliberate on a question
   with an AI council, incorporate findings from multiple LLMs, or check agent
-  health status. Replaces manual `codex exec` and `gemini -p` subprocess calls
+  health status. Replaces manual `codex exec` and `agy -p` subprocess calls
   with structured JSON output and exit codes for agent control flow.
 ---
 
 # दूतसभा — Multi-Agent Council Orchestrator
 
-दूतसभा orchestrates AI coding agents (Claude Code, Codex CLI, Gemini CLI) for
+दूतसभा orchestrates AI coding agents (Claude Code, Codex CLI, Antigravity CLI) for
 council-mode deliberation, peer review, iterative refinement, and single-agent
 consultation. It produces structured JSON output with exit codes designed for
 agent-to-agent workflows.
+
+> **Provider note:** The third agent is `agy` (Google's Antigravity CLI), which
+> replaced the retired Gemini CLI (sunset 2026-06-18). `agy` runs in plain-text
+> print mode, so its results carry **no token counts or cost** — those JSON fields
+> are `0`/empty for `agy`. `claude` and `codex` report full token/cost data.
 
 **Prerequisite:** `dootsabha` binary on `$PATH` (see [installation](#installation))
 
 ## When to Use
 
 - Get a **second opinion** from multiple LLMs on a question or design decision
-- Do a **final review with codex/gemini** — replaces manual `codex exec --yolo` and `gemini -p` calls
+- Do a **final review with codex/agy** — replaces manual `codex exec --yolo` and `agy -p` calls
 - **Validate and review** a PRD, design doc, or implementation — identify gaps across multiple models
 - Run **multi-perspective code review** with peer review and synthesis
-- **Consult a single agent** (Claude, Codex, or Gemini) with structured output
+- **Consult a single agent** (Claude, Codex, or Antigravity) with structured output
 - **Refine output** through sequential reviewer feedback and author incorporation
 - **Run it by another model** — quick cross-check without switching terminals
 - **Incorporate findings** from multiple LLMs into a single synthesized answer
@@ -55,7 +60,7 @@ dootsabha council --json "What's the best approach to implement rate limiting?"
 ```
 
 Dispatches to all configured agents. When running inside a Claude Code session,
-defaults to codex and gemini (Claude is already the host). When running standalone,
+defaults to codex and agy (Claude is already the host). When running standalone,
 defaults to all three. Exit 0 = success, 5 = partial result.
 
 ### 2. Consult a single agent
@@ -102,6 +107,7 @@ Exit 0 = all healthy, 3 = one or more unhealthy.
 | `refine` | Sequential review + incorporation | `--author`, `--reviewers`, `--anonymous`, `--model` |
 | `status` | Agent health check | (no command-specific flags) |
 | `config show` | View configuration and source | `--reveal`, `--commented` |
+| `config migrate` | Rewrite a stale `gemini` config to `agy` | `--dry-run`, `--json` |
 | `plugin list` | Discover extensions | (no command-specific flags) |
 
 For complete flag reference, see [references/command-reference.md](references/command-reference.md).
@@ -140,7 +146,7 @@ Written directly (no envelope wrapper). All fields snake_case with json tags.
     { "provider": "codex",  "model": "...", "content": "...", "duration_ms": 2800, "cost_usd": 0.008, "tokens_in": 120, "tokens_out": 600 }
   ],
   "reviews": [
-    { "reviewer": "claude", "reviewed": ["codex", "gemini"], "content": "..." }
+    { "reviewer": "claude", "reviewed": ["codex", "agy"], "content": "..." }
   ],
   "synthesis": {
     "chair": "claude",
@@ -153,12 +159,13 @@ Written directly (no envelope wrapper). All fields snake_case with json tags.
     "total_cost_usd": 0.045,
     "total_tokens_in": 420,
     "total_tokens_out": 2000,
-    "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" }
+    "providers": { "claude": "ok", "codex": "ok", "agy": "ok" }
   }
 }
 ```
 
 **Note:** `synthesis` is `null` when all agents failed or synthesis was not reached.
+`agy` contributes `0` to token/cost totals (plain-text print mode has no usage data).
 On error with `--json`, per-agent errors are in `dispatch[].error` and `meta.providers`.
 
 ### review
@@ -182,10 +189,10 @@ Written directly (no envelope wrapper). All fields snake_case with json tags.
   "versions": [
     { "version": 1, "provider": "claude", "content": "v1 draft...", "duration_ms": 3200 },
     { "version": 2, "provider": "claude", "content": "v2 after codex review...", "reviewer": "codex", "review": "...", "duration_ms": 5400 },
-    { "version": 3, "provider": "claude", "content": "v3 after gemini review...", "reviewer": "gemini", "review": "...", "duration_ms": 5200 }
+    { "version": 3, "provider": "claude", "content": "v3 after agy review...", "reviewer": "agy", "review": "...", "duration_ms": 5200 }
   ],
   "final": { "version": 3, "content": "Final refined output..." },
-  "meta": { "schema_version": 1, "strategy": "refine", "anonymous": true, "duration_ms": 18000, "total_cost_usd": 0.065, "total_tokens_in": 900, "total_tokens_out": 4200, "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" } }
+  "meta": { "schema_version": 1, "strategy": "refine", "anonymous": true, "duration_ms": 18000, "total_cost_usd": 0.065, "total_tokens_in": 900, "total_tokens_out": 4200, "providers": { "claude": "ok", "codex": "ok", "agy": "ok" } }
 }
 ```
 
@@ -197,9 +204,9 @@ Wrapped in an envelope. Fields are PascalCase (no json tags on struct).
 {
   "meta": { "schema_version": 1 },
   "data": [
+    { "Name": "agy",    "Healthy": true, "Version": "1.0.8", "Model": "Gemini 3.5 Flash (High)", "Auth": "✓", "Error": "" },
     { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-opus-4-8", "Auth": "✓", "Error": "" },
-    { "Name": "codex",  "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.5", "Auth": "✓", "Error": "" },
-    { "Name": "gemini", "Healthy": false, "Version": "", "Model": "", "Auth": "", "Error": "binary not found" }
+    { "Name": "codex",  "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.5", "Auth": "✓", "Error": "" }
   ]
 }
 ```
@@ -254,7 +261,7 @@ cp bin/dootsabha ~/.local/bin/
 dootsabha status --json
 ```
 
-Requires at least one AI CLI installed: `claude`, `codex`, or `gemini`.
+Requires at least one AI CLI installed: `claude`, `codex`, or `agy`.
 
 ## Configuration
 
@@ -279,9 +286,9 @@ providers:
   codex:
     binary: codex
     model: gpt-5.5
-  gemini:
-    binary: gemini
-    model: gemini-3.1-pro-preview
+  agy:
+    binary: agy
+    model: Gemini 3.5 Flash (High)
 
 council:
   chair: claude
@@ -290,6 +297,11 @@ council:
 
 timeout: 5m
 ```
+
+> **Migrating from an older config?** If your `~/.config/dootsabha/config.yaml`
+> still has a `gemini:` provider block, run `dootsabha config migrate` to rewrite
+> it to `agy` (a `.bak` backup is written first). `dootsabha` also prints a one-line
+> nudge on TTY when it detects a stale `gemini` reference.
 
 Override with environment variables: `DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-8`
 

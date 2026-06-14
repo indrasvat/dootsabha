@@ -1,6 +1,6 @@
 # दूतसभा (dootsabha) — Multi-Agent Council
 
-दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Gemini CLI) through council-mode deliberation, peer review, and synthesis. Use it when you need multi-perspective answers from multiple AI agents.
+दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy)) through council-mode deliberation, peer review, and synthesis. Use it when you need multi-perspective answers from multiple AI agents.
 
 ## Quick Reference
 
@@ -16,13 +16,13 @@ Output structure:
   "dispatch": [
     { "provider": "claude", "model": "claude-opus-4-8", "content": "...", "duration_ms": 5000, "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 500 },
     { "provider": "codex", "content": "..." },
-    { "provider": "gemini", "content": "..." }
+    { "provider": "agy", "content": "...", "cost_usd": 0, "tokens_in": 0, "tokens_out": 0 }
   ],
   "reviews": [
-    { "reviewer": "claude", "reviewed": ["codex", "gemini"], "content": "..." }
+    { "reviewer": "claude", "reviewed": ["codex", "agy"], "content": "..." }
   ],
   "synthesis": { "chair": "claude", "content": "The synthesized best answer..." },
-  "meta": { "schema_version": 1, "strategy": "council", "total_cost_usd": 0.05, "total_tokens_in": 1000, "total_tokens_out": 3000, "duration_ms": 15000, "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" } }
+  "meta": { "schema_version": 1, "strategy": "council", "total_cost_usd": 0.05, "total_tokens_in": 1000, "total_tokens_out": 3000, "duration_ms": 15000, "providers": { "claude": "ok", "codex": "ok", "agy": "ok" } }
 }
 ```
 
@@ -76,7 +76,7 @@ Extract review: `dootsabha review --json "question" | jq -r '.review.content'`
 Author writes, reviewers review sequentially, author incorporates feedback:
 
 ```bash
-dootsabha refine --json "Implement a concurrent-safe LRU cache" --author claude --reviewers codex,gemini
+dootsabha refine --json "Implement a concurrent-safe LRU cache" --author claude --reviewers codex,agy
 ```
 
 Output structure:
@@ -87,7 +87,7 @@ Output structure:
     { "version": 2, "provider": "claude", "content": "revised after codex review...", "reviewer": "codex", "review": "codex's feedback...", "duration_ms": 4000 }
   ],
   "final": { "version": 2, "content": "final version..." },
-  "meta": { "schema_version": 1, "strategy": "refine", "anonymous": true, "duration_ms": 15000, "total_cost_usd": 0.03, "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" } }
+  "meta": { "schema_version": 1, "strategy": "refine", "anonymous": true, "duration_ms": 15000, "total_cost_usd": 0.03, "providers": { "claude": "ok", "codex": "ok", "agy": "ok" } }
 }
 ```
 
@@ -106,7 +106,7 @@ Output structure (envelope format):
   "data": [
     { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-opus-4-8", "Auth": "\u2713" },
     { "Name": "codex", "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.5", "Auth": "\u2713" },
-    { "Name": "gemini", "Healthy": true, "Version": "0.30.0", "Model": "gemini-3.1-pro-preview", "Auth": "\u2713" }
+    { "Name": "agy", "Healthy": true, "Version": "1.0.8", "Model": "Gemini 3.5 Flash (High)", "Auth": "\u2713" }
   ]
 }
 ```
@@ -118,6 +118,16 @@ Check for unhealthy agents: `dootsabha status --json | jq '.data[] | select(.Hea
 ```bash
 dootsabha config show --json
 dootsabha config show --commented  # Human-readable with inline docs
+```
+
+### Migrate stale config (config migrate)
+
+Rewrites a legacy config that still references the retired `gemini` provider to the new `agy` (Antigravity CLI) provider. Writes a `<config>.bak` backup before modifying:
+
+```bash
+dootsabha config migrate            # migrate in place (writes <config>.bak)
+dootsabha config migrate --dry-run  # show what would change, write nothing
+dootsabha config migrate --json     # structured result for agent consumption
 ```
 
 ## Exit Codes

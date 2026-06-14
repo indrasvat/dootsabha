@@ -24,7 +24,7 @@ const (
 // AgentConfig identifies an agent and its invocation settings.
 type AgentConfig struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Agent name (e.g., "claude", "codex", "gemini").
+	// Agent name (e.g., "claude", "codex", "agy").
 	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	// Override model for this agent (empty = use provider default).
 	Model string `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`

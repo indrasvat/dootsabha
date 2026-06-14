@@ -15,7 +15,7 @@ fail() { printf "  ✗ %s\n" "$1"; FAIL=$((FAIL+1)); }
 # Mock provider env vars — override real CLIs with mock scripts.
 export DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$MOCK_DIR/mock-claude"
 export DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex"
-export DOOTSABHA_PROVIDERS_GEMINI_BINARY="$MOCK_DIR/mock-gemini"
+export DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy"
 
 echo "Running L5 agent workflow tests..."
 echo "  Binary: $BINARY"
@@ -160,7 +160,7 @@ echo "--- Status provider coverage ---"
 # 5a. status mentions all 3 providers
 STATUS_OUT=$("$BINARY" status)
 FOUND=0
-for prov in claude codex gemini; do
+for prov in claude codex agy; do
   if echo "$STATUS_OUT" | grep -qi "$prov"; then
     FOUND=$((FOUND+1))
   fi

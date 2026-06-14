@@ -303,10 +303,10 @@ async def main(connection):
 
         # Launch refine command — 5 LLM calls (1 author + 2 reviewers * 2)
         print(
-            '\nLaunching: dootsabha refine "Say PONG" --author claude --reviewers codex,gemini'
+            '\nLaunching: dootsabha refine "Say PONG" --author claude --reviewers codex,agy'
         )
         await session.async_send_text(
-            f'{BINARY} refine "Say PONG" --author claude --reviewers codex,gemini\n'
+            f'{BINARY} refine "Say PONG" --author claude --reviewers codex,agy\n'
         )
 
         # -- Test 1: Initial generation (v1) -----------------------
@@ -597,7 +597,7 @@ async def main(connection):
                     "--author",
                     "claude",
                     "--reviewers",
-                    "codex,gemini",
+                    "codex,agy",
                     "--json",
                 ],
                 capture_output=True,

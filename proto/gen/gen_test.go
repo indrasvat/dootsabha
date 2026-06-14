@@ -170,7 +170,7 @@ func TestSessionSummaryConstruction(t *testing.T) {
 	ss := &gen.SessionSummary{
 		SessionId:    "ds_a1b2c3",
 		Strategy:     "council",
-		Providers:    []string{"claude", "codex", "gemini"},
+		Providers:    []string{"claude", "codex", "agy"},
 		TotalCostUsd: 0.015,
 		TotalTokens:  1200,
 		DurationMs:   8500,
@@ -267,7 +267,7 @@ func TestExecuteRequestSerializationRoundtrip(t *testing.T) {
 		Agents: []*gen.AgentConfig{
 			{Name: "claude", Model: "claude-opus-4-8", TimeoutMs: 30000},
 			{Name: "codex", Model: "codex-mini", TimeoutMs: 45000, ExtraArgs: []string{"--sandbox", "full"}},
-			{Name: "gemini", Model: "gemini-3-pro", TimeoutMs: 30000},
+			{Name: "agy", Model: "agy-3-pro", TimeoutMs: 30000},
 		},
 		Config: &gen.StrategyConfig{
 			Parallel:     true,
@@ -304,12 +304,12 @@ func TestExecuteResponseSerializationRoundtrip(t *testing.T) {
 		DispatchResults: []*gen.DispatchResult{
 			{Provider: "claude", Model: "claude-opus-4-8", Content: "API design v1", DurationMs: 3000, CostUsd: 0.005, TokensIn: 100, TokensOut: 200},
 			{Provider: "codex", Model: "codex-mini", Content: "API design v2", DurationMs: 4000, CostUsd: 0.003, TokensIn: 100, TokensOut: 180},
-			{Provider: "gemini", Content: "", Error: "timeout after 30s"},
+			{Provider: "agy", Content: "", Error: "timeout after 30s"},
 		},
 		ReviewResults: []*gen.ReviewResult{
-			{Reviewer: "claude", Reviewed: []string{"codex", "gemini"}, Content: "review of codex and gemini", DurationMs: 2000, TokensIn: 300, TokensOut: 100},
-			{Reviewer: "codex", Reviewed: []string{"claude", "gemini"}, Content: "review of claude and gemini", DurationMs: 2500, TokensIn: 350, TokensOut: 120},
-			{Reviewer: "gemini", Error: "skipped: dispatch failed"},
+			{Reviewer: "claude", Reviewed: []string{"codex", "agy"}, Content: "review of codex and agy", DurationMs: 2000, TokensIn: 300, TokensOut: 100},
+			{Reviewer: "codex", Reviewed: []string{"claude", "agy"}, Content: "review of claude and agy", DurationMs: 2500, TokensIn: 350, TokensOut: 120},
+			{Reviewer: "agy", Error: "skipped: dispatch failed"},
 		},
 		Synthesis: &gen.SynthesisResult{
 			Chair: "claude", Content: "synthesized output", DurationMs: 3000, CostUsd: 0.004, TokensIn: 500, TokensOut: 250,
@@ -319,7 +319,7 @@ func TestExecuteResponseSerializationRoundtrip(t *testing.T) {
 			TotalTokensIn:   1350,
 			TotalTokensOut:  850,
 			TotalDurationMs: 14500,
-			ProvidersStatus: map[string]string{"claude": "healthy", "codex": "healthy", "gemini": "error:timeout"},
+			ProvidersStatus: map[string]string{"claude": "healthy", "codex": "healthy", "agy": "error:timeout"},
 		},
 	}
 
@@ -797,7 +797,7 @@ func TestUnicodeContentEmoji(t *testing.T) {
 
 func TestUnicodeContentCJK(t *testing.T) {
 	content := "分析完了。コードは正しいです。코드가 올바릅니다."
-	resp := &gen.InvokeResponse{Content: content, Provider: "gemini"}
+	resp := &gen.InvokeResponse{Content: content, Provider: "agy"}
 
 	data, err := proto.Marshal(resp)
 	if err != nil {
@@ -919,7 +919,7 @@ func TestMaxProvidersInSessionSummary(t *testing.T) {
 	ss := &gen.SessionSummary{
 		SessionId: "ds_1",
 		Strategy:  "council",
-		Providers: []string{"claude", "codex", "gemini", "ollama", "deepseek"},
+		Providers: []string{"claude", "codex", "agy", "ollama", "deepseek"},
 	}
 
 	data, err := proto.Marshal(ss)
@@ -988,7 +988,7 @@ func TestDispatchResultWithError(t *testing.T) {
 func TestReviewResultReviewedOrder(t *testing.T) {
 	rr := &gen.ReviewResult{
 		Reviewer: "claude",
-		Reviewed: []string{"codex", "gemini", "ollama"},
+		Reviewed: []string{"codex", "agy", "ollama"},
 		Content:  "review",
 	}
 
@@ -1002,7 +1002,7 @@ func TestReviewResultReviewedOrder(t *testing.T) {
 	}
 
 	reviewed := decoded.GetReviewed()
-	expected := []string{"codex", "gemini", "ollama"}
+	expected := []string{"codex", "agy", "ollama"}
 	if len(reviewed) != len(expected) {
 		t.Fatalf("reviewed len = %d, want %d", len(reviewed), len(expected))
 	}
@@ -1064,7 +1064,7 @@ func TestSessionMetaProvidersStatusMap(t *testing.T) {
 		ProvidersStatus: map[string]string{
 			"claude": "healthy",
 			"codex":  "error:timeout",
-			"gemini": "healthy",
+			"agy":    "healthy",
 		},
 	}
 

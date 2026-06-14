@@ -32,7 +32,7 @@ All 4 items addressed in PRD v1.6.
 | 1.9 | Align code with architecture doc (model, flags) | DONE | — |
 
 ### What Works End-to-End
-- `dootsabha consult --agent claude/codex/gemini "prompt"` — invokes real CLIs, parses JSON/JSONL
+- `dootsabha consult --agent claude/codex/agy "prompt"` — invokes real CLIs, parses JSON/JSONL (agy is plain-text)
 - `dootsabha status` — health table with provider dots (TTY/pipe/JSON modes)
 - `dootsabha config show` — merged config with key redaction
 - Bilingual aliases: paraamarsh, sthiti, vinyaas + Devanagari
@@ -58,7 +58,7 @@ All 4 items addressed in PRD v1.6.
 - `dootsabha council "prompt" --rounds 2` — multi-round with context chaining
 - `dootsabha review "prompt" --author codex --reviewer claude` — 2-step pipeline
 - `dootsabha review "prompt" --json` — JSON with author/review/meta
-- `dootsabha refine "prompt" --author claude --reviewers codex,gemini` — sequential review + incorporate
+- `dootsabha refine "prompt" --author claude --reviewers codex,agy` — sequential review + incorporate
 - `dootsabha refine "prompt" --json` — JSON with versions/final/meta
 - Bilingual aliases: sabha/सभा (council), sameeksha/समीक्षा (review), sanshodhan/संशोधन (refine)
 - Bilingual flags: --dootas, --adhyaksha, --chakra, --samantar, --kartaa, --pareekshak, --gupt
@@ -98,7 +98,7 @@ All 4 items addressed in PRD v1.6.
 - Full pipeline test: hook rewrites prompt → provider invokes → hook redacts response
 - Crash recovery: kill plugin, detect error, relaunch succeeds
 - Handshake mismatch: wrong MagicCookieValue correctly rejected
-- 3 provider plugin binaries (claude-provider, codex-provider, gemini-provider)
+- 3 provider plugin binaries (claude-provider, codex-provider, agy-provider)
 - Plugin smoke tests: 8/8 pass (binary existence, integration tests, no orphans)
 - `make build-plugins` target builds all 3 provider plugins
 - `make test-plugins` target runs plugin smoke tests
@@ -208,3 +208,15 @@ All 4 items addressed in PRD v1.6.
 | Task | Description | Status | Agent |
 |------|-------------|--------|-------|
 | 702 | Provider default model refresh | DONE | — |
+| 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
+
+### What Works End-to-End (703)
+- Gemini CLI retired (sunset 2026-06-18) → replaced by `agy` (Antigravity CLI) as the 3rd agent
+- `internal/providers/agy.go` — plain-text print-mode provider (`agy --dangerously-skip-permissions -p`); no token/cost/session data
+- `plugins/agy/` — gRPC provider plugin (replaces `plugins/gemini/`); `make build-plugins` builds `agy-provider`
+- Defaults: council `claude,codex,agy` (`codex,agy` inside Claude Code); refine reviewers `codex,agy`; default model `Gemini 3.5 Flash (High)`
+- `dootsabha config migrate` (स्थानांतरण) — rewrites stale `providers.gemini`/`council.chair: gemini` → `agy`, writes `<config>.bak`; `--dry-run`, `--json`
+- TTY stderr nudge when a stale `gemini` config reference is detected
+- `mock-agy` (plain text) replaces `mock-gemini`; all gemini references removed from code/config/scripts/docs/skill
+- Real-CLI verified: consult/council/review/refine/status against live `agy` 1.0.8
+- `make ci` — 0 lint issues, all tests pass; `make test-binary` — 8/8 L3 smoke

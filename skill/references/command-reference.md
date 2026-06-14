@@ -23,7 +23,7 @@ dootsabha council [flags] "<prompt>"
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--agents` | | `codex,gemini` (inside Claude Code) / `claude,codex,gemini` (standalone) | Comma-separated agent names |
+| `--agents` | | `codex,agy` (inside Claude Code) / `claude,codex,agy` (standalone) | Comma-separated agent names |
 | `--chair` | | from config (`claude`) | Agent for synthesis |
 | `--rounds` | | from config (`1`) | Number of deliberation rounds (max 5) |
 | `--parallel` | | `true` | Run dispatch in parallel |
@@ -68,10 +68,15 @@ Written directly (no envelope wrapper). All fields snake_case.
     "total_cost_usd": 0.0,
     "total_tokens_in": 0,
     "total_tokens_out": 0,
-    "providers": { "claude": "ok", "codex": "ok" }
+    "providers": { "claude": "ok", "codex": "ok", "agy": "ok" }
   }
 }
 ```
+
+> **Note on `agy`:** The `agy` provider (Antigravity CLI) runs in plain-text
+> print mode (`agy -p`) and emits no JSON usage data. Its `cost_usd`,
+> `tokens_in`, and `tokens_out` fields are always `0`, and it has no session ID.
+> Only `claude` and `codex` contribute to `total_cost_usd` / token totals.
 
 ### Exit Codes
 
@@ -95,7 +100,7 @@ dootsabha consult [flags] --agent <name> "<prompt>"
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--agent` | `-a` | (required) | Agent name: claude, codex, or gemini |
+| `--agent` | `-a` | (required) | Agent name: claude, codex, or agy |
 | `--model` | | from config | Override model for this invocation |
 | `--max-turns` | | `0` (no limit) | Maximum agent turns |
 
@@ -120,6 +125,10 @@ Wrapped in envelope. Fields are PascalCase (no json tags on ProviderResult struc
 ```
 
 Extract content: `jq -r '.data.Content'`
+
+> **Note on `agy`:** When `--agent agy` is used, the Antigravity CLI runs in
+> plain-text mode and reports no usage data — `CostUSD`, `TokensIn`,
+> `TokensOut` are `0` and `SessionID` is empty.
 
 ### Exit Codes
 
@@ -211,7 +220,7 @@ dootsabha refine [flags] "<prompt>"
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
 | `--author` | | `claude` | Agent that produces and refines |
-| `--reviewers` | | `codex,gemini` | Comma-separated ordered reviewer list |
+| `--reviewers` | | `codex,agy` | Comma-separated ordered reviewer list |
 | `--anonymous` | | `true` | Anonymize reviewer identities in prompts |
 | `--model` | | from config | Override model for all agents |
 
@@ -252,10 +261,14 @@ Written directly (no envelope wrapper). All fields snake_case.
     "total_cost_usd": 0.0,
     "total_tokens_in": 0,
     "total_tokens_out": 0,
-    "providers": { "claude": "ok", "codex": "ok", "gemini": "ok" }
+    "providers": { "claude": "ok", "codex": "ok", "agy": "ok" }
   }
 }
 ```
+
+> **Note on `agy`:** As a reviewer or author, `agy` (Antigravity CLI) runs in
+> plain-text mode, so its per-version `cost_usd` / `tokens_in` / `tokens_out`
+> are always `0` and it does not contribute to the cost or token totals.
 
 ### Exit Codes
 
@@ -329,6 +342,31 @@ dootsabha config show [flags]
 |------|---------|
 | 0 | Success |
 | 5 | Config error (file not found, parse error) |
+
+---
+
+## config migrate
+
+Migrate a stale `gemini` provider block in your config to the new `agy`
+(Antigravity CLI) provider. The retired Gemini CLI was sunset 2026-06-18 and is
+replaced by `agy`. A timestamped backup is written to `<config>.bak` before any
+changes are made.
+
+```bash
+dootsabha config migrate [flags]
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` | `false` | Show what would change without writing |
+| `--json` | `false` | Output the migration result as JSON |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Migration applied (or dry-run completed, or nothing to migrate) |
+| 5 | Config error (file not found, parse error, write failed) |
 
 ---
 

@@ -63,7 +63,7 @@ Layer 5 — Detail docs            as needed    Architecture, testing-strategy, 
 
 ### 1.1 One-line Vision
 
-दूतसभा (dūtasabhā — "The Council of Agents") is a plugin-extensible Go CLI that orchestrates AI coding agents (Claude Code, Codex CLI, Gemini CLI) through council-mode deliberation, peer review, and synthesis — producing higher-quality outputs than any single agent alone.
+दूतसभा (dūtasabhā — "The Council of Agents") is a plugin-extensible Go CLI that orchestrates AI coding agents (Claude Code, Codex CLI, Antigravity CLI) through council-mode deliberation, peer review, and synthesis — producing higher-quality outputs than any single agent alone.
 
 ### 1.2 Design Principles
 
@@ -79,7 +79,7 @@ Layer 5 — Detail docs            as needed    Architecture, testing-strategy, 
 ### 1.3 What दूतसभा Is NOT
 
 - **Not a chat interface** — sends prompts, collects responses. No conversational turn-taking.
-- **Not an API wrapper** — orchestrates CLI tools (claude, codex, gemini), not APIs directly.
+- **Not an API wrapper** — orchestrates CLI tools (claude, codex, agy), not APIs directly.
 - **Not a model evaluator** — it's a collaboration tool, not a benchmark suite (though `dootsabha-bench` extension could add this).
 - **Not a daemon** — runs on demand, produces output, exits. No background process.
 
@@ -118,7 +118,7 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 
 ### 3.2 Primary: AI Coding Agents (as Consumers)
 
-- Claude Code, Codex, Gemini CLI using दूतसभा as a tool
+- Claude Code, Codex, Antigravity CLI (agy) using दूतसभा as a tool
 - Need structured JSON output via `--json`
 - Use exit codes for control flow (0=success, 1=error, 2=usage, 3=provider, 4=timeout, 5=partial)
 - Operate in non-TTY environments (subprocess invocation)
@@ -158,7 +158,7 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 |-----|-------------------|-----------|-----------|
 | claude | 2.1.63 | `--output-format json` | `--dangerously-skip-permissions` |
 | codex | 0.106.0 | `--json` (JSONL stream) | `--sandbox danger-full-access` |
-| gemini | 0.30.0 | `--output-format json` | `--yolo` or `--approval-mode yolo` |
+| agy | 1.0.8 | none (plain-text print mode) | `--dangerously-skip-permissions` |
 
 **Codex JSONL format (verified):**
 ```
@@ -175,17 +175,16 @@ Final content is in `item.completed` where `item.type == "agent_message"`. Token
 - `usage` in `turn.completed` has an undocumented `cached_input_tokens` field. Add to `Usage` struct.
 - `item.completed` can have `item.type == "error"` with `message` field instead of `text`. Handle gracefully.
 
-**Gemini flags (verified v0.30.0):**
-- Both `--yolo` (boolean shorthand) and `--approval-mode yolo` work
-- `-p`/`--prompt` flag is available for non-interactive mode (NOT deprecated)
-- Positional `gemini "prompt"` also works for non-interactive
+**agy flags (verified v1.0.8):**
+- `--dangerously-skip-permissions` is the yolo-equivalent flag (skips approval prompts)
+- `-p "<prompt>"` runs in non-interactive plain-text print mode
+- Antigravity CLI (agy) is Google's Go-built successor to the retired Gemini CLI (sunset 2026-06-18)
 
-**Gemini dual-model architecture (Spike 0.3):**
-- Every invocation uses TWO models: `gemini-2.5-flash-lite` (role: `utility_router`) + `gemini-3-flash-preview` (role: `main`)
-- Response text is at top-level `response` field (no unwrapping needed)
-- `stats.models` is a string-keyed map; find primary model via `roles["main"]`
-- Token fields per model: `input`, `prompt`, `candidates`, `total`, `cached`, `thoughts`, `tool`
-- Wall-clock ~10s (MCP startup overhead); actual API latency ~1s (use `api.totalLatencyMs`)
+**agy plain-text output (Spike 0.3):**
+- `agy` runs in plain-text print mode (`agy -p "<prompt>"`) — there is NO JSON output
+- No token counts, no cost, no session ID: those JSON fields are `0`/empty for `agy`
+- Parsing is simply "capture trimmed stdout as content; no usage data" (claude/codex still report full usage)
+- Default model: `Gemini 3.5 Flash (High)` (a display-name model id reported by agy)
 - Errors: no JSON error format — exit code != 0, empty stdout, plain text on stderr
 
 **Claude nested session gotcha (Spike 0.2):** `claude -p` cannot be run inside a Claude Code session. Must **remove** (not just empty) all `CLAUDECODE*` and `CLAUDE_CODE*` env vars from subprocess environment. Known vars: `CLAUDECODE=1`, `CLAUDE_CODE_ENTRYPOINT=cli`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Setting `CLAUDECODE=""` is NOT sufficient — the key must be absent entirely.
@@ -237,7 +236,7 @@ dootsabha/
 │   ├── providers/                  # Hardcoded providers (Phase 1-2, extracted in Phase 3)
 │   │   ├── claude.go
 │   │   ├── codex.go
-│   │   └── gemini.go
+│   │   └── agy.go
 │   ├── observability/
 │   │   ├── logger.go               # slog setup
 │   │   ├── metrics.go              # In-process metrics collector
@@ -247,7 +246,7 @@ dootsabha/
 ├── plugins/                        # gRPC plugin binaries (Phase 3+)
 │   ├── claude/
 │   ├── codex/
-│   ├── gemini/
+│   ├── agy/
 │   └── council-strategy/
 ├── proto/
 │   ├── provider.proto
@@ -281,7 +280,7 @@ dootsabha/
 
 | Type | Interface | Transport | Discovery | Built-in |
 |------|-----------|-----------|-----------|----------|
-| **Provider** | `Provider` (Invoke, Cancel, HealthCheck, Capabilities) | gRPC | plugins dir | claude, codex, gemini |
+| **Provider** | `Provider` (Invoke, Cancel, HealthCheck, Capabilities) | gRPC | plugins dir | claude, codex, agy |
 | **Strategy** | `Strategy` (Execute) | gRPC | plugins dir | council, consult |
 | **Extension** | none (binary) | exec (stdin/out/err) | $PATH + plugins dir | none |
 | **Hook** | `Hook` (PreInvoke, PostInvoke, PreSynthesis, PostSession) | gRPC | plugins dir | none |
@@ -355,7 +354,7 @@ dootsabha/
 **Purpose:** All configured agents deliberate → peer review → synthesized answer.
 
 **Flags:**
-- `--agents` / `--dootas` — Agents to include [default: claude,codex,gemini]
+- `--agents` / `--dootas` — Agents to include [default: claude,codex,agy standalone; codex,agy inside a Claude Code session]
 - `--chair` / `--adhyaksha` — Synthesis agent [default: claude]
 - `--rounds` / `--chakra` — Deliberation rounds [default: 1]
 - `--parallel` / `--samantar` — Run agents concurrently [default: true]
@@ -384,13 +383,13 @@ dootsabha/
 
 ● claude  ██████████████████████████████████████████ 3.1s ✓
 ● codex   ████████████████████████████████████       2.8s ✓
-● gemini  ████████████████████████████               2.2s ✓
+● agy     ████████████████████████████               2.2s ✓
 
 ═══ Stage 2: Peer Review ═══
 
-claude  reviewing codex + gemini ..................... ✓
-codex   reviewing claude + gemini .................... ✓
-gemini  reviewing claude + codex ..................... ✓
+claude  reviewing codex + agy ........................ ✓
+codex   reviewing claude + agy ....................... ✓
+agy     reviewing claude + codex ..................... ✓
 
 ═══ Stage 3: Synthesis ═══                             chair: claude
 
@@ -398,7 +397,7 @@ gemini  reviewing claude + codex ..................... ✓
 
 ─────────────────────────────────────────────────────────
 total: 8.4s │ cost: $0.042 │ tokens: 3,847 in · 1,203 out
-agents: claude ✓ · codex ✓ · gemini ✓
+agents: claude ✓ · codex ✓ · agy ✓
 ```
 
 **JSON output:**
@@ -407,12 +406,12 @@ agents: claude ✓ · codex ✓ · gemini ✓
   "dispatch": [
     {"provider": "claude", "model": "sonnet-4-6", "content": "...", "duration_ms": 3100, "cost_usd": 0.003, "tokens_in": 847, "tokens_out": 234},
     {"provider": "codex", "model": "gpt-5.3-codex", "content": "...", "duration_ms": 2800},
-    {"provider": "gemini", "model": "gemini-3-pro", "content": "...", "duration_ms": 2200}
+    {"provider": "agy", "model": "Gemini 3.5 Flash (High)", "content": "...", "duration_ms": 2200}
   ],
   "reviews": [
-    {"reviewer": "claude", "reviewed": ["codex", "gemini"], "content": "..."},
-    {"reviewer": "codex", "reviewed": ["claude", "gemini"], "content": "..."},
-    {"reviewer": "gemini", "reviewed": ["claude", "codex"], "content": "..."}
+    {"reviewer": "claude", "reviewed": ["codex", "agy"], "content": "..."},
+    {"reviewer": "codex", "reviewed": ["claude", "agy"], "content": "..."},
+    {"reviewer": "agy", "reviewed": ["claude", "codex"], "content": "..."}
   ],
   "synthesis": {
     "chair": "claude",
@@ -426,7 +425,7 @@ agents: claude ✓ · codex ✓ · gemini ✓
     "total_cost_usd": 0.042,
     "total_tokens_in": 3847,
     "total_tokens_out": 1203,
-    "providers": {"claude": "ok", "codex": "ok", "gemini": "ok"}
+    "providers": {"claude": "ok", "codex": "ok", "agy": "ok"}
   }
 }
 ```
@@ -494,7 +493,7 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 - [ ] FR-CON-03: Styled output with provider color dot, timing, cost
 - [ ] FR-CON-04: `--json` produces valid JSON
 - [ ] FR-CON-05: `--agent codex` uses Codex CLI with JSONL parsing
-- [ ] FR-CON-06: `--agent gemini` uses Gemini CLI
+- [ ] FR-CON-06: `--agent agy` uses Antigravity CLI (agy) in plain-text print mode (no usage data)
 - [ ] FR-CON-07: `--model opus-4-6` overrides provider default model
 - [ ] FR-CON-08: `--timeout 30s` kills agent after 30s with structured error
 - [ ] FR-CON-09: Piped output has no ANSI codes, no spinner artifacts
@@ -532,10 +531,10 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 दूतसभा · status                                              v0.1.0
 
 PROVIDER   MODEL           STATUS    VERSION    LATENCY
-● claude   sonnet-4-6      ✓ ready   2.1.63     —
-● codex    gpt-5.3-codex   ✓ ready   0.106.0    —
-● gemini   gemini-3-pro    ✗ auth    0.30.0     —
-                            ↳ OAuth token expired — run: gemini auth login
+● claude   sonnet-4-6              ✓ ready   2.1.63     —
+● codex    gpt-5.3-codex          ✓ ready   0.106.0    —
+● agy      Gemini 3.5 Flash (High) ✗ auth    1.0.8      —
+                            ↳ OAuth token expired — run: agy auth login
 
 Plugins: 3 providers · 1 strategy · 0 hooks
 Extensions: bench, cost, tui
@@ -548,7 +547,7 @@ Extensions: bench, cost, tui
   "providers": {
     "claude": {"healthy": true, "model": "sonnet-4-6", "cli_version": "2.1.63", "auth_valid": true},
     "codex": {"healthy": true, "model": "gpt-5.3-codex", "cli_version": "0.106.0", "auth_valid": true},
-    "gemini": {"healthy": false, "model": "gemini-3-pro", "cli_version": "0.30.0", "auth_valid": false, "error": "OAuth token expired"}
+    "agy": {"healthy": false, "model": "Gemini 3.5 Flash (High)", "cli_version": "1.0.8", "auth_valid": false, "error": "OAuth token expired"}
   },
   "plugins": {"providers": 3, "strategies": 1, "hooks": 0},
   "extensions": ["bench", "cost", "tui"]
@@ -572,6 +571,9 @@ Extensions: bench, cost, tui
 **Subcommands:**
 - `config show` — Dump resolved config (merged: defaults + file + env + flags)
 - `config show --commented` — Annotated config with explanations
+- `config migrate` — Migrate stale `gemini` config references → `agy` (writes `<config>.bak` backup; supports `--dry-run` and `--json`)
+
+**Stale-provider nudge:** When a stale `gemini` config reference is detected, दूतसभा prints a one-line stderr nudge on a TTY suggesting `dootsabha config migrate`.
 
 **Acceptance criteria:**
 - [ ] FR-CFG-01: Shows effective merged configuration
@@ -580,6 +582,7 @@ Extensions: bench, cost, tui
 - [ ] FR-CFG-04: Config precedence: defaults < file < env (`DOOTSABHA_*`) < flags. Override chain testable via `config show --json`.
 - [ ] FR-CFG-05: Unknown config keys are silently ignored (forward-compatible)
 - [ ] FR-CFG-06: Keys matching `*token*`, `*key*`, `*secret*` are redacted in `config show` output unless `--reveal` flag is passed
+- [ ] FR-CFG-07: `config migrate` rewrites stale `gemini` provider references to `agy`, backs up the original to `<config>.bak`, and supports `--dry-run` (preview only) and `--json`; a one-line stderr nudge appears on TTY when a stale reference is detected
 
 ### 6.7 Plugin Command (`dootsabha plugin` / `vistaarak`)
 
@@ -605,7 +608,7 @@ Extensions: bench, cost, tui
 
 **Flags:**
 - `--author` / `--kartaa` — Agent that produces and refines content [default: claude]
-- `--reviewers` / `--pareekshak` — Ordered comma-separated reviewer list [default: codex,gemini]
+- `--reviewers` / `--pareekshak` — Ordered comma-separated reviewer list [default: codex,agy]
 - `--anonymous` / `--gupt` — Anonymize prompts: reviewers don't know who wrote it, author doesn't know who reviewed [default: true]
 - All global flags
 
@@ -674,12 +677,12 @@ Output: v{N+1} — the final refined version. Total LLM calls: 1 + (2 × N).
 - Go 1.26+ (use latest idioms: range-over-func, enhanced loop vars. Run `go fix` on toolchain upgrades only.)
 - macOS (darwin/arm64, darwin/amd64) — primary development platform
 - Linux (linux/amd64, linux/arm64) — CI and server use
-- Requires: `claude`, `codex`, and/or `gemini` CLIs installed (graceful degradation if missing)
+- Requires: `claude`, `codex`, and/or `agy` CLIs installed (graceful degradation if missing)
 
 ### 7.4 Security
 
 - No credential storage — inherits auth from underlying CLIs
-- No network calls except via subprocess (claude/codex/gemini do the calling)
+- No network calls except via subprocess (claude/codex/agy do the calling)
 - Remove all `CLAUDECODE*` and `CLAUDE_CODE*` env vars when spawning claude subprocess (Spike 0.2 — key must be absent, not empty)
 - Config file permissions: warn if world-readable (may contain preferences)
 
@@ -705,7 +708,7 @@ Output: v{N+1} — the final refined version. Total LLM calls: 1 + (2 × N).
 var (
     ClaudeColor  = lipgloss.Color("#F59E0B")  // Amber/gold
     CodexColor   = lipgloss.Color("#10B981")  // Emerald
-    GeminiColor  = lipgloss.Color("#3B82F6")  // Blue
+    AgyColor     = lipgloss.Color("#3B82F6")  // Blue
     ErrorColor   = lipgloss.Color("#EF4444")  // Red
     SuccessColor = lipgloss.Color("#10B981")  // Green
     WarnColor    = lipgloss.Color("#F59E0B")  // Amber
@@ -749,12 +752,12 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 |------|-------------|---------------------|
 | 0.1 | Codex JSONL parsing spike | Reliably extract content from JSONL event stream |
 | 0.2 | Claude JSON output spike | Verify exact JSON schema, error cases, cost field |
-| 0.3 | Gemini JSON output spike | Verify `--yolo` behavior, JSON schema, positional prompt |
+| 0.3 | agy print-mode spike | Verify `--dangerously-skip-permissions` behavior, plain-text print mode (no JSON/usage) |
 | 0.4 | go-plugin gRPC handshake spike | Minimal host+plugin pair, measure overhead |
 | 0.5 | Subprocess management spike | errgroup, context cancellation, process group cleanup |
 | 0.6 | Cobra alias behavior spike | Bilingual names, flag aliases, unknown cmd handler |
 | 0.7 | Terminal UX foundations spike | lipgloss under pipe/NO_COLOR/narrow, spinner patterns |
-| 0.8 | PTY vs pipe subprocess spike | Verify CLI behavior (claude/codex/gemini) with plain pipes vs PTY. YOLO flags should prevent interactive prompts, but confirm JSON output is identical in pipe mode. If not, evaluate `creack/pty`. |
+| 0.8 | PTY vs pipe subprocess spike | Verify CLI behavior (claude/codex/agy) with plain pipes vs PTY. YOLO flags should prevent interactive prompts, but confirm output is identical in pipe mode. If not, evaluate `creack/pty`. |
 
 **Output:** `_spikes/` directory with 8 throwaway programs + README.md documenting findings.
 **Gate:** All assumptions validated or architecture redesigned.
@@ -770,7 +773,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 | 1.3 | Config manager (viper, YAML + env + flags) | 1.1 | 1.2 |
 | 1.4 | Subprocess runner (os/exec, context, Setpgid) | 1.1 | 1.2, 1.3 |
 | 1.5 | Claude provider (hardcoded, not plugin yet) | 1.2, 1.3, 1.4 | — |
-| 1.6 | Codex + Gemini providers (hardcoded) | 1.5 | — |
+| 1.6 | Codex + agy providers (hardcoded) | 1.5 | — |
 | 1.7 | Cobra CLI wiring (root, consult, status, config) | 1.5, 1.6 | — |
 
 **Gate:** `dootsabha consult "PONG"` returns PONG from all 3 CLIs. `dootsabha status` shows real health data. All outputs beautiful in TTY, clean when piped, valid when `--json`.
@@ -800,7 +803,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 |------|------------|------------|---------------|
 | 3.1 | Proto definitions + code generation | Phase 2 | — |
 | 3.2 | Plugin manager (discovery, loading, registry) | 3.1 | — |
-| 3.3 | Extract provider plugins (claude, codex, gemini) | 3.2 | — |
+| 3.3 | Extract provider plugins (claude, codex, agy) | 3.2 | — |
 | 3.4 | Council strategy plugin | 3.3 | — |
 | 3.5 | Extension discovery ($PATH + plugins dir) | 3.2 | 3.3, 3.4 |
 | 3.6 | Plugin subcommand (vistaarak list/inspect) | 3.5 | — |
@@ -885,7 +888,7 @@ Full Makefile with build flags, gotestsum, colored output — implemented during
 
 | Component | Location | Reference |
 |-----------|----------|-----------|
-| Mock providers (claude, codex, gemini) | `testdata/mock-providers/` | `testing-strategy.md §1` |
+| Mock providers (claude, codex, agy) | `testdata/mock-providers/` | `testing-strategy.md §1` |
 | iTerm2-driver canonical template | `.claude/automations/` | `testing-strategy.md §2` |
 | L4 gating hooks (pre-task-done, pre-push) | `scripts/hooks/` | `testing-strategy.md §3` |
 | L5 agent workflow tests | `scripts/test-agent-workflow.sh` | `testing-strategy.md §4` |
@@ -922,7 +925,7 @@ Mark DONE → Update PROGRESS.md → Commit
 |------|--------|------------|------------|
 | Codex JSONL format changes | HIGH | MEDIUM | Spike 0.1 captures exact format. Version-pinned parsing. L4 integration tests. |
 | go-plugin gRPC overhead too high | MEDIUM | LOW | Spike 0.4 measures. If >200ms, use in-process providers with plugin opt-in. |
-| Claude/Gemini JSON schema undocumented | HIGH | MEDIUM | Spikes 0.2/0.3 capture schemas. Lenient parsing (ignore unknown fields). |
+| Claude JSON schema / agy print-mode output undocumented | HIGH | MEDIUM | Spikes 0.2/0.3 capture behavior. Lenient parsing (ignore unknown fields); agy is plain-text (no usage). |
 | Council synthesis quality is poor | MEDIUM | MEDIUM | Prompt engineering in P2. Iterate. Configurable via strategy plugin. |
 | Claude nested session error | HIGH | HIGH | Remove all `CLAUDECODE*`/`CLAUDE_CODE*` env vars entirely (not empty). Validated in Spike 0.2. |
 | charmbracelet version conflicts | MEDIUM | MEDIUM | Pin lipgloss v1.1.0. Let `go mod tidy` resolve. From gh-ghent: always re-verify. |
@@ -942,8 +945,8 @@ Mark DONE → Update PROGRESS.md → Commit
 | Q3 | Should providers be hardcoded in MVP, plugins deferred to v0.2? | Open | Build plan has both in MVP (P1-P2 hardcoded → P3 plugins). Could ship P1-P2 as v0.1, plugins as v0.2. |
 | Q4 | Should we vendor proto-generated code? | Open | Vendoring avoids protoc dependency for contributors. But adds git bloat. |
 | Q5 | BubbleTea TUI extension (`dootsabha-tui`) — scope it for MVP? | Open | Build plan mentions it as future extension. Could be v0.2. |
-| Q6 | Gemini `-p` vs positional prompt — which is more reliable? | Resolved | Both work in v0.30.0. Positional is simpler. Use positional, fallback to `-p`. |
-| Q7 | Gemini `--yolo` vs `--approval-mode yolo`? | Resolved | Both work in v0.30.0. Use `--yolo` (simpler). Keep `--approval-mode yolo` as fallback. |
+| Q6 | agy invocation mode — how do we send the prompt? | Resolved | Use `agy -p "<prompt>"` plain-text print mode in v1.0.8. No JSON output, so no usage data. |
+| Q7 | agy yolo flag? | Resolved | Use `--dangerously-skip-permissions` in v1.0.8 (skips approval prompts). |
 | Q8 | `--watch` streaming — what does it look like? | Open | Deferred to Phase 4. Needs spec for TTY stream events, non-TTY line-buffered format, and `--json` NDJSON stream. |
 
 ---
@@ -959,3 +962,4 @@ Mark DONE → Update PROGRESS.md → Commit
 | 2026-02-28 | 1.4 | Progressive disclosure structure: document hierarchy section, "Also read" cross-refs on all §6 commands, annotated ToC with line counts and typical references |
 | 2026-02-28 | 1.5 | Task files + git hooks: 37 numbered task files (docs/tasks/, P0-P5), lefthook spec delegating to Makefile (pre-commit→`make pre-commit`, pre-push→`make ci`), new targets (pre-commit, fmt-check, fix-check), `make build` depends on `hooks`, two-layer quality system (testing-strategy.md §8) |
 | 2026-02-28 | 1.6 | Phase 0 spike findings integrated: (1) huh v0.8.0 has no `NewSpinner()` — replaced with raw stderr goroutine pattern, (2) `CLAUDECODE*`/`CLAUDE_CODE*` env vars must be removed entirely (not emptied), (3) Codex `type:"error"` events are non-fatal transport fallback, `cached_input_tokens` field added, (4) Gemini dual-model architecture documented (utility_router + main), API latency vs wall-clock, (5) PTY risk resolved — `creack/pty` NOT needed |
+| 2026-06-13 | 1.7 | Provider migration: retired Gemini CLI (Google sunset 2026-06-18) replaced by `agy` (Antigravity CLI), Google's Go-built successor. Provider/binary renamed `gemini`→`agy`, v1.0.8, default model `Gemini 3.5 Flash (High)`, flag `--dangerously-skip-permissions`. agy runs plain-text print mode (`agy -p`) with NO JSON — no token/cost/session data. Defaults updated (council `claude,codex,agy`; refine reviewers `codex,agy`). Added `dootsabha config migrate` (gemini→agy config rewrite with `.bak`, `--dry-run`, `--json`) plus stale-config TTY nudge. |

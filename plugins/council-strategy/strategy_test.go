@@ -244,7 +244,7 @@ func TestBuildExecuteResponseProvidersStatusMap(t *testing.T) {
 	dispatches := []core.DispatchResult{
 		{Provider: "claude", Content: "OK"},
 		{Provider: "codex", Error: fmt.Errorf("fail")},
-		{Provider: "gemini", Content: "OK"},
+		{Provider: "agy", Content: "OK"},
 	}
 
 	resp := buildExecuteResponse(dispatches, nil, nil, 100*time.Millisecond)
@@ -258,7 +258,7 @@ func TestBuildExecuteResponseProvidersStatusMap(t *testing.T) {
 	}{
 		{"claude", "healthy"},
 		{"codex", "error"},
-		{"gemini", "healthy"},
+		{"agy", "healthy"},
 	} {
 		if got := resp.Metadata.ProvidersStatus[tc.provider]; got != tc.want {
 			t.Errorf("provider %s status = %q, want %q", tc.provider, got, tc.want)

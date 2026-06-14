@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Simulates the Antigravity CLI (agy) for smoke tests — no API calls.
+# Print mode emits plain text only (no JSON, no token stats).
+set -euo pipefail
+PROMPT=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --version) echo "1.0.8"; exit 0 ;;
+    --dangerously-skip-permissions) shift ;;
+    --sandbox) shift ;;
+    --model) shift 2 ;;
+    -p|--print|--prompt) PROMPT="$2"; shift 2 ;;
+    *) PROMPT="${PROMPT:-$1}"; shift ;;
+  esac
+done
+echo "Mock response to: $PROMPT"

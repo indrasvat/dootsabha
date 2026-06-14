@@ -126,7 +126,7 @@ func TestWriteContextFileProviders(t *testing.T) {
 		Providers: map[string]ContextProvider{
 			"claude": {Healthy: true, Model: "claude-opus-4-8"},
 			"codex":  {Healthy: false, Model: "o4-mini"},
-			"gemini": {Healthy: true, Model: "gemini-2.5-flash"},
+			"agy":    {Healthy: true, Model: "agy-2.5-flash"},
 		},
 	}
 

@@ -70,7 +70,7 @@ func TestConfigShowSubcommand(t *testing.T) {
 }
 
 func TestProviderColorKnown(t *testing.T) {
-	for _, name := range []string{"claude", "codex", "gemini"} {
+	for _, name := range []string{"claude", "codex", "agy"} {
 		c := providerColor(name)
 		if c == "" {
 			t.Errorf("providerColor(%q) returned empty color", name)

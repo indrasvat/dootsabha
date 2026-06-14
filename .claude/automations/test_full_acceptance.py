@@ -385,12 +385,12 @@ async def main(connection):
         # -- Test 4: status_providers --
         print_test_header("status_providers", 4)
         matched = await verify_screen_contains_any(
-            session, ["claude", "codex", "gemini"], timeout=30.0
+            session, ["claude", "codex", "agy"], timeout=30.0
         )
         if matched:
             lines = await get_all_screen_text(session)
             screen_text = "\n".join(lines).lower()
-            found = sum(1 for p in ["claude", "codex", "gemini"] if p in screen_text)
+            found = sum(1 for p in ["claude", "codex", "agy"] if p in screen_text)
             if found == 3:
                 log_result("status_providers", "PASS", "All 3 providers listed")
             else:

@@ -18,7 +18,7 @@ Output (status uses envelope + PascalCase):
 ```json
 {"Name":"claude","Healthy":true,"Model":"claude-opus-4-8"}
 {"Name":"codex","Healthy":true,"Model":"gpt-5.5"}
-{"Name":"gemini","Healthy":true,"Model":"gemini-3.1-pro-preview"}
+{"Name":"agy","Healthy":true,"Model":"Gemini 3.5 Flash (High)"}
 ```
 
 Exit code: `0` (all healthy).
@@ -73,9 +73,13 @@ Output (`providers` is a map of agent → status):
 {
   "duration_s": 12.4,
   "cost_usd": 0.045,
-  "agents": { "claude": "ok", "codex": "ok", "gemini": "ok" }
+  "agents": { "claude": "ok", "codex": "ok", "agy": "ok" }
 }
 ```
+
+> **Note:** `agy` (Antigravity CLI) runs in plain-text mode and reports no usage
+> data, so its `cost_usd`, `tokens_in`, and `tokens_out` are always `0`. Only
+> `claude` and `codex` contribute to `total_cost_usd` above.
 
 ## Step 6: Handling Partial Results
 
@@ -96,7 +100,7 @@ fi
 
 ## Narrowing to Specific Agents
 
-If you only want claude and codex (skip gemini):
+If you only want claude and codex (skip agy):
 
 ```bash
 dootsabha council --json --agents claude,codex "Your question"
