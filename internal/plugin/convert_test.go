@@ -174,7 +174,7 @@ func TestDispatchResultRoundtrip(t *testing.T) {
 func TestReviewResultRoundtrip(t *testing.T) {
 	original := &core.ReviewResult{
 		Reviewer:  "claude",
-		Reviewed:  []string{"codex", "gemini"},
+		Reviewed:  []string{"codex", "agy"},
 		Content:   "Both outputs are well-structured.",
 		Duration:  2 * time.Second,
 		CostUSD:   0.003,

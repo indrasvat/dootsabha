@@ -25,7 +25,7 @@ internal/cli/             Cobra commands (root, council, consult, ...)
 internal/core/            Engine, config, subprocess, retry
 internal/output/          Renderer, styles, formatters
 internal/version/         Version via ldflags
-internal/providers/       Claude/Codex/Gemini (Phase 1-2, mostly replaced by plugins)
+internal/providers/       Claude/Codex/Agy (Phase 1-2, mostly replaced by plugins)
 internal/plugin/          gRPC plugin manager & handshake logic
 plugins/                  Provider and Strategy plugins (Phase 3+)
 proto/                    gRPC service definitions (.proto + generated)
@@ -87,7 +87,7 @@ nested session detection. All other `CLAUDE_CODE_*` vars (USE_BEDROCK, USE_VERTE
 ENTRYPOINT, etc.) are left untouched. This is done ONCE at startup via
 `core.DetectAndCleanClaude()` in `init()` — no per-invocation sanitization needed.
 When inside Claude Code, `core.InsideClaude` is true and council defaults to
-`codex,gemini` (Claude is already the host).
+`codex,agy` (Claude is already the host).
 
 ### No huh spinner — use raw goroutine (Spike 0.7)
 `huh v0.8.0` removed `NewSpinner()`. Use:

@@ -357,7 +357,7 @@ async def main(connection):
 
         # ── Test 3: Models populated ─────────────────────────────
         print_test_header("models_populated", 3)
-        expected_models = ["claude-sonnet-4-6", "gpt-5.3-codex", "gemini-3-pro"]
+        expected_models = ["claude-opus-4-8", "gpt-5.5", "Gemini 3.5 Flash"]
         found_models = []
         missing_models = []
 
@@ -384,12 +384,12 @@ async def main(connection):
         print_test_header("table_layout", 4)
         has_claude = any("claude" in line for line in lines)
         has_codex = any("codex" in line for line in lines)
-        has_gemini = any("gemini" in line for line in lines)
+        has_agy = any("agy" in line for line in lines)
         has_version_header = any("VERSION" in line for line in lines)
         has_model_header = any("MODEL" in line for line in lines)
 
         if all(
-            [has_claude, has_codex, has_gemini, has_version_header, has_model_header]
+            [has_claude, has_codex, has_agy, has_version_header, has_model_header]
         ):
             log_result(
                 "table_layout",
@@ -402,8 +402,8 @@ async def main(connection):
                 missing.append("claude")
             if not has_codex:
                 missing.append("codex")
-            if not has_gemini:
-                missing.append("gemini")
+            if not has_agy:
+                missing.append("agy")
             if not has_version_header:
                 missing.append("VERSION header")
             if not has_model_header:

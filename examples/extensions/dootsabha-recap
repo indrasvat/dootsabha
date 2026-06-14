@@ -34,7 +34,7 @@ from rich.text import Text
 
 CLAUDE_COLOR = "#F59E0B"
 CODEX_COLOR = "#10B981"
-GEMINI_COLOR = "#3B82F6"
+AGY_COLOR = "#3B82F6"
 ACCENT_COLOR = "#06B6D4"
 MUTED_COLOR = "#64748B"
 SUCCESS_COLOR = "#22C55E"
@@ -43,7 +43,7 @@ ERROR_COLOR = "#EF4444"
 PROVIDER_COLORS = {
     "claude": CLAUDE_COLOR,
     "codex": CODEX_COLOR,
-    "gemini": GEMINI_COLOR,
+    "agy": AGY_COLOR,
 }
 
 

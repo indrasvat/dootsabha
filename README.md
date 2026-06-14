@@ -42,14 +42,16 @@ You need at least one of these AI CLI tools installed:
 |-------|---------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @anthropic-ai/gemini-cli` |
+| [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) |
+
+> **Note:** `agy` is Google's Go-built [Antigravity CLI](https://github.com/google/antigravity), the official successor to the retired Gemini CLI (Google sunset the Gemini CLI on 2026-06-18). The dootsabha provider name and binary are both `agy`.
 
 Verify they're on your PATH:
 
 ```bash
 claude --version
 codex --version
-gemini --version
+agy --version
 ```
 
 ## Install
@@ -115,7 +117,7 @@ dootsabha council "question" --json | jq -r '.synthesis.content'
 ```bash
 dootsabha consult "What is a goroutine?" --agent claude
 dootsabha consult "Explain channels" --agent codex --model gpt-5.5
-dootsabha consult "What is a mutex?" --agent gemini --json
+dootsabha consult "What is a mutex?" --agent agy --json
 ```
 
 Aliases: `paraamarsh`, `परामर्श`
@@ -125,7 +127,7 @@ Aliases: `paraamarsh`, `परामर्श`
 Three-stage pipeline: **dispatch** (all agents answer) → **peer review** (each reviews the others) → **synthesis** (chair produces final answer).
 
 ```bash
-# Default: all 3 agents (or codex,gemini when running inside Claude Code)
+# Default: all 3 agents (or codex,agy when running inside Claude Code)
 dootsabha council "What's the best way to handle errors in Go?"
 
 # Pick agents and chair
@@ -157,7 +159,7 @@ Author generates content → reviewers review sequentially → author incorporat
 
 ```bash
 dootsabha refine "Implement a concurrent-safe LRU cache"
-dootsabha refine "question" --author claude --reviewers codex,gemini
+dootsabha refine "question" --author claude --reviewers codex,agy
 dootsabha refine "question" --anonymous=false  # reveal author identity to reviewers
 ```
 
@@ -179,11 +181,20 @@ dootsabha config show              # Current merged config (sensitive values red
 dootsabha config show --commented  # With inline documentation
 dootsabha config show --json       # JSON output
 dootsabha config show --reveal     # Show sensitive values
+
+dootsabha config migrate           # Migrate a stale `gemini` block to `agy`
+dootsabha config migrate --dry-run # Preview changes without writing
+dootsabha config migrate --json    # JSON output
 ```
 
 `config show` includes a `config_source` entry so you can tell whether the
 effective configuration came from the built-in defaults, an auto-loaded default
 file, or an explicit `--config` path.
+
+`config migrate` rewrites a stale `gemini:` provider block in your config to the
+`agy` provider, writing a `<config>.bak` backup first. dootsabha also prints a
+one-line stderr nudge on a TTY when it detects a leftover `gemini` reference in
+your config.
 
 Aliases: `vinyaas`, `विन्यास`
 
@@ -226,12 +237,11 @@ providers:
       - --skip-git-repo-check
       - -c
       - model_reasoning_effort=medium
-  gemini:
-    binary: gemini
-    model: gemini-3.1-pro-preview
+  agy:
+    binary: agy
+    model: Gemini 3.5 Flash (High)
     flags:
-      - --approval-mode
-      - yolo
+      - --dangerously-skip-permissions
 
 council:
   chair: claude       # Agent that synthesizes final output (fallback: first healthy non-chair)
@@ -256,6 +266,7 @@ Environment variables use `DOOTSABHA_` prefix with `_` separators:
 
 ```bash
 export DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-8
+export DOOTSABHA_PROVIDERS_AGY_BINARY=agy
 export DOOTSABHA_COUNCIL_CHAIR=codex
 export DOOTSABHA_TIMEOUT=10m
 ```
@@ -282,6 +293,12 @@ dootsabha council "question" | cat
 # Suppress progress output
 dootsabha council "question" --quiet
 ```
+
+> **Note on token/cost data:** `claude` and `codex` report full token counts,
+> cost, and session IDs in `--json` output. `agy` runs in plain-text print mode
+> (`agy -p "<prompt>"`) and has no JSON output, so it returns no token counts, no
+> cost, and no session ID — those fields are `0`/empty for `agy` in dootsabha's
+> JSON.
 
 ---
 
@@ -357,9 +374,9 @@ dootsabha plugin list  # Shows both gRPC plugins and PATH extensions
 ## Claude Code Integration
 
 When running inside a Claude Code session, दूतसभा automatically:
-- **Defaults council agents to `codex,gemini`** — Claude is already the host, no need to call it again
+- **Defaults council agents to `codex,agy`** — Claude is already the host, no need to call it again
 - **Preserves all `CLAUDE_CODE_*` env vars** — Bedrock, Vertex, and Foundry routing works seamlessly
-- You can still explicitly add Claude with `--agents claude,codex,gemini` if needed
+- You can still explicitly add Claude with `--agents claude,codex,agy` if needed
 
 ### Skill
 
@@ -373,7 +390,7 @@ Agents also discover the checked-in skill when working directly in this repo.
 
 The skill triggers when you ask for things like:
 - "get a second opinion from another LLM"
-- "do a final review with codex/gemini"
+- "do a final review with codex/agy"
 - "run it by another model"
 - "validate and review this PRD"
 
@@ -436,7 +453,7 @@ cmd/dootsabha/        Entry point
 internal/cli/         Cobra commands
 internal/core/        Engine, config, subprocess, retry
 internal/output/      Renderer, styles, formatters
-internal/providers/   Claude/Codex/Gemini wrappers
+internal/providers/   Claude/Codex/Antigravity wrappers
 internal/plugin/      go-plugin gRPC infrastructure
 internal/observability/ Structured logging + metrics
 proto/                gRPC service definitions

@@ -237,6 +237,17 @@ pre {
   <span class="version-badge">6 Phases · ~14 days · Agent-Buildable</span>
 </div>
 
+<!-- ═══════════════════════════ MIGRATION NOTE ═══════════════════════════ -->
+<div class="callout callout-warn">
+  <strong>Provider migration — Gemini CLI → agy (Antigravity CLI).</strong>
+  Google sunset the <strong>Gemini CLI</strong> on <strong>2026-06-18</strong>. The third council agent is now
+  <code>agy</code> — Google's <strong>Antigravity CLI</strong> (v1.0.8), the official Go-built replacement.
+  Default model: <code>Gemini 3.5 Flash (High)</code>; default flags: <code>--dangerously-skip-permissions</code>.
+  Unlike Claude/Codex, <code>agy</code> runs plain-text print mode (<code>agy -p</code>) — it emits <em>no JSON</em>,
+  so dootsabha captures its trimmed stdout and records <strong>no token/cost/session usage data</strong> for agy.
+  Current architecture below uses <code>agy</code>; Phase 0 spike narrative is preserved as historical record.
+</div>
+
 <!-- ═══════════════════════════ PHILOSOPHY ═══════════════════════════ -->
 <section id="philosophy">
 <h2><span class="num">00</span> Build Philosophy</h2>
@@ -395,7 +406,7 @@ echo "✓ All smoke tests passed"</pre>
   <span class="test-num">L4</span>
   <div>
     <h4>Integration Tests (Real CLIs) <span class="badge badge-gold">every phase</span></h4>
-    <p>Run against actual <code>claude</code>, <code>codex</code>, <code>gemini</code> CLIs. Validates real subprocess behavior, JSON parsing, auth detection, timeout handling. Requires CLIs installed and authenticated. Costs actual API tokens — keep prompts tiny.</p>
+    <p>Run against actual <code>claude</code>, <code>codex</code>, <code>agy</code> CLIs. Validates real subprocess behavior, JSON parsing, auth detection, timeout handling. Requires CLIs installed and authenticated. Costs actual API tokens — keep prompts tiny.</p>
     <pre>
 # integration_test.sh — run with real CLIs
 set -euo pipefail
@@ -413,9 +424,10 @@ echo "── Codex ──"
 result=$($BIN consult --agent codex --json "$PROMPT")
 echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "codex: no PONG"
 
-echo "── Gemini ──"
-result=$($BIN consult --agent gemini --json "$PROMPT")
-echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "gemini: no PONG"
+echo "── Antigravity (agy) ──"
+result=$($BIN consult --agent agy --json "$PROMPT")
+echo "$result" | jq -r '.content' | grep -qi "PONG" || fail "agy: no PONG"
+# agy runs plain-text print mode (agy -p) — no JSON usage data, so tokens/cost/session are empty.
 
 echo "── Status ──"
 $BIN status --json | jq -e '.providers | length == 3' > /dev/null
@@ -575,7 +587,7 @@ fi
 var (
     ClaudeColor  = lipgloss.Color("#F59E0B")  // Amber/gold
     CodexColor   = lipgloss.Color("#10B981")  // Emerald
-    GeminiColor  = lipgloss.Color("#3B82F6")  // Blue
+    AgyColor     = lipgloss.Color("#3B82F6")  // Blue
     ErrorColor   = lipgloss.Color("#EF4444")  // Red
     SuccessColor = lipgloss.Color("#10B981")  // Green
     WarnColor    = lipgloss.Color("#F59E0B")  // Amber
@@ -590,11 +602,11 @@ $ dootsabha status
 
   दूतसभा · status                                              v0.1.0
 
-  PROVIDER   MODEL           STATUS    VERSION    LATENCY
-  ● claude   sonnet-4-6      ✓ ready   1.0.24     —
-  ● codex    gpt-5.3-codex   ✓ ready   0.9.3      —
-  ● gemini   gemini-3-pro    ✗ auth    0.18.1     —
-                              ↳ OAuth token expired — run: gemini auth login
+  PROVIDER   MODEL                      STATUS    VERSION    LATENCY
+  ● claude   sonnet-4-6                 ✓ ready   1.0.24     —
+  ● codex    gpt-5.3-codex              ✓ ready   0.9.3      —
+  ● agy      Gemini 3.5 Flash (High)    ✗ auth    1.0.8      —
+                                        ↳ OAuth token expired — run: agy auth login
 
   Plugins: 3 providers · 1 strategy · 0 hooks
   Extensions: bench, cost, tui
@@ -620,13 +632,13 @@ $ dootsabha council "write a palindrome checker"
 
   ● claude  ██████████████████████████████████████████ 3.1s ✓
   ● codex   ████████████████████████████████████       2.8s ✓
-  ● gemini  ████████████████████████████               2.2s ✓
+  ● agy     ████████████████████████████               2.2s ✓
 
   ═══ Stage 2: Peer Review ═══
 
-  claude  reviewing codex + gemini ..................... ✓
-  codex   reviewing claude + gemini .................... ✓
-  gemini  reviewing claude + codex ..................... ✓
+  claude  reviewing codex + agy ....................... ✓
+  codex   reviewing claude + agy ...................... ✓
+  agy     reviewing claude + codex .................... ✓
 
   ═══ Stage 3: Synthesis ═══                             chair: claude
 
@@ -634,8 +646,8 @@ $ dootsabha council "write a palindrome checker"
   [synthesized output here]
 
   ─────────────────────────────────────────────────────────
-  total: 8.4s │ cost: $0.042 │ tokens: 3,847 in · 1,203 out
-  agents: claude ✓ · codex ✓ · gemini ✓
+  total: 8.4s │ cost: $0.042 │ tokens: 3,847 in · 1,203 out  (agy: no usage data)
+  agents: claude ✓ · codex ✓ · agy ✓
 </pre>
 </div>
 
@@ -734,16 +746,17 @@ $ dootsabha council "write a palindrome checker"
 </div>
 
 <div class="card danger">
-  <h4>Spike 0.3 — Gemini CLI JSON Output</h4>
-  <p><strong>Risk:</strong> The <code>--yolo</code> bug (#13561), positional prompt syntax, and JSON schema need validation.</p>
+  <h4>Spike 0.3 — Gemini CLI JSON Output <span class="badge badge-red">superseded</span></h4>
+  <p><strong>Historical note:</strong> This spike was run against the original <strong>Gemini CLI</strong>, which Google sunset on 2026-06-18. It has been superseded by the <strong>agy</strong> (Antigravity CLI) provider, which runs plain-text print mode (<code>agy -p</code>) and emits no JSON — see the migration note at the top of this document. The narrative below is retained as a record of what was investigated at the time.</p>
+  <p><strong>Risk (at the time):</strong> The <code>--yolo</code> bug (#13561), positional prompt syntax, and JSON schema needed validation.</p>
   <ul class="checklist">
-    <li>Run <code>gemini "PONG" --output-format json --model gemini-3-pro --approval-mode yolo</code></li>
-    <li>Confirm <code>--approval-mode yolo</code> works (not <code>--yolo</code>)</li>
-    <li>Capture and document JSON schema (<code>response</code>, <code>stats</code> fields)</li>
-    <li>Test error case (invalid model)</li>
-    <li>Write <code>parseGeminiOutput([]byte) (*Response, error)</code></li>
+    <li>Ran <code>gemini "PONG" --output-format json --model gemini-3-pro --approval-mode yolo</code></li>
+    <li>Confirmed <code>--approval-mode yolo</code> worked (not <code>--yolo</code>)</li>
+    <li>Captured and documented JSON schema (<code>response</code>, <code>stats</code> fields)</li>
+    <li>Tested error case (invalid model)</li>
+    <li>Wrote <code>parseGeminiOutput([]byte) (*Response, error)</code></li>
   </ul>
-  <p><strong>Done when:</strong> Parser works. <code>--approval-mode yolo</code> confirmed working.</p>
+  <p><strong>Was done when:</strong> Parser worked and <code>--approval-mode yolo</code> was confirmed working. <em>Now obsolete: agy needs no JSON parser — capture trimmed stdout, no usage data.</em></p>
 </div>
 
 <div class="card danger">
@@ -997,13 +1010,13 @@ See `dootsabha-buildplan.html` for the phased build plan.
 </div>
 
 <div class="card phase">
-  <h4>P1.6 — Codex + Gemini Providers (Hardcoded)</h4>
+  <h4>P1.6 — Codex + Antigravity (agy) Providers (Hardcoded)</h4>
   <ul class="checklist">
-    <li>Same pattern as Claude, with Codex JSONL parsing (Spike 0.1) and Gemini specifics (Spike 0.3)</li>
+    <li>Same pattern as Claude, with Codex JSONL parsing (Spike 0.1) and agy plain-text print mode (<code>agy -p</code>) — capture trimmed stdout, no usage data</li>
     <li><code>--agent</code> / <code>--doota</code> flag selects provider</li>
     <li>All three health checks work</li>
   </ul>
-  <p><strong>Done:</strong> <code>dootsabha consult --agent codex "PONG"</code> and <code>--agent gemini "PONG"</code> both work. <code>dootsabha status</code> shows all three with real health data.</p>
+  <p><strong>Done:</strong> <code>dootsabha consult --agent codex "PONG"</code> and <code>--agent agy "PONG"</code> both work. <code>dootsabha status</code> shows all three with real health data.</p>
 </div>
 
 <div class="card phase">
@@ -1138,7 +1151,7 @@ See `dootsabha-buildplan.html` for the phased build plan.
   <h4>P3.3 — Extract Provider Plugins</h4>
   <ul class="checklist">
     <li>Move <code>internal/providers/claude.go</code> → <code>plugins/claude/</code> as standalone binary</li>
-    <li>Same for codex and gemini</li>
+    <li>Same for codex and agy (<code>internal/providers/agy.go</code> → <code>plugins/agy/</code>, binary <code>agy-provider</code>)</li>
     <li>Core now loads providers via plugin manager, not direct import</li>
     <li>All existing tests still pass (L1-L4) — zero behavioral change</li>
   </ul>
@@ -1214,7 +1227,7 @@ See `dootsabha-buildplan.html` for the phased build plan.
   <h4>P4.3 — Edge Cases &amp; Error Paths</h4>
   <ul class="checklist">
     <li>CLI not installed → actionable error: "codex not found. Install: npm install -g @openai/codex"</li>
-    <li>Auth expired → "gemini auth expired. Run: gemini auth login"</li>
+    <li>Auth expired → "agy auth expired. Run: agy auth login"</li>
     <li>Network timeout → retry with backoff, then degrade</li>
     <li>Empty response → warn, don't crash</li>
     <li>Binary response (non-UTF8) → safe handling</li>
@@ -1320,7 +1333,7 @@ skill/
 ---
 name: dootsabha
 description: >
-  Orchestrate multiple AI coding agents (Claude Code, Codex CLI, Gemini CLI) 
+  Orchestrate multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI)
   for collaborative code review, synthesis, and multi-perspective problem solving.
 triggers:
   - multi-agent
@@ -1383,7 +1396,7 @@ echo "$result" | jq '.meta.total_cost_usd'
 | Flag | Alias | Default | Purpose |
 |------|-------|---------|---------|
 | `--agent` | `--doota` | claude | Provider for consult |
-| `--agents` | `--dootas` | claude,codex,gemini | Providers for council |
+| `--agents` | `--dootas` | claude,codex,agy | Providers for council |
 | `--chair` | `--adhyaksha` | claude | Synthesis agent |
 | `--json` | — | false | JSON output mode |
 | `--timeout` | `--kaalseema` | 5m | Per-agent timeout |
@@ -1415,13 +1428,13 @@ vars and a JSON context file. See `examples/extension-dev.md`.
     "multi-agent", "multiple agents", "council", "compare agents",
     "code review by ai", "second opinion", "cross-review",
     "synthesize", "benchmark agents", "agent collaboration",
-    "claude and codex", "claude and gemini", "codex and gemini",
+    "claude and codex", "claude and agy", "codex and agy",
     "dootsabha", "sabha", "council of agents"
   ],
   "categories": ["ai-tools", "code-review", "orchestration", "cli"],
   "requires": {
     "binaries": ["dootsabha"],
-    "optional_binaries": ["claude", "codex", "gemini"]
+    "optional_binaries": ["claude", "codex", "agy"]
   },
   "author": "indrasvat",
   "repository": "https://github.com/indrasvat/dootsabha"
@@ -1473,10 +1486,10 @@ vars and a JSON context file. See `examples/extension-dev.md`.
   <td>Spike 0.4 measures overhead. If &gt;200ms, consider in-process providers with plugin opt-in.</td>
 </tr>
 <tr>
-  <td>Claude/Gemini JSON schema undocumented, changes silently</td>
+  <td>Claude/Codex JSON schema undocumented, changes silently</td>
   <td><span class="badge badge-red">HIGH</span></td>
   <td><span class="badge badge-gold">MEDIUM</span></td>
-  <td>Spikes 0.2/0.3 capture schemas. Lenient parsing (ignore unknown fields). Version checks in health.</td>
+  <td>Spikes 0.1/0.2 capture schemas. Lenient parsing (ignore unknown fields). Version checks in health. (agy emits no JSON — plain-text print mode, so no schema risk there.)</td>
 </tr>
 <tr>
   <td>macOS SIP interferes with process group management</td>
@@ -1491,10 +1504,10 @@ vars and a JSON context file. See `examples/extension-dev.md`.
   <td>Prompt engineering in Phase 2. Iterate on synthesis prompt. Configurable via strategy plugin.</td>
 </tr>
 <tr>
-  <td>Gemini <code>--approval-mode yolo</code> bug persists/worsens</td>
+  <td>agy <code>--dangerously-skip-permissions</code> flag changes/breaks</td>
   <td><span class="badge badge-green">LOW</span></td>
   <td><span class="badge badge-gold">MEDIUM</span></td>
-  <td>Spike 0.3 validates. Fallback: use <code>--yolo</code> if fixed, or <code>echo y | gemini</code> hack.</td>
+  <td>Validate the flag against agy 1.0.8 in integration tests. Fallback: pipe confirmation, or pin a known-good agy version.</td>
 </tr>
 <tr>
   <td>Token cost accumulation during development is high</td>

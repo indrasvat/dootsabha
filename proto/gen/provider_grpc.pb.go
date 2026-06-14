@@ -30,7 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
 // Provider is the gRPC service that agent provider plugins implement.
-// Each provider wraps a coding agent CLI (Claude, Codex, Gemini, or custom).
+// Each provider wraps a coding agent CLI (Claude, Codex, Antigravity, or custom).
 type ProviderClient interface {
 	// Invoke sends a prompt to the agent and returns structured output.
 	Invoke(ctx context.Context, in *InvokeRequest, opts ...grpc.CallOption) (*InvokeResponse, error)
@@ -95,7 +95,7 @@ func (c *providerClient) Capabilities(ctx context.Context, in *CapabilitiesReque
 // for forward compatibility.
 //
 // Provider is the gRPC service that agent provider plugins implement.
-// Each provider wraps a coding agent CLI (Claude, Codex, Gemini, or custom).
+// Each provider wraps a coding agent CLI (Claude, Codex, Antigravity, or custom).
 type ProviderServer interface {
 	// Invoke sends a prompt to the agent and returns structured output.
 	Invoke(context.Context, *InvokeRequest) (*InvokeResponse, error)

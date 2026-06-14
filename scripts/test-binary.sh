@@ -72,16 +72,16 @@ else
   fail "mock-codex not found/executable"
 fi
 
-# Test 8: mock-gemini works
-if [[ -x "$MOCK_DIR/mock-gemini" ]]; then
-  RESULT=$("$MOCK_DIR/mock-gemini" --approval-mode yolo --output-format json -p "PONG" 2>&1)
-  if echo "$RESULT" | grep -q '"result"'; then
-    pass "mock-gemini produces JSON"
+# Test 8: mock-agy works (Antigravity print mode — plain text)
+if [[ -x "$MOCK_DIR/mock-agy" ]]; then
+  RESULT=$("$MOCK_DIR/mock-agy" --dangerously-skip-permissions --model "Gemini 3.5 Flash (High)" -p "PONG" 2>&1)
+  if echo "$RESULT" | grep -q 'PONG'; then
+    pass "mock-agy produces plain-text response"
   else
-    fail "mock-gemini JSON unexpected: $RESULT"
+    fail "mock-agy output unexpected: $RESULT"
   fi
 else
-  fail "mock-gemini not found/executable"
+  fail "mock-agy not found/executable"
 fi
 
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"

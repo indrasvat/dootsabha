@@ -71,7 +71,7 @@ func TestMetricsSummary(t *testing.T) {
 	m := NewMetrics()
 	m.RecordInvocation("claude", 100*time.Millisecond, 0.01, 50, 100, nil)
 	m.RecordInvocation("codex", 200*time.Millisecond, 0.02, 60, 120, nil)
-	m.RecordInvocation("gemini", 150*time.Millisecond, 0.015, 40, 80, nil)
+	m.RecordInvocation("agy", 150*time.Millisecond, 0.015, 40, 80, nil)
 
 	summary := m.Summary()
 

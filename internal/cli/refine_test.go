@@ -61,8 +61,8 @@ func TestRefineCommandDefaults(t *testing.T) {
 			t.Errorf("--author default should be 'claude', got %q", authorFlag.DefValue)
 		}
 		reviewersFlag := cmd.Flags().Lookup("reviewers")
-		if reviewersFlag.DefValue != "codex,gemini" {
-			t.Errorf("--reviewers default should be 'codex,gemini', got %q", reviewersFlag.DefValue)
+		if reviewersFlag.DefValue != "codex,agy" {
+			t.Errorf("--reviewers default should be 'codex,agy', got %q", reviewersFlag.DefValue)
 		}
 		anonFlag := cmd.Flags().Lookup("anonymous")
 		if anonFlag.DefValue != "true" {
@@ -78,10 +78,10 @@ func TestParseReviewerList(t *testing.T) {
 		input string
 		want  []string
 	}{
-		{"codex,gemini", []string{"codex", "gemini"}},
+		{"codex,agy", []string{"codex", "agy"}},
 		{"codex", []string{"codex"}},
-		{"codex, gemini, claude", []string{"codex", "gemini", "claude"}},
-		{" codex , gemini ", []string{"codex", "gemini"}},
+		{"codex, agy, claude", []string{"codex", "agy", "claude"}},
+		{" codex , agy ", []string{"codex", "agy"}},
 		{"", nil},
 	}
 	for _, tt := range tests {

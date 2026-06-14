@@ -66,7 +66,7 @@ func TestExitErrorImplementsError(t *testing.T) {
 }
 
 func TestGetProviderKnownNames(t *testing.T) {
-	for _, name := range []string{"claude", "codex", "gemini"} {
+	for _, name := range []string{"claude", "codex", "agy"} {
 		_, err := getProvider(name, nil, nil)
 		if err != nil {
 			t.Errorf("getProvider(%q) returned unexpected error: %v", name, err)

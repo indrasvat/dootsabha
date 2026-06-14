@@ -76,11 +76,11 @@ func TestConfigDefaults(t *testing.T) {
 	if cfg.Providers["codex"].Model != "gpt-5.5" {
 		t.Errorf("codex.Model: got %q, want %q", cfg.Providers["codex"].Model, "gpt-5.5")
 	}
-	if _, ok := cfg.Providers["gemini"]; !ok {
-		t.Error("providers.gemini missing from defaults")
+	if _, ok := cfg.Providers["agy"]; !ok {
+		t.Error("providers.agy missing from defaults")
 	}
-	if cfg.Providers["gemini"].Model != "gemini-3.1-pro-preview" {
-		t.Errorf("gemini.Model: got %q, want %q", cfg.Providers["gemini"].Model, "gemini-3.1-pro-preview")
+	if cfg.Providers["agy"].Model != "Gemini 3.5 Flash (High)" {
+		t.Errorf("agy.Model: got %q, want %q", cfg.Providers["agy"].Model, "Gemini 3.5 Flash (High)")
 	}
 }
 
@@ -93,10 +93,10 @@ func TestConfigAutoLoadsDefaultUserFile(t *testing.T) {
 	path := filepath.Join(configDir, "config.yaml")
 	if err := os.WriteFile(path, []byte(`
 providers:
-  gemini:
-    binary: gemini
-    model: gemini-from-home-config
-    flags: ["--approval-mode", "yolo"]
+  agy:
+    binary: agy
+    model: agy-from-home-config
+    flags: ["--dangerously-skip-permissions"]
 timeout: 10m
 `), 0o600); err != nil {
 		t.Fatalf("write default config: %v", err)
@@ -113,8 +113,8 @@ timeout: 10m
 	if cfg.Source.Type != "file" || cfg.Source.Path != path {
 		t.Errorf("Source: got %+v, want file %q", cfg.Source, path)
 	}
-	if cfg.Providers["gemini"].Model != "gemini-from-home-config" {
-		t.Errorf("gemini.Model: got %q, want gemini-from-home-config", cfg.Providers["gemini"].Model)
+	if cfg.Providers["agy"].Model != "agy-from-home-config" {
+		t.Errorf("agy.Model: got %q, want agy-from-home-config", cfg.Providers["agy"].Model)
 	}
 }
 
@@ -127,16 +127,16 @@ func TestConfigExplicitFileOverridesDefaultUserFile(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(`
 timeout: 10m
 providers:
-  gemini:
-    model: gemini-from-home-config
+  agy:
+    model: agy-from-home-config
 `), 0o600); err != nil {
 		t.Fatalf("write default config: %v", err)
 	}
 	explicit := writeTempConfig(t, `
 timeout: 20m
 providers:
-  gemini:
-    model: gemini-from-explicit-config
+  agy:
+    model: agy-from-explicit-config
 `)
 
 	cfg, err := core.LoadConfig(explicit)
@@ -150,8 +150,8 @@ providers:
 	if cfg.Source.Type != "file" || cfg.Source.Path != explicit {
 		t.Errorf("Source: got %+v, want file %q", cfg.Source, explicit)
 	}
-	if cfg.Providers["gemini"].Model != "gemini-from-explicit-config" {
-		t.Errorf("gemini.Model: got %q, want gemini-from-explicit-config", cfg.Providers["gemini"].Model)
+	if cfg.Providers["agy"].Model != "agy-from-explicit-config" {
+		t.Errorf("agy.Model: got %q, want agy-from-explicit-config", cfg.Providers["agy"].Model)
 	}
 }
 
@@ -169,8 +169,8 @@ func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
 	}
-	if cfg.Providers["gemini"].Model != "gemini-3.1-pro-preview" {
-		t.Errorf("gemini.Model: got %q, want built-in gemini-3.1-pro-preview", cfg.Providers["gemini"].Model)
+	if cfg.Providers["agy"].Model != "Gemini 3.5 Flash (High)" {
+		t.Errorf("agy.Model: got %q, want built-in Gemini 3.5 Flash (High)", cfg.Providers["agy"].Model)
 	}
 }
 
@@ -442,7 +442,7 @@ func TestConfigCommentsKeys(t *testing.T) {
 	requiredKeys := []string{
 		"providers.claude.binary", "providers.claude.model", "providers.claude.flags",
 		"providers.codex.binary", "providers.codex.model", "providers.codex.flags",
-		"providers.gemini.binary", "providers.gemini.model", "providers.gemini.flags",
+		"providers.agy.binary", "providers.agy.model", "providers.agy.flags",
 		"config_source.type", "config_source.path",
 		"council.chair", "council.parallel", "council.rounds",
 		"timeout", "session_timeout",

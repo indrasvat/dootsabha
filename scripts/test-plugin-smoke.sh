@@ -44,7 +44,7 @@ fi
 # ── Test: Provider plugin binaries exist (if built) ─────────────────────────
 PLUGIN_BIN="$ROOT_DIR/plugins/bin"
 if [[ -d "$PLUGIN_BIN" ]]; then
-    for name in claude-provider codex-provider gemini-provider; do
+    for name in claude-provider codex-provider agy-provider; do
         if [[ -x "$PLUGIN_BIN/$name" ]]; then
             pass "provider plugin $name exists and is executable"
         else

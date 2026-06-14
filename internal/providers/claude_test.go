@@ -260,7 +260,7 @@ func TestVersionParsing(t *testing.T) {
 	}{
 		{"claude format", "2.1.63 (Claude Code)\n", "2.1.63"},
 		{"codex format", "codex-cli 0.106.0\n", "0.106.0"},
-		{"gemini format", "0.30.0\n", "0.30.0"},
+		{"agy format", "1.0.8\n", "1.0.8"},
 		{"bare version", "1.2.3\n", "1.2.3"},
 		{"no digit token", "foobar\n", "foobar"},
 	}

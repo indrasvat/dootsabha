@@ -13,7 +13,7 @@ service Strategy {
 
 // AgentConfig identifies an agent and its invocation settings.
 message AgentConfig {
-  // Agent name (e.g., "claude", "codex", "gemini").
+  // Agent name (e.g., "claude", "codex", "agy").
   string name = 1;
 
   // Override model for this agent (empty = use provider default).

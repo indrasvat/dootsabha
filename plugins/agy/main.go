@@ -1,5 +1,5 @@
-// Gemini provider plugin binary.
-// Wraps the existing GeminiProvider and serves it via gRPC.
+// Antigravity (agy) provider plugin binary.
+// Wraps the existing AgyProvider and serves it via gRPC.
 package main
 
 import (
@@ -14,24 +14,24 @@ import (
 	gen "github.com/indrasvat/dootsabha/proto/gen"
 )
 
-// geminiPluginServer wraps GeminiProvider and implements plugin.ProviderPlugin.
-type geminiPluginServer struct {
-	provider *providers.GeminiProvider
+// agyPluginServer wraps AgyProvider and implements plugin.ProviderPlugin.
+type agyPluginServer struct {
+	provider *providers.AgyProvider
 }
 
-func newGeminiPluginServer() *geminiPluginServer {
+func newAgyPluginServer() *agyPluginServer {
 	cfg, err := core.LoadConfig("")
 	if err != nil {
 		cfg = &core.Config{
 			Providers: map[string]core.ProviderConfig{},
 		}
 	}
-	return &geminiPluginServer{
-		provider: providers.NewGeminiProvider(cfg, &core.SubprocessRunner{}),
+	return &agyPluginServer{
+		provider: providers.NewAgyProvider(cfg, &core.SubprocessRunner{}),
 	}
 }
 
-func (s *geminiPluginServer) Invoke(ctx context.Context, req *gen.InvokeRequest) (*gen.InvokeResponse, error) {
+func (s *agyPluginServer) Invoke(ctx context.Context, req *gen.InvokeRequest) (*gen.InvokeResponse, error) {
 	if req.Prompt == "" {
 		return nil, fmt.Errorf("prompt is required")
 	}
@@ -60,11 +60,11 @@ func (s *geminiPluginServer) Invoke(ctx context.Context, req *gen.InvokeRequest)
 	}, nil
 }
 
-func (s *geminiPluginServer) Cancel(_ context.Context, _ *gen.CancelRequest) (*gen.CancelResponse, error) {
+func (s *agyPluginServer) Cancel(_ context.Context, _ *gen.CancelRequest) (*gen.CancelResponse, error) {
 	return &gen.CancelResponse{Cancelled: false}, nil
 }
 
-func (s *geminiPluginServer) HealthCheck(ctx context.Context) (*gen.HealthCheckResponse, error) {
+func (s *agyPluginServer) HealthCheck(ctx context.Context) (*gen.HealthCheckResponse, error) {
 	status, err := s.provider.HealthCheck(ctx)
 	if err != nil {
 		return nil, err
@@ -78,13 +78,22 @@ func (s *geminiPluginServer) HealthCheck(ctx context.Context) (*gen.HealthCheckR
 	}, nil
 }
 
-func (s *geminiPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesResponse, error) {
+func (s *agyPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesResponse, error) {
 	return &gen.CapabilitiesResponse{
-		SupportsJson:      true,
+		SupportsJson:      false,
 		SupportsStreaming: false,
-		SupportedModels:   []string{"gemini-3.1-pro-preview", "gemini-3-flash-preview", "gemini-2.5-flash"},
-		DefaultModel:      "gemini-3.1-pro-preview",
-		MaxContextTokens:  1000000,
+		SupportedModels: []string{
+			"Gemini 3.5 Flash (Low)",
+			"Gemini 3.5 Flash (Medium)",
+			"Gemini 3.5 Flash (High)",
+			"Gemini 3.1 Pro (Low)",
+			"Gemini 3.1 Pro (High)",
+			"Claude Sonnet 4.6 (Thinking)",
+			"Claude Opus 4.6 (Thinking)",
+			"GPT-OSS 120B (Medium)",
+		},
+		DefaultModel:     "Gemini 3.5 Flash (High)",
+		MaxContextTokens: 1000000,
 	}, nil
 }
 
@@ -92,7 +101,7 @@ func main() {
 	goplugin.Serve(&goplugin.ServeConfig{
 		HandshakeConfig: plugin.ProviderHandshake,
 		Plugins: map[string]goplugin.Plugin{
-			"provider": &plugin.ProviderGRPCPlugin{Impl: newGeminiPluginServer()},
+			"provider": &plugin.ProviderGRPCPlugin{Impl: newAgyPluginServer()},
 		},
 		GRPCServer: goplugin.DefaultGRPCServer,
 	})

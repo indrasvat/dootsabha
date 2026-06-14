@@ -74,8 +74,8 @@ func DefaultContextFile(sessionID string, isTTY bool, termWidth int) ContextFile
 		Workspace: wd,
 		Providers: map[string]ContextProvider{
 			"claude": {Healthy: true, Model: "claude-opus-4-8"},
-			"codex":  {Healthy: true, Model: "o4-mini"},
-			"gemini": {Healthy: true, Model: "gemini-2.5-flash"},
+			"codex":  {Healthy: true, Model: "gpt-5.5"},
+			"agy":    {Healthy: true, Model: "Gemini 3.5 Flash (High)"},
 		},
 		Capabilities: ContextCapabilities{
 			Council: true,

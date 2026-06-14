@@ -26,7 +26,7 @@ func TestCommandHeader_Piped(t *testing.T) {
 
 func TestCommandHeader_TTY_NoColor(t *testing.T) {
 	rc := &output.RenderContext{IsTTY: true, HasColor: false, Width: 60}
-	got := output.CommandHeader(rc, "Council", "agents: claude, codex, gemini")
+	got := output.CommandHeader(rc, "Council", "agents: claude, codex, agy")
 	lines := strings.Split(got, "\n")
 	if len(lines) != 3 {
 		t.Fatalf("TTY header should have 3 lines, got %d", len(lines))
@@ -71,14 +71,14 @@ func TestCommandHeader_Alignment(t *testing.T) {
 		info  string
 		width int
 	}{
-		{"Refine", "author: claude · reviewers: codex, gemini", 60},
-		{"Council", "agents: claude, codex, gemini · chair: claude", 60},
+		{"Refine", "author: claude · reviewers: codex, agy", 60},
+		{"Council", "agents: claude, codex, agy · chair: claude", 60},
 		{"Review", "author: codex · reviewer: claude", 60},
 		{"R", "a", 40}, // minimal
 		{"LongCommandName", "some info here that is moderately long", 60},
-		{"X", "this info is extremely long and will exceed the box width limit easily", 40},                // overflow → truncated
-		{"Council", "agents: claude, codex, gemini · chair: claude", 80},                                   // wide terminal
-		{"Refine", "author: claude · reviewers: codex, gemini, claude, gemini, codex, claude, gemini", 60}, // many reviewers
+		{"X", "this info is extremely long and will exceed the box width limit easily", 40},       // overflow → truncated
+		{"Council", "agents: claude, codex, agy · chair: claude", 80},                             // wide terminal
+		{"Refine", "author: claude · reviewers: codex, agy, claude, agy, codex, claude, agy", 60}, // many reviewers
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

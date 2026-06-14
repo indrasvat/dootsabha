@@ -20,9 +20,9 @@ var ConfigComments = map[string]string{
 	"providers.codex.binary":  "CLI executable name (must be on $PATH)",
 	"providers.codex.model":   "Default model for codex invocations",
 	"providers.codex.flags":   "Flags passed to every codex invocation",
-	"providers.gemini.binary": "CLI executable name (must be on $PATH)",
-	"providers.gemini.model":  "Default model for gemini invocations",
-	"providers.gemini.flags":  "Flags passed to every gemini invocation",
+	"providers.agy.binary":    "CLI executable name (must be on $PATH)",
+	"providers.agy.model":     "Default model for agy (Antigravity) invocations",
+	"providers.agy.flags":     "Flags passed to every agy invocation",
 	"config_source.type":      "Where the base configuration was loaded from",
 	"config_source.path":      "Configuration file path when type is file",
 	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
@@ -119,9 +119,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.codex.binary", "codex")
 	v.SetDefault("providers.codex.model", "gpt-5.5")
 	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
-	v.SetDefault("providers.gemini.binary", "gemini")
-	v.SetDefault("providers.gemini.model", "gemini-3.1-pro-preview")
-	v.SetDefault("providers.gemini.flags", []string{"--approval-mode", "yolo"})
+	v.SetDefault("providers.agy.binary", "agy")
+	v.SetDefault("providers.agy.model", "Gemini 3.5 Flash (High)")
+	v.SetDefault("providers.agy.flags", []string{"--dangerously-skip-permissions"})
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)
 	v.SetDefault("council.rounds", 1)
@@ -130,7 +130,7 @@ func setDefaults(v *viper.Viper) {
 }
 
 // defaultProviderNames are the three built-in AI providers.
-var defaultProviderNames = []string{"claude", "codex", "gemini"}
+var defaultProviderNames = []string{"claude", "codex", "agy"}
 
 // collectProviderNames returns all provider names: built-ins plus any from config file.
 func collectProviderNames(v *viper.Viper) []string {

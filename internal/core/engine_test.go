@@ -62,7 +62,7 @@ func TestDispatchAllSucceed(t *testing.T) {
 	agents := []core.Agent{
 		okAgent("claude", "c-out"),
 		okAgent("codex", "x-out"),
-		okAgent("gemini", "g-out"),
+		okAgent("agy", "g-out"),
 	}
 	eng := core.NewEngine(agents, defaultCfg())
 
@@ -87,7 +87,7 @@ func TestDispatchOneFailure(t *testing.T) {
 	agents := []core.Agent{
 		okAgent("claude", "c-out"),
 		failAgent("codex"),
-		okAgent("gemini", "g-out"),
+		okAgent("agy", "g-out"),
 	}
 	eng := core.NewEngine(agents, defaultCfg())
 

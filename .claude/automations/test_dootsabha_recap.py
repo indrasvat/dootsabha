@@ -314,13 +314,13 @@ async def main(connection):
         screen_text = "\n".join(lines).lower()
         has_claude = "claude" in screen_text
         has_codex = "codex" in screen_text
-        has_gemini = "gemini" in screen_text
+        has_agy = "agy" in screen_text
 
-        if all([has_claude, has_codex, has_gemini]):
+        if all([has_claude, has_codex, has_agy]):
             log_result(
                 "recap_provider_matrix",
                 "PASS",
-                "All 3 providers visible: claude, codex, gemini",
+                "All 3 providers visible: claude, codex, agy",
             )
         else:
             missing = []
@@ -328,8 +328,8 @@ async def main(connection):
                 missing.append("claude")
             if not has_codex:
                 missing.append("codex")
-            if not has_gemini:
-                missing.append("gemini")
+            if not has_agy:
+                missing.append("agy")
             log_result(
                 "recap_provider_matrix", "FAIL", f"Missing providers: {missing}"
             )

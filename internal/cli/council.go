@@ -231,9 +231,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 	}
 
 	f := cmd.Flags()
-	defaultAgents := "claude,codex,gemini"
+	defaultAgents := "claude,codex,agy"
 	if core.InsideClaude {
-		defaultAgents = "codex,gemini" // Claude is already the host session
+		defaultAgents = "codex,agy" // Claude is already the host session
 	}
 	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names")
 	f.String("dootas", "", "Alias for --agents (दूत)")

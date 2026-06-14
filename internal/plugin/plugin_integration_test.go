@@ -329,7 +329,7 @@ func TestStrategyPluginExecuteRoundtrip(t *testing.T) {
 		Agents: []*gen.AgentConfig{
 			{Name: "claude", Model: "sonnet-4"},
 			{Name: "codex", Model: "o4-mini"},
-			{Name: "gemini", Model: "gemini-2.5-pro"},
+			{Name: "agy", Model: "agy-2.5-pro"},
 		},
 		Config: &gen.StrategyConfig{
 			Parallel:     true,
@@ -535,7 +535,7 @@ func TestHookPluginPostSessionRecords(t *testing.T) {
 			SessionSummary: &gen.SessionSummary{
 				SessionId:    "sess-001",
 				Strategy:     "council",
-				Providers:    []string{"claude", "codex", "gemini"},
+				Providers:    []string{"claude", "codex", "agy"},
 				TotalCostUsd: 0.015,
 				TotalTokens:  5000,
 				DurationMs:   3200,

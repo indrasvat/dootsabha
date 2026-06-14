@@ -54,24 +54,21 @@ echo '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","tex
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}'
 ```
 
-**`testdata/mock-providers/mock-gemini`:**
+**`testdata/mock-providers/mock-agy`:** (plain-text print mode — no JSON, no tokens/cost/session)
 ```bash
 #!/usr/bin/env bash
+# Simulates agy (Antigravity CLI) for smoke tests — print mode only, no API calls
 set -euo pipefail
-PROMPT="" FORMAT=""
+PROMPT=""
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --yolo) shift ;;
+    --dangerously-skip-permissions) shift ;;
     -p|--prompt) PROMPT="$2"; shift 2 ;;
-    --output-format) FORMAT="$2"; shift 2 ;;
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
-if [ "$FORMAT" = "json" ]; then
-  echo '{"result":"Mock: '"$PROMPT"'","model":"gemini-3.1-pro-preview","duration_ms":120}'
-else
-  echo "Mock response to: $PROMPT"
-fi
+# agy -p is plain text only: no JSON, no token counts, no cost, no session ID
+echo "Mock response to: $PROMPT"
 ```
 
 Mock providers are activated via config override: `DOOTSABHA_CLAUDE_BIN=testdata/mock-providers/mock-claude` etc.

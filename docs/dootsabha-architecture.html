@@ -263,7 +263,7 @@ code {
 }
 .provider-dot.claude { background: var(--accent-gold); }
 .provider-dot.codex { background: var(--accent-green); }
-.provider-dot.gemini { background: var(--accent-blue); }
+.provider-dot.agy { background: var(--accent-blue); }
 
 /* ── CALLOUT ── */
 .callout {
@@ -360,10 +360,22 @@ code {
   <h1>दूतसभा</h1>
   <div class="subtitle">dūtasabhā — The Council of Agents</div>
   <p class="tagline">
-    A plugin-extensible Go CLI orchestrating coding agents (Claude Code, Codex CLI, Gemini CLI)
+    A plugin-extensible Go CLI orchestrating coding agents (Claude Code, Codex CLI, Antigravity CLI)
     through council-mode deliberation, peer review, and synthesis.
   </p>
   <span class="version-badge">v0.1.0 · Blueprint · Feb 2026</span>
+</div>
+
+<!-- ═══════════════════════════ MIGRATION NOTICE ═══════════════════════════ -->
+<div class="callout callout-warn">
+  <strong>⚠ Provider migration: Gemini CLI → agy (Antigravity CLI)</strong>
+  Google sunset the <strong>Gemini CLI</strong> on <strong>2026-06-18</strong>. Its slot in the
+  council is now filled by <code>agy</code>, Google's official Go-built <strong>Antigravity CLI</strong>
+  replacement (binary <code>agy</code>, v1.0.8, default model <code>Gemini 3.5 Flash (High)</code>).
+  Unlike the old CLI, <code>agy</code> runs in plain-text print mode (<code>agy -p "&lt;prompt&gt;"</code>)
+  with <code>--dangerously-skip-permissions</code> — it emits <em>no</em> JSON, so it reports no token
+  counts, cost, or session id. References below reflect the <code>agy</code> provider; surviving
+  mentions of the Gemini CLI are historical.
 </div>
 
 <!-- ═══════════════════════════ TABLE OF CONTENTS ═══════════════════════════ -->
@@ -415,7 +427,7 @@ graph TB
         direction TB
         P1["claude-provider<br/><small>Claude Code CLI</small>"]
         P2["codex-provider<br/><small>Codex CLI</small>"]
-        P3["gemini-provider<br/><small>Gemini CLI</small>"]
+        P3["agy-provider<br/><small>Antigravity CLI</small>"]
         P4["council-strategy<br/><small>dispatch → review → synth</small>"]
         P5["output-formatter<br/><small>JSON · table · markdown</small>"]
         P7["lifecycle-hook<br/><small>pre/post middleware</small>"]
@@ -500,7 +512,7 @@ graph TB
 <pre>
 // ─── Provider Plugin ─── The primary interface for coding agents.
 type Provider interface {
-    // Name returns the friendly name (e.g., "claude", "codex", "gemini").
+    // Name returns the friendly name (e.g., "claude", "codex", "agy").
     Name() string
 
     // Capabilities returns supported features (streaming, JSON output, etc.).
@@ -682,7 +694,7 @@ flowchart LR
   <td><span class="badge badge-gold">Provider</span></td>
   <td><code>Provider</code></td>
   <td>gRPC</td>
-  <td>claude, codex, gemini</td>
+  <td>claude, codex, agy</td>
   <td>Wraps a coding agent CLI — invoke, parse output, health check</td>
 </tr>
 <tr>
@@ -874,13 +886,13 @@ flowchart LR
         "ephemeral": true,
         "skip_git_check": true
       },
-      "gemini": {
-        "model": "gemini-3-pro",
-        "approval_mode": "yolo"
+      "agy": {
+        "model": "Gemini 3.5 Flash (High)",
+        "skip_permissions": true
       }
     },
     "strategy": {
-      "council": { "agents": ["claude", "codex", "gemini"], "chair": "claude", "rounds": 1 },
+      "council": { "agents": ["claude", "codex", "agy"], "chair": "claude", "rounds": 1 },
       "consult": { "default_agent": "claude" }
     }
   },
@@ -913,17 +925,17 @@ flowchart LR
         "max_context_tokens": 256000
       }
     },
-    "gemini": {
+    "agy": {
       "healthy": false,
-      "cli_path": "/usr/local/bin/gemini",
-      "cli_version": "0.18.1",
+      "cli_path": "/usr/local/bin/agy",
+      "cli_version": "1.0.8",
       "auth_valid": false,
-      "error": "OAuth token expired — run: gemini auth login",
+      "error": "OAuth token expired — run: agy auth login",
       "capabilities": {
-        "supports_json": true,
-        "supports_streaming": true,
-        "supported_models": ["gemini-3-pro", "gemini-2.5-flash"],
-        "default_model": "gemini-3-pro",
+        "supports_json": false,
+        "supports_streaming": false,
+        "supported_models": ["Gemini 3.5 Flash (High)", "Gemini 3.1 Pro (High)"],
+        "default_model": "Gemini 3.5 Flash (High)",
         "max_context_tokens": 2000000
       }
     }
@@ -958,7 +970,7 @@ flowchart LR
   // ─── Installed extensions &amp; gRPC plugins ───
   "extensions": ["bench", "cost", "tui"],
   "plugins": {
-    "providers": ["claude", "codex", "gemini"],
+    "providers": ["claude", "codex", "agy"],
     "strategies": ["council", "consult", "solo"],
     "formatters": ["json", "table", "markdown"],
     "hooks": ["cost-guard"]
@@ -1115,7 +1127,7 @@ sequenceDiagram
   <td><code>council</code></td>
   <td><code>sabha</code></td>
   <td>All 3 agents deliberate → peer review → synthesized answer</td>
-  <td>claude + codex + gemini, majority synthesis</td>
+  <td>claude + codex + agy, majority synthesis</td>
 </tr>
 <tr>
   <td><code>consult</code></td>
@@ -1220,7 +1232,7 @@ sequenceDiagram
   <td><code>--dootas</code></td>
   <td><span class="badge badge-gold">council</span></td>
   <td>[]string</td>
-  <td><code>claude,codex,gemini</code></td>
+  <td><code>claude,codex,agy</code></td>
   <td>Agents to include in council</td>
 </tr>
 <tr>
@@ -1410,31 +1422,29 @@ sequenceDiagram
   --skip-git-repo-check</pre>
 </div>
 
-<!-- GEMINI -->
+<!-- AGY -->
 <div class="card">
   <div class="provider-header">
-    <span class="provider-dot gemini"></span>
-    <h4 style="margin:0;">Gemini CLI <span class="badge badge-blue">Google</span></h4>
+    <span class="provider-dot agy"></span>
+    <h4 style="margin:0;">Antigravity CLI (agy) <span class="badge badge-blue">Google</span></h4>
   </div>
   <div class="table-wrap" style="margin-top:12px;">
   <table>
-  <tr><td><strong>Default Model</strong></td><td><code>gemini-3-pro</code></td></tr>
-  <tr><td><strong>Available</strong></td><td><code>gemini-3-pro</code>, <code>gemini-2.5-flash</code></td></tr>
-  <tr><td><strong>YOLO Flag</strong></td><td><code>--approval-mode yolo</code></td></tr>
-  <tr><td><strong>Non-interactive</strong></td><td><code>gemini "prompt"</code> (positional arg)</td></tr>
-  <tr><td><strong>JSON Output</strong></td><td><code>--output-format json</code></td></tr>
-  <tr><td><strong>JSON Shape</strong></td><td><code>{"response","stats":{"models","tools","files"}}</code></td></tr>
-  <tr><td><strong>Tool Control</strong></td><td><code>--allowed-tools "ShellTool(...)"</code></td></tr>
-  <tr><td><strong>Model Flag</strong></td><td><code>--model gemini-3-pro</code></td></tr>
+  <tr><td><strong>Binary / Version</strong></td><td><code>agy</code> · <code>1.0.8</code></td></tr>
+  <tr><td><strong>Default Model</strong></td><td><code>Gemini 3.5 Flash (High)</code></td></tr>
+  <tr><td><strong>Available</strong></td><td><code>Gemini 3.5 Flash (High)</code>, <code>Gemini 3.1 Pro (High)</code></td></tr>
+  <tr><td><strong>YOLO Flag</strong></td><td><code>--dangerously-skip-permissions</code></td></tr>
+  <tr><td><strong>Non-interactive</strong></td><td><code>agy -p "prompt"</code> (print mode)</td></tr>
+  <tr><td><strong>Output</strong></td><td>Plain text on stdout — <strong>no JSON</strong></td></tr>
+  <tr><td><strong>Usage Data</strong></td><td>None — no tokens, cost, or session id</td></tr>
   </table>
   </div>
-  <pre>gemini "prompt" \
-  --output-format json \
-  --model gemini-3-pro \
-  --approval-mode yolo</pre>
+  <pre>agy -p "prompt" \
+  --dangerously-skip-permissions</pre>
   <div class="callout callout-warn" style="margin-top:12px;">
-    <strong>Gotcha:</strong> <code>--yolo</code> shorthand has known bug (#13561). Always use <code>--approval-mode yolo</code>.
-    Positional prompt (not <code>-p</code>) — the <code>-p</code> flag was deprecated in v0.17+.
+    <strong>Gotcha:</strong> <code>agy</code> only supports plain-text print mode — it emits no JSON,
+    so the provider captures trimmed stdout as the response content with <strong>zero usage data</strong>
+    (token counts, cost, and session id are <code>0</code>/empty). claude and codex still report full usage.
   </div>
 </div>
 </div>
@@ -1450,8 +1460,8 @@ providers:
     allowed_tools: ["Bash(git *)"]       # Restrict tool access
   codex:
     sandbox: "workspace-write"           # Downgrade from full access
-  gemini:
-    approval_mode: "auto"                # Downgrade from yolo
+  agy:
+    skip_permissions: false              # Reverts to interactive approvals
 </pre>
 </div>
 </section>
@@ -1535,7 +1545,7 @@ sequenceDiagram
     participant C as Core Engine
     participant CL as Claude Plugin
     participant CX as Codex Plugin
-    participant GM as Gemini Plugin
+    participant GM as Agy Plugin
     participant CH as Chair (Claude)
 
     U->>C: dootsabha council "refactor auth module"
@@ -1549,7 +1559,7 @@ sequenceDiagram
         activate CL
         C->>CX: Invoke(prompt, json, gpt-5.3-codex)
         activate CX
-        C->>GM: Invoke(prompt, json, gemini-3-pro)
+        C->>GM: Invoke(prompt, text, Gemini 3.5 Flash High)
         activate GM
     end
 
@@ -1557,15 +1567,15 @@ sequenceDiagram
     deactivate CL
     CX-->>C: InvokeResponse (codex)
     deactivate CX
-    GM-->>C: InvokeResponse (gemini)
+    GM-->>C: InvokeResponse (agy)
     deactivate GM
 
     Note over C: ═══ Stage 2: Peer Review ═══
 
     par Cross-Review
-        C->>CL: Review(codex_output + gemini_output)
+        C->>CL: Review(codex_output + agy_output)
         activate CL
-        C->>CX: Review(claude_output + gemini_output)
+        C->>CX: Review(claude_output + agy_output)
         activate CX
         C->>GM: Review(claude_output + codex_output)
         activate GM
@@ -1758,7 +1768,7 @@ slog.Info("agent invoked",
 <tr>
   <td><strong>JSON Streaming</strong></td>
   <td><code>encoding/json</code> (stdlib)</td>
-  <td>Decoder for JSONL (Codex). Standard marshal/unmarshal for Claude/Gemini single-object responses.</td>
+  <td>Decoder for JSONL (Codex). Standard marshal/unmarshal for Claude single-object responses. (agy returns plain text — no JSON parsing.)</td>
 </tr>
 <tr>
   <td><strong>Retry</strong></td>
@@ -1819,9 +1829,9 @@ dootsabha/
 │   ├── codex/
 │   │   ├── main.go
 │   │   └── provider.go             # Codex CLI provider impl
-│   ├── gemini/
+│   ├── agy/
 │   │   ├── main.go
-│   │   └── provider.go             # Gemini CLI provider impl
+│   │   └── provider.go             # Antigravity CLI (agy) provider impl
 │   └── council-strategy/
 │       ├── main.go
 │       └── strategy.go             # 3-stage council strategy impl
@@ -2118,7 +2128,7 @@ dootsabha council --json "implement retry logic" | jq .
 dootsabha council --agents claude,codex "only need two opinions"
 
 # Change the synthesis chair
-dootsabha sabha --adhyaksha gemini "want gemini to synthesize"
+dootsabha sabha --adhyaksha agy "want agy to synthesize"
 </pre>
 
 <h3>Agent / CI Usage</h3>
@@ -2218,16 +2228,16 @@ providers:
     extra_args: []
     env: {}
 
-  gemini:
-    model: gemini-3-pro          # Default model
-    approval_mode: yolo          # --approval-mode yolo
+  agy:
+    model: Gemini 3.5 Flash (High)   # Default model
+    skip_permissions: true           # --dangerously-skip-permissions
     extra_args: []
     env: {}
 
 # Strategy defaults
 strategy:
   council:
-    agents: [claude, codex, gemini]
+    agents: [claude, codex, agy]
     chair: claude                # Synthesizer
     rounds: 1                    # Deliberation rounds
   consult:
