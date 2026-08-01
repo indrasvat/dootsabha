@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Short: "dootsabha (दूतसभा) — AI council orchestrator",
 	Long: `दूतसभा (dootsabha) — Council of AI Messengers
 
-Orchestrate multiple AI coding agents (Claude, Codex, Antigravity) in
+Orchestrate multiple AI coding agents (Claude, Codex, Antigravity, Grok) in
 council-mode deliberation, peer review, and synthesis.
 
 दूतसभा — AI दूतों की सभा (Council of AI Messengers)

@@ -23,6 +23,9 @@ var ConfigComments = map[string]string{
 	"providers.agy.binary":    "CLI executable name (must be on $PATH)",
 	"providers.agy.model":     "Default model for agy (Antigravity) invocations",
 	"providers.agy.flags":     "Flags passed to every agy invocation",
+	"providers.grok.binary":   "CLI executable name (must be on $PATH)",
+	"providers.grok.model":    "Default model for grok (xAI) invocations",
+	"providers.grok.flags":    "Flags passed to every grok invocation (pinned flags are enforced by the provider)",
 	"config_source.type":      "Where the base configuration was loaded from",
 	"config_source.path":      "Configuration file path when type is file",
 	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
@@ -122,6 +125,12 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.agy.binary", "agy")
 	v.SetDefault("providers.agy.model", "Gemini 3.5 Flash (High)")
 	v.SetDefault("providers.agy.flags", []string{"--dangerously-skip-permissions"})
+	v.SetDefault("providers.grok.binary", "grok")
+	v.SetDefault("providers.grok.model", "grok-4.5")
+	// Correctness-critical flags (--output-format, --sandbox, --permission-mode, -m,
+	// --no-plan) are pinned by the provider and stripped from this list, so only
+	// user-tunable settings belong here.
+	v.SetDefault("providers.grok.flags", []string{"--reasoning-effort", "high"})
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)
 	v.SetDefault("council.rounds", 1)
@@ -129,8 +138,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("session_timeout", "30m")
 }
 
-// defaultProviderNames are the three built-in AI providers.
-var defaultProviderNames = []string{"claude", "codex", "agy"}
+// defaultProviderNames are the built-in AI providers. Membership here makes a
+// provider *known* (so `status` lists it and `--agent <name>` resolves); it does
+// NOT enrol it in any default pipeline — council/refine/review defaults are set
+// independently in the CLI layer.
+var defaultProviderNames = []string{"claude", "codex", "agy", "grok"}
 
 // collectProviderNames returns all provider names: built-ins plus any from config file.
 func collectProviderNames(v *viper.Viper) []string {

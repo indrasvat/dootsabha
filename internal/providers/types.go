@@ -1,5 +1,5 @@
 // Package providers defines the Provider interface and shared types for
-// all दूतसभा agent backends (Claude, Codex, Antigravity).
+// all दूतसभा agent backends (Claude, Codex, Antigravity, Grok).
 package providers
 
 import (

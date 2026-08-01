@@ -71,6 +71,33 @@ done
 echo "Mock response to: $PROMPT"
 ```
 
+**`testdata/mock-providers/mock-grok`:** (streaming-messages-json NDJSON)
+```bash
+#!/usr/bin/env bash
+# Simulates the xAI Grok CLI — emits the NDJSON stream, not a single object.
+set -euo pipefail
+PROMPT=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --version) echo "grok 0.2.118 (mock) [stable]"; exit 0 ;;
+    -p|--single) PROMPT="$2"; shift 2 ;;
+    --output-format|-m|--model|--reasoning-effort|--effort) shift 2 ;;
+    --sandbox|--permission-mode|--max-turns|--cwd|--prompt-file) shift 2 ;;
+    --always-approve|--no-plan|--no-subagents|--no-auto-update) shift ;;
+    *) PROMPT="${PROMPT:-$1}"; shift ;;
+  esac
+done
+# Emits a system line, an assistant preamble block that is NOT the answer, then
+# the final result event. The preamble proves dootsabha reads `result` rather
+# than concatenating assistant text (grok's `--output-format json` .text trap).
+```
+
+> **Why the preamble block matters:** grok's `--output-format json` merges every
+> assistant text block into `.text` with no separator, so tool-call preambles leak
+> into the answer. dootsabha uses `--output-format streaming-messages-json` and
+> reads the last `type=="result"` line. `mock-grok` reproduces that shape so the
+> L3 smoke test would catch a regression back to `.text` parsing.
+
 Mock providers are activated via config override: `DOOTSABHA_CLAUDE_BIN=testdata/mock-providers/mock-claude` etc.
 
 ---

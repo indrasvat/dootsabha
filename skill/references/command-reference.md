@@ -2,6 +2,34 @@
 
 Complete flag and output schema reference for all दूतसभा commands.
 
+## Provider Matrix
+
+| Provider | Binary | Default model | Tokens | Cost | Session ID | In default council? |
+|---|---|---|---|---|---|---|
+| `claude` | `claude` | `claude-opus-4-8` | ✅ | ✅ | ✅ | ✅ (standalone only) |
+| `codex` | `codex` | `gpt-5.5` | ✅ | — | — | ✅ |
+| `agy` | `agy` | `Gemini 3.5 Flash (High)` | — | — | — | ✅ |
+| `grok` | `grok` | `grok-4.5` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
+
+**`agy`** runs in plain-text print mode (`agy -p`) and emits no usage data, so its
+`cost_usd`, `tokens_in`, `tokens_out` and `session_id` fields are `0`/empty.
+
+**`grok`** (xAI Grok CLI) is never selected automatically — pass `--agent grok`,
+`--agents claude,codex,grok`, `--chair grok`, or `--reviewers codex,grok`.
+Notes when using it:
+
+- Reasoning effort defaults to `high`; override via `providers.grok.flags`
+  (`--reasoning-effort high|medium|low`). `high` runs ~1.6× slower than `low` for
+  better prioritisation rather than more findings.
+- A real review takes ~105 s (p50), comfortably inside the 5 m default timeout.
+- dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
+  `$HOME`, so it cannot write files and does not inherit the caller's Claude Code
+  skills, hooks, MCP servers, or `CLAUDE.md`.
+- Correctness-critical flags (`--output-format`, `--sandbox`, `--permission-mode`,
+  `-m`, `--no-plan`) are pinned by the provider and stripped from user config.
+
+---
+
 ## Global Flags
 
 | Flag | Short | Default | Description |
@@ -100,7 +128,7 @@ dootsabha consult [flags] --agent <name> "<prompt>"
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--agent` | `-a` | (required) | Agent name: claude, codex, or agy |
+| `--agent` | `-a` | (required) | Agent name: claude, codex, agy, or grok |
 | `--model` | | from config | Override model for this invocation |
 | `--max-turns` | | `0` (no limit) | Maximum agent turns |
 

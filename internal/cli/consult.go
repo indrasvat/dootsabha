@@ -102,7 +102,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 	}
 
 	f := cmd.Flags()
-	f.StringVarP(&agent, "agent", "a", "", "Agent to query: claude, codex, agy")
+	f.StringVarP(&agent, "agent", "a", "", "Agent to query: claude, codex, agy, grok")
 	f.String("doota", "", "Alias for --agent (दूत)")
 	_ = cmd.Flags().MarkHidden("doota")
 	f.StringVar(&model, "model", "", "Override model for this invocation")
@@ -122,8 +122,10 @@ func getProvider(name string, cfg *core.Config, runner providers.Runner) (provid
 		return providers.NewCodexProvider(cfg, runner), nil
 	case "agy":
 		return providers.NewAgyProvider(cfg, runner), nil
+	case "grok":
+		return providers.NewGrokProvider(cfg, runner), nil
 	default:
-		return nil, fmt.Errorf("unknown provider: %q — valid values: claude, codex, agy", name)
+		return nil, fmt.Errorf("unknown provider: %q — valid values: claude, codex, agy, grok", name)
 	}
 }
 
@@ -136,6 +138,8 @@ func providerColor(name string) lipgloss.Color {
 		return output.CodexColor
 	case "agy":
 		return output.AgyColor
+	case "grok":
+		return output.GrokColor
 	default:
 		return output.MutedColor
 	}

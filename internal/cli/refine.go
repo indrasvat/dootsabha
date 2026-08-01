@@ -278,10 +278,10 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&author, "author", "claude", "Agent that produces and refines content")
+	f.StringVar(&author, "author", "claude", "Agent that produces and refines content (claude, codex, agy, grok)")
 	f.String("kartaa", "", "Alias for --author (कर्ता)")
 	_ = f.MarkHidden("kartaa")
-	f.StringVar(&reviewersRaw, "reviewers", "codex,agy", "Ordered comma-separated reviewer list")
+	f.StringVar(&reviewersRaw, "reviewers", "codex,agy", "Ordered comma-separated reviewer list (claude, codex, agy, grok)")
 	f.String("pareekshak", "", "Alias for --reviewers (परीक्षक)")
 	_ = f.MarkHidden("pareekshak")
 	f.BoolVar(&anonymous, "anonymous", true, "Anonymize prompts (reviewer doesn't see author name)")

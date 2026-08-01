@@ -209,6 +209,7 @@ All 4 items addressed in PRD v1.6.
 |------|-------------|--------|-------|
 | 702 | Provider default model refresh | DONE | — |
 | 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
+| 704 | Add xAI Grok CLI as opt-in fourth provider | IN PROGRESS | — |
 
 ### What Works End-to-End (703)
 - Gemini CLI retired (sunset 2026-06-18) → replaced by `agy` (Antigravity CLI) as the 3rd agent

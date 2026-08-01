@@ -16,6 +16,7 @@ fail() { printf "  ✗ %s\n" "$1"; FAIL=$((FAIL+1)); }
 export DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$MOCK_DIR/mock-claude"
 export DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex"
 export DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy"
+export DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok"
 
 echo "Running L5 agent workflow tests..."
 echo "  Binary: $BINARY"
@@ -157,18 +158,18 @@ fi
 echo ""
 echo "--- Status provider coverage ---"
 
-# 5a. status mentions all 3 providers
+# 5a. status mentions all 4 providers
 STATUS_OUT=$("$BINARY" status)
 FOUND=0
-for prov in claude codex agy; do
+for prov in claude codex agy grok; do
   if echo "$STATUS_OUT" | grep -qi "$prov"; then
     FOUND=$((FOUND+1))
   fi
 done
-if [ "$FOUND" -eq 3 ]; then
-  pass "status lists all 3 providers"
+if [ "$FOUND" -eq 4 ]; then
+  pass "status lists all 4 providers"
 else
-  fail "status only lists $FOUND/3 providers"
+  fail "status only lists $FOUND/4 providers"
 fi
 
 # ── Workflow 6: Error produces structured output ─────────────────────────────

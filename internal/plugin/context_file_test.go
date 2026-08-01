@@ -206,8 +206,13 @@ func TestDefaultContextFile(t *testing.T) {
 	if ctx.TermWidth != 120 {
 		t.Errorf("terminal_width = %d", ctx.TermWidth)
 	}
-	if len(ctx.Providers) != 3 {
-		t.Errorf("providers count = %d, want 3", len(ctx.Providers))
+	// claude, codex, agy, grok — grok joined the built-ins in task 704, so
+	// extensions (e.g. dootsabha-recap) see it in the provider matrix.
+	if len(ctx.Providers) != 4 {
+		t.Errorf("providers count = %d, want 4", len(ctx.Providers))
+	}
+	if _, ok := ctx.Providers["grok"]; !ok {
+		t.Error("grok missing from the extension context provider map")
 	}
 	if !ctx.Capabilities.Council {
 		t.Error("council capability should be true")

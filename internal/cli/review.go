@@ -161,10 +161,10 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&author, "author", "codex", "Agent that produces initial output")
+	f.StringVar(&author, "author", "codex", "Agent that produces initial output (claude, codex, agy, grok)")
 	f.String("kartaa", "", "Alias for --author (कर्ता)")
 	_ = f.MarkHidden("kartaa")
-	f.StringVar(&reviewer, "reviewer", "claude", "Agent that reviews the output")
+	f.StringVar(&reviewer, "reviewer", "claude", "Agent that reviews the output (claude, codex, agy, grok)")
 	f.String("pareekshak", "", "Alias for --reviewer (परीक्षक)")
 	_ = f.MarkHidden("pareekshak")
 	f.StringVar(&model, "model", "", "Override model for both agents")

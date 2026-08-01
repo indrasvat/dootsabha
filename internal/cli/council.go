@@ -235,7 +235,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 	if core.InsideClaude {
 		defaultAgents = "codex,agy" // Claude is already the host session
 	}
-	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names")
+	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names (claude, codex, agy, grok)")
 	f.String("dootas", "", "Alias for --agents (दूत)")
 	_ = f.MarkHidden("dootas")
 	f.StringVar(&chair, "chair", "", "Chair agent for synthesis (default: from config)")

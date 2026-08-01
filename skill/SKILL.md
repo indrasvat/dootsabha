@@ -3,7 +3,7 @@ name: dootsabha
 description: >
   Multi-agent AI council orchestrator for coding tasks. Use when you need a
   second opinion from multiple LLMs, want to consult another AI agent (Claude,
-  Codex, Antigravity), do a final review with codex or agy, run a multi-perspective
+  Codex, Antigravity, Grok), do a final review with codex, agy or grok, run a multi-perspective
   code review, get peer review from multiple agents, have another LLM validate
   and review something, identify gaps in a PRD or design, refine output through
   iterative agent feedback, run it by another model, deliberate on a question
@@ -19,10 +19,13 @@ council-mode deliberation, peer review, iterative refinement, and single-agent
 consultation. It produces structured JSON output with exit codes designed for
 agent-to-agent workflows.
 
-> **Provider note:** The third agent is `agy` (Google's Antigravity CLI), which
-> replaced the retired Gemini CLI (sunset 2026-06-18). `agy` runs in plain-text
-> print mode, so its results carry **no token counts or cost** — those JSON fields
-> are `0`/empty for `agy`. `claude` and `codex` report full token/cost data.
+> **Provider note:** `agy` (Google's Antigravity CLI) runs in plain-text print
+> mode, so its results carry **no token counts or cost** — those JSON fields are
+> `0`/empty. `claude`, `codex` and `grok` report token data; `claude` and `grok`
+> also report cost and session IDs. `grok` (xAI) is **opt-in** — select it with
+> `--agent grok` / `--agents …,grok` / `--chair grok`; it is in no default council.
+> See [references/command-reference.md](references/command-reference.md) for the
+> full provider matrix.
 
 **Prerequisite:** `dootsabha` binary on `$PATH` (see [installation](#installation))
 
@@ -32,7 +35,7 @@ agent-to-agent workflows.
 - Do a **final review with codex/agy** — replaces manual `codex exec --yolo` and `agy -p` calls
 - **Validate and review** a PRD, design doc, or implementation — identify gaps across multiple models
 - Run **multi-perspective code review** with peer review and synthesis
-- **Consult a single agent** (Claude, Codex, or Antigravity) with structured output
+- **Consult a single agent** (Claude, Codex, Antigravity, or Grok) with structured output
 - **Refine output** through sequential reviewer feedback and author incorporation
 - **Run it by another model** — quick cross-check without switching terminals
 - **Incorporate findings** from multiple LLMs into a single synthesized answer

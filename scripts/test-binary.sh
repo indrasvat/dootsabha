@@ -84,5 +84,20 @@ else
   fail "mock-agy not found/executable"
 fi
 
+# Test 9: mock-grok works (streaming-messages-json NDJSON)
+if [[ -x "$MOCK_DIR/mock-grok" ]]; then
+  RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.5 \
+    --reasoning-effort high --sandbox read-only --permission-mode bypassPermissions \
+    --always-approve --no-plan --no-subagents --no-auto-update -p "PONG" 2>&1)
+  # The answer must come from the result event, not the assistant preamble block.
+  if echo "$RESULT" | grep -q '"type":"result"' && echo "$RESULT" | grep -q '"result":"Mock response to: PONG"'; then
+    pass "mock-grok emits a parseable result event"
+  else
+    fail "mock-grok output unexpected: $RESULT"
+  fi
+else
+  fail "mock-grok not found/executable"
+fi
+
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

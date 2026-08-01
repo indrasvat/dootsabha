@@ -1,6 +1,6 @@
 # दूतसभा (dootsabha) — Multi-Agent Council
 
-दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy)) through council-mode deliberation, peer review, and synthesis. Use it when you need multi-perspective answers from multiple AI agents.
+दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy), xAI Grok CLI (grok)) through council-mode deliberation, peer review, and synthesis. `grok` is opt-in — select it with `--agent grok` / `--agents …,grok` / `--chair grok`. Use it when you need multi-perspective answers from multiple AI agents.
 
 ## Quick Reference
 

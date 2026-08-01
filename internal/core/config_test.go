@@ -470,8 +470,10 @@ func TestConfigNoFileStillWorks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadConfig with no file: %v", err)
 	}
-	if len(cfg.Providers) != 3 {
-		t.Errorf("providers count = %d, want 3", len(cfg.Providers))
+	// claude, codex, agy, grok — grok joined the built-ins in task 704. Being a
+	// *known* provider is not the same as being in a default pipeline.
+	if len(cfg.Providers) != 4 {
+		t.Errorf("providers count = %d, want 4", len(cfg.Providers))
 	}
 	if cfg.Timeout == 0 {
 		t.Error("timeout should have a default value")
