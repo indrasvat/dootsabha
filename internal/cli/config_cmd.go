@@ -20,10 +20,16 @@ func newConfigCmd() *cobra.Command {
 		Long: `View and manage दूतसभा configuration.
 
 विन्यास (vinyaas) — दूतसभा विन्यास प्रबंधित करें।`,
+		// Without a RunE, a bare `config` (or `config --json`) printed help to
+		// STDOUT and exited 0 — an invocation an agent plausibly makes, and one
+		// `plugin` already handles as a usage error.
 		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: "config requires a subcommand: show or migrate",
+			}
 		},
 	}
 

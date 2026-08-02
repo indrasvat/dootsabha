@@ -66,8 +66,8 @@ fi
 ```bash
 dootsabha council --json "Design review for auth module" > result.json 2>/dev/null
 case $? in
-  0) echo "Full council result"; jq -r '.synthesis.content' result.json ;;
-  5) echo "Partial result — some agents failed"; jq -r '.synthesis.content' result.json ;;
+  0) echo "Full council result"; jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json ;;
+  5) echo "Partial result — some agents failed"; jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json ;;
   4) echo "Timed out — try with fewer agents or longer timeout" ;;
   3) echo "Provider error — check agent health" ;;
   3) echo "All agents failed — nothing usable" ;;
@@ -114,7 +114,7 @@ if [ $exit_code -eq 0 ] || [ $exit_code -eq 5 ]; then
   jq -r '[.dispatch[] | select(.error == null) | .provider] | join(", ")' result.json
 
   # Synthesis is still attempted even with partial results
-  jq -r '.synthesis.content' result.json
+  jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json
 fi
 ```
 

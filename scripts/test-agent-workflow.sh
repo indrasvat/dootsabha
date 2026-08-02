@@ -380,13 +380,21 @@ expect_exit() {
     fail "exit $rc (want $want) — $desc"
   fi
 
-  # Same invocation, plus --json. The code must be identical.
-  local jrc=0
-  "$@" --json >/dev/null 2>&1 || jrc=$?
+  # Same invocation, plus --json: the code must be identical AND stdout must be
+  # exactly one JSON document. Asserting only the code left code x payload
+  # uncrossed — that gap is why an empty stdout with a correct exit code went
+  # unnoticed.
+  local jrc=0 jout
+  jout=$("$@" --json 2>/dev/null) || jrc=$?
   if [ "$jrc" -eq "$want" ]; then
     pass "exit $want — $desc [--json]"
   else
     fail "exit $jrc (want $want) — $desc [--json] — JSON mode disagrees with text mode"
+  fi
+  if printf '%s' "$jout" | one_json; then
+    pass "one JSON document — $desc [--json]"
+  else
+    fail "stdout was not exactly one JSON document — $desc [--json]"
   fi
 }
 
@@ -473,6 +481,76 @@ expect_exit 6 "config missing (council)"      "$BINARY" council "hi" --config /n
 expect_exit 3 "single agent unavailable"      env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok "hi"
 expect_exit 3 "ALL agents failed"             env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x "$BINARY" council "hi" --agents claude,codex
 expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" council "hi" --agents claude,grok
+
+# Exit 5 is the least-covered non-zero code and it changed meaning in three
+# places, so each path gets an explicit case. A stage failing AFTER usable output
+# exists is 5, never 3 — callers follow `rc == 0 || rc == 5` and would otherwise
+# discard content they already paid for.
+FAILN="$(mktemp -t ds-failn)"
+CTR="$(mktemp -t ds-ctr)"
+trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$SCRATCH_HANG" "$FAILN" "$CTR"' EXIT
+# shellcheck disable=SC2016  # $1/$C belong to the generated script
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -ge "${MOCK_OK:-1}" ]; then echo gone >&2; exit 1; fi\necho "{\\"result\\":\\"r\\",\\"session_id\\":\\"s\\",\\"cost_usd\\":0,\\"model\\":\\"m\\",\\"duration_ms\\":1}"\n' > "$FAILN"
+chmod +x "$FAILN"
+
+echo 0 > "$CTR"
+# expect_exit runs each command twice (text, then --json). A counter-backed mock
+# is stateful, so the counter must be reset before EACH invocation or the second
+# run starts mid-sequence and reports a different code.
+expect_exit_stateful() {
+  local want="$1" desc="$2"; shift 2
+  local rc=0 jrc=0 jout
+  echo 0 > "$CTR"
+  "$@" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq "$want" ]; then
+    pass "exit $want — $desc"
+  else
+    fail "exit $rc (want $want) — $desc"
+  fi
+
+  echo 0 > "$CTR"
+  jout=$("$@" --json 2>/dev/null) || jrc=$?
+  if [ "$jrc" -eq "$want" ]; then
+    pass "exit $want — $desc [--json]"
+  else
+    fail "exit $jrc (want $want) — $desc [--json] — JSON mode disagrees with text mode"
+  fi
+
+  if printf '%s' "$jout" | one_json; then
+    pass "one JSON document — $desc [--json]"
+  else
+    fail "stdout was not exactly one JSON document — $desc [--json]"
+  fi
+}
+
+expect_exit_stateful 5 "council: synthesis fails after good dispatch" \
+  env MOCK_OK=1 MOCK_CTR="$CTR" DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$FAILN" \
+  "$BINARY" council "hi" --agents claude --chair claude
+
+expect_exit_stateful 5 "council: multi-round, later round loses all agents" \
+  env MOCK_OK=2 MOCK_CTR="$CTR" DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$FAILN" \
+  "$BINARY" council "hi" --agents claude --chair claude --rounds 2
+
+expect_exit_stateful 3 "council: every agent fails from the start" \
+  env MOCK_OK=0 MOCK_CTR="$CTR" DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$FAILN" \
+  "$BINARY" council "hi" --agents claude --rounds 2
+
+expect_exit 5 "review: reviewer fails, author content usable" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+  "$BINARY" review "hi" --author claude --reviewer grok
+
+expect_exit 3 "review: author fails, nothing to review" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+  "$BINARY" review "hi" --author grok --reviewer claude
+
+expect_exit 5 "refine: reviewer fails" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+  "$BINARY" refine "hi" --author claude --reviewers grok
+
+expect_exit 2 "plugin: unknown subcommand"   "$BINARY" plugin definitely-not-a-subcommand
+expect_exit 2 "plugin inspect: unknown name" "$BINARY" plugin inspect definitely-not-a-plugin
+expect_exit 2 "config: no subcommand"        "$BINARY" config
+expect_exit 0 "config /dev/null is allowed"  "$BINARY" status --config /dev/null
 expect_exit 5 "status degraded"               env DOOTSABHA_PROVIDERS_AGY_BINARY=/x "$BINARY" status
 expect_exit 3 "status nothing usable"         env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x DOOTSABHA_PROVIDERS_AGY_BINARY=/x DOOTSABHA_PROVIDERS_GROK_BINARY=/x "$BINARY" status
 expect_exit 6 "config error (council)"        "$BINARY" council "hi" --config /nope/nope.yaml
@@ -482,7 +560,6 @@ expect_exit 6 "config error (status)"         "$BINARY" status --config /nope/no
 # values, so `timeout: 5 minutes` silently ran with the built-in default.
 CFG_DUR="$(mktemp -t ds-dur)"; CFG_HUMAN="$(mktemp -t ds-human)"
 CFG_PROV="$(mktemp -t ds-prov)"; CFG_ROUNDS="$(mktemp -t ds-rounds)"
-trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$SCRATCH_HANG"' EXIT
 printf 'timeout: "not a duration"\n'       > "$CFG_DUR"
 printf 'timeout: 5 minutes\n'              > "$CFG_HUMAN"
 printf 'providers:\n  claude: "scalar"\n' > "$CFG_PROV"

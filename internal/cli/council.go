@@ -171,9 +171,20 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 
 				if successes == 0 {
 					if rc.IsJSON() {
-						_ = renderCouncilJSON(allDispatches, nil, nil)
+						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitProvider), Message: "all agents failed during dispatch"}
+					// Judge from the ACCUMULATED payload, not just this round. With
+					// multi-round accumulation an earlier round's output may still be
+					// in the JSON, and reporting "nothing usable" would tell callers
+					// to discard content they already paid for.
+					fallback := core.ExitProvider
+					for _, d := range allDispatches {
+						if d.Error == nil {
+							fallback = core.ExitPartial
+							break
+						}
+					}
+					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), fallback), Message: "all agents failed during dispatch"}
 				}
 
 				// Stage 2: Peer Review (skip if <2 successes)

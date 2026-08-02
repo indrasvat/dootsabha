@@ -99,7 +99,9 @@ Two envelope shapes — this trips up most callers:
 
 ```bash
 RESULT=$(dootsabha council --json "Redis or Memcached for session caching?")
-echo "$RESULT" | jq -r '.synthesis.content'      # the answer
+# .synthesis is null if synthesis itself failed (exit 5) — fall back to the
+# per-agent answers, which are still in the payload.
+echo "$RESULT" | jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)'
 echo "$RESULT" | jq '.meta.total_cost_usd'       # what it cost
 echo "$RESULT" | jq -r '.dispatch[] | select(.error != null) | .provider'   # who failed
 ```

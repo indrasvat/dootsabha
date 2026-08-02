@@ -119,6 +119,12 @@ func checkRegularFile(path string) error {
 		return fmt.Errorf("read config %q: is a directory, expected a regular file", path)
 	}
 	if !info.Mode().IsRegular() {
+		// /dev/null is the conventional "ignore my user config" idiom and reads
+		// instantly to EOF. The hazard being guarded against is an UNBOUNDED
+		// read (/dev/zero, a FIFO with a live writer), not character devices.
+		if isDevNull(path) {
+			return nil
+		}
 		return fmt.Errorf("read config %q: not a regular file (mode %s)", path, info.Mode().Type())
 	}
 	return nil
@@ -305,4 +311,9 @@ func redact(m map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+// isDevNull reports whether path is the null device.
+func isDevNull(path string) bool {
+	return path == os.DevNull
 }

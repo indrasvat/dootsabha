@@ -216,6 +216,10 @@ func init() {
 	f.Duration("kaalseema", 0, "Alias for --timeout (कालसीमा)")
 	_ = f.MarkHidden("kaalseema")
 	f.DurationVar(&sessionTimeout, "session-timeout", 0, "Max session duration (e.g. 30m)")
+	// TODO(704): session_timeout is parsed and stored but never enforced.
+	// Hidden rather than advertised — a flag that silently does nothing is worse
+	// than one that is absent, since PRD §6.1 names it a council stop condition.
+	_ = rootCmd.PersistentFlags().MarkHidden("session-timeout")
 	f.StringVar(&configFile, "config", "", "Path to config file (YAML)")
 
 	rootCmd.AddCommand(newConsultCmd())
