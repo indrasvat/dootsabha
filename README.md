@@ -320,11 +320,14 @@ dootsabha council "question" --quiet
 | Code | Meaning | Example |
 |------|---------|---------|
 | 0 | Success | All agents responded |
-| 1 | General error | Internal failure |
-| 2 | Usage error | Bad flag, missing argument |
+| 1 | General error, or bad invocation | Internal failure; bad flag; missing argument |
 | 3 | Provider error | Agent CLI not found or crashed |
 | 4 | Timeout | Agent exceeded deadline |
 | 5 | Partial result | Some agents failed, result still useful |
+
+> Exit code **2** (`ExitUsage`) is defined in the PRD but never emitted — usage
+> errors exit 1. Do not branch on 2.
+
 
 ---
 

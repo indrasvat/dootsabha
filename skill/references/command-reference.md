@@ -2,6 +2,18 @@
 
 Complete flag and output schema reference for all दूतसभा commands.
 
+- [Provider matrix](#provider-matrix) — which agent reports tokens/cost, which are defaults
+- [Global flags](#global-flags)
+- [`council`](#council-sabha--सभा) — dispatch → peer review → synthesis
+- [`consult`](#consult-paraamarsh--परामर्श) — query one agent
+- [`review`](#review-sameeksha--समीक्षा) — author + reviewer
+- [`refine`](#refine-sanshodhan--संशोधन) — sequential review + incorporation
+- [`status`](#status-sthiti--स्थिति) — agent health
+- [`config show`](#config-show-vinyaas--विन्यास) · [`config migrate`](#config-migrate)
+- [`plugin list` / `inspect`](#plugin-list--inspect-vistaarak--विस्तारक)
+
+Each command section lists: flags, pipeline, JSON output schema, exit codes.
+
 ## Provider Matrix
 
 | Provider | Binary | Default model | Tokens | Cost | Session ID | In default council? |

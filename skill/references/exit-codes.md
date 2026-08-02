@@ -2,30 +2,40 @@
 
 दूतसभा uses structured exit codes so agents can branch logic without parsing output.
 
+- [Exit code table](#exit-code-table)
+- [Per-command exit codes](#per-command-exit-codes)
+- [Conditional patterns](#conditional-patterns)
+
 ## Exit Code Table
 
 | Code | Constant | Meaning | Precedence |
 |------|----------|---------|------------|
 | 0 | ExitSuccess | Everything OK | 1 (lowest) |
-| 1 | ExitError | General error | 2 |
-| 2 | ExitUsage | Bad flags, missing arguments | 6 (highest) |
-| 3 | ExitProvider | Provider error (CLI not found, auth invalid) | 4 |
-| 4 | ExitTimeout | At least one agent timed out | 5 |
+| 1 | ExitError | General error; also usage errors, and `council` when **all** agents failed | 2 |
+| 3 | ExitProvider | Provider error (CLI not found, auth invalid, agent crashed) | 4 |
+| 4 | ExitTimeout | At least one agent timed out | 5 (highest in practice) |
 | 5 | ExitPartial | Partial result (some agents failed) | 3 |
 
-When multiple errors occur in a multi-agent pipeline, the highest-precedence code wins:
-`2 > 4 > 3 > 5 > 1 > 0`
+Highest-precedence code wins: `4 > 3 > 5 > 1 > 0`.
+
+> **`ExitUsage` (2) is not emitted.** The PRD and CLAUDE.md define it, but every
+> usage error — unknown flag, missing argument, unknown provider, unknown chair —
+> exits **1**. Do not branch on 2; treat 1 as "bad invocation or general error".
 
 ## Per-Command Exit Codes
 
-| Command | 0 | 1 | 2 | 3 | 4 | 5 |
-|---------|---|---|---|---|---|---|
-| `council` | All agents + synthesis OK | All agents failed | Bad flags | Provider error | Timeout | Partial (some failed) |
-| `consult` | Agent responded | Error | Bad flags | Provider error | Timeout | Config error |
-| `review` | Author + reviewer OK | Error | Bad flags | Provider error | Timeout | Config error |
-| `refine` | All rounds completed | Error | Bad flags | Provider error | Timeout | Partial (some reviewers failed) |
-| `status` | All healthy | Error | — | Some unhealthy | — | — |
-| `config show` | Success | — | — | — | — | Config error |
+| Command | 0 | 1 | 3 | 4 | 5 |
+|---------|---|---|---|---|---|
+| `council` | All agents + synthesis OK | Bad flags; all agents failed | Provider/synthesis error | Timeout | Partial (some failed) |
+| `consult` | Agent responded | Bad flags; missing `--agent` | Provider error | Timeout | Config error |
+| `review` | Author + reviewer OK | Bad flags | Provider error | Timeout | Config error |
+| `refine` | All rounds completed | Bad flags | Provider error | Timeout | Partial (some reviewers failed) |
+| `status` | All healthy | Error | Some unhealthy¹ | — | — |
+| `config show` | Success | — | — | — | Config error |
+
+¹ An **opt-in** provider (`grok`) that is simply not installed does **not** make
+`status` fail — it is listed as `not installed (optional)` and the command exits 0.
+An installed-but-broken provider, or any absent required provider, still exits 3.
 
 ## Conditional Patterns
 
@@ -71,7 +81,7 @@ if [ $exit_code -ne 0 ]; then
 fi
 
 # Safe to parse JSON
-echo "$output" | jq -r '.content'
+echo "$output" | jq -r '.data.Content'
 ```
 
 ### Timeout handling with fallback
@@ -94,7 +104,7 @@ exit_code=$?
 
 if [ $exit_code -eq 0 ] || [ $exit_code -eq 5 ]; then
   # Extract which agents succeeded
-  jq -r '[.dispatch[] | select(.error == "") | .provider] | join(", ")' result.json
+  jq -r '[.dispatch[] | select(.error == null) | .provider] | join(", ")' result.json
 
   # Synthesis is still attempted even with partial results
   jq -r '.synthesis.content' result.json
@@ -105,12 +115,12 @@ fi
 
 ```bash
 # Count healthy agents
-HEALTHY=$(dootsabha status --json | jq '[.[] | select(.healthy)] | length')
+HEALTHY=$(dootsabha status --json | jq '[.data[] | select(.Healthy)] | length')
 
 case $HEALTHY in
   0) echo "No agents available"; exit 1 ;;
   1) echo "One agent — using consult"
-     AGENT=$(dootsabha status --json | jq -r '.[] | select(.healthy) | .name')
+     AGENT=$(dootsabha status --json | jq -r '.data[] | select(.Healthy) | .Name')
      dootsabha consult --json --agent "$AGENT" "Question" ;;
   *) echo "$HEALTHY agents — using council"
      dootsabha council --json "Question" ;;
