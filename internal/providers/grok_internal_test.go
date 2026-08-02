@@ -191,3 +191,77 @@ func TestExtractGrokEffortDoesNotSwallowFollowingFlag(t *testing.T) {
 		t.Errorf("rest = %v, want --keep-me preserved", rest)
 	}
 }
+
+// --- parseGrokNDJSON, directly ---------------------------------------------
+//
+// Exercised indirectly through Invoke elsewhere; these pin the parser itself so
+// a regression names the parser rather than surfacing as a confusing Invoke error.
+
+func TestParseGrokNDJSONLastResultWins(t *testing.T) {
+	stream := []byte(
+		`{"type":"system","subtype":"init"}` + "\n" +
+			`{"type":"result","subtype":"success","result":"first"}` + "\n" +
+			`{"type":"assistant","message":{"content":[]}}` + "\n" +
+			`{"type":"result","subtype":"success","result":"second"}` + "\n")
+
+	got := parseGrokNDJSON(stream)
+	if got == nil {
+		t.Fatal("expected a result event")
+	}
+	if got.Result != "second" {
+		t.Errorf("Result = %q, want the LAST result line", got.Result)
+	}
+}
+
+func TestParseGrokNDJSONSkipsMalformed(t *testing.T) {
+	stream := []byte("not json\n{\"broken\":\n\n{\"type\":\"result\",\"result\":\"ok\"}\n")
+	got := parseGrokNDJSON(stream)
+	if got == nil || got.Result != "ok" {
+		t.Errorf("malformed lines must be skipped, got %+v", got)
+	}
+}
+
+func TestParseGrokNDJSONNoResultEvent(t *testing.T) {
+	stream := []byte(`{"type":"system"}` + "\n" + `{"type":"assistant"}` + "\n")
+	if got := parseGrokNDJSON(stream); got != nil {
+		t.Errorf("no result event must yield nil, got %+v", got)
+	}
+}
+
+func TestParseGrokNDJSONEmpty(t *testing.T) {
+	if got := parseGrokNDJSON(nil); got != nil {
+		t.Errorf("empty input must yield nil, got %+v", got)
+	}
+}
+
+// An error result is still type=="result"; the discriminator is is_error.
+func TestParseGrokNDJSONErrorResult(t *testing.T) {
+	stream := []byte(`{"type":"result","subtype":"error_during_execution","is_error":true,` +
+		`"errors":["quota exceeded"],"session_id":"x"}` + "\n")
+
+	got := parseGrokNDJSON(stream)
+	if got == nil {
+		t.Fatal("an error result must still parse — it carries the reason")
+	}
+	if !got.IsError {
+		t.Error("IsError = false, want true")
+	}
+	if len(got.Errors) != 1 || got.Errors[0] != "quota exceeded" {
+		t.Errorf("Errors = %v, want the upstream message", got.Errors)
+	}
+	if got.Result != "" {
+		t.Errorf("Result = %q, want empty — error events carry no result field", got.Result)
+	}
+}
+
+// Real review payloads exceed bufio.Scanner's 64KB token limit; the parser uses
+// bytes.Split precisely to avoid that.
+func TestParseGrokNDJSONHugeLine(t *testing.T) {
+	big := strings.Repeat("x", 200_000)
+	stream := []byte(`{"type":"result","result":"` + big + `"}` + "\n")
+
+	got := parseGrokNDJSON(stream)
+	if got == nil || len(got.Result) != len(big) {
+		t.Errorf("200KB line must parse intact, got len=%d", len(got.Result))
+	}
+}
