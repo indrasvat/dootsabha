@@ -337,6 +337,41 @@ else
   fail "chair fallback missing from JSON"
 fi
 
+# ── Workflow 5p: exit-code contract ─────────────────────────────────────────
+#
+# One code, one caller action:
+#   0 proceed · 1 internal bug · 2 fix the command · 3 retry/other agent
+#   4 raise --timeout · 5 usable but incomplete · 6 fix the config
+# Precedence: 2 > 6 > 4 > 3 > 5 > 1 > 0
+
+echo ""
+echo "--- Exit-code contract ---"
+
+expect_exit() {
+  local want="$1" desc="$2"; shift 2
+  local rc=0
+  "$@" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq "$want" ]; then
+    pass "exit $want — $desc"
+  else
+    fail "exit $rc (want $want) — $desc"
+  fi
+}
+
+expect_exit 0 "successful consult"            "$BINARY" consult --agent claude "hi"
+expect_exit 2 "unknown flag"                  "$BINARY" consult --definitely-not-a-flag
+expect_exit 2 "missing prompt arg"            "$BINARY" consult
+expect_exit 2 "missing --agent"               "$BINARY" consult "hi"
+expect_exit 2 "unknown provider"              "$BINARY" consult --agent definitely-not-an-agent "hi"
+expect_exit 2 "unknown chair"                 "$BINARY" council "hi" --chair definitely-not-an-agent
+expect_exit 2 "unknown agent in --agents"     "$BINARY" council "hi" --agents claude,definitely-not-an-agent
+expect_exit 2 "unknown command"               "$BINARY" definitely-not-a-command
+expect_exit 6 "config file missing"           "$BINARY" consult --agent claude "hi" --config /nope/nope.yaml
+expect_exit 6 "config missing (council)"      "$BINARY" council "hi" --config /nope/nope.yaml
+expect_exit 3 "single agent unavailable"      env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok "hi"
+expect_exit 3 "ALL agents failed"             env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x "$BINARY" council "hi" --agents claude,codex
+expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" council "hi" --agents claude,grok
+
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
 echo ""

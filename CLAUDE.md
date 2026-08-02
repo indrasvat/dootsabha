@@ -70,14 +70,19 @@ docs/PROGRESS.md          Phase/task status tracker
 
 **Never mark a task DONE without L1+L2+L3 passing. L4 required for output-visible changes.**
 
-## Exit Code Precedence (PRD §6.1)
-Precedence: `2 > 4 > 3 > 5 > 1 > 0`. Higher precedence overrides lower ones.
-- `2` (ExitUsage): Bad flags, missing args (Highest)
+## Exit Codes (PRD §6.1)
+One code, one caller action. Precedence: `2 > 6 > 4 > 3 > 5 > 1 > 0`.
+- `2` (ExitUsage): Bad flags/args, unknown agent or chair — **fix the command** (highest)
+- `6` (ExitConfig): Config missing, unreadable, invalid — **fix the config**
 - `4` (ExitTimeout): At least one agent timed out
-- `3` (ExitProvider): Provider error (CLI failed, auth invalid)
-- `5` (ExitPartial): Partial result (some agents failed)
-- `1` (ExitError): General error
-- `0` (ExitSuccess): Everything OK (Lowest)
+- `3` (ExitProvider): Every requested agent failed — nothing usable
+- `5` (ExitPartial): Some agents failed, output still usable
+- `1` (ExitError): Unexpected internal error — a bug
+- `0` (ExitSuccess): Complete and usable (lowest)
+
+Read most-blocking first: never valid → couldn't load config → ran out of time →
+nothing usable → partially usable. `1` is reserved for genuine internal failures,
+never for a bad command line.
 
 ## Plugin Architecture
 - **gRPC based:** Uses `hashicorp/go-plugin`.

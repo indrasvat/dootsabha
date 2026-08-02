@@ -8,34 +8,37 @@
 
 ## Exit Code Table
 
-| Code | Constant | Meaning |
-|------|----------|---------|
-| 0 | ExitSuccess | Everything OK |
-| 1 | ExitError | General error; also usage errors, and `council` when **all** agents failed |
-| 3 | ExitProvider | Provider error (CLI not found, auth invalid, agent crashed, quota exhausted) |
-| 4 | ExitTimeout | At least one agent timed out |
-| 5 | ExitPartial | **Config error, or** partial result (some agents failed) |
+| Code | Constant | Meaning | Caller action |
+|------|----------|---------|---------------|
+| 0 | ExitSuccess | Complete and usable | proceed |
+| 1 | ExitError | Unexpected internal error | report a bug |
+| 2 | ExitUsage | Bad flags/args, unknown agent or chair | fix the command |
+| 3 | ExitProvider | Every requested agent failed — CLI missing, auth invalid, crashed, quota exhausted | retry, or pick another agent |
+| 4 | ExitTimeout | At least one agent timed out | raise `--timeout`, shrink the prompt |
+| 5 | ExitPartial | Some agents failed, output still usable | use it, note the gaps |
+| 6 | ExitConfig | Config missing, unreadable, or invalid | fix the config |
 
-When several apply, the highest wins: `4 > 3 > 5 > 1 > 0`.
+When several apply, the highest wins: `2 > 6 > 4 > 3 > 5 > 1 > 0`.
 
-**Exit 5 is overloaded on every command** — a bad `--config` and a partial council
-result both exit 5. Branch on the payload, not the code: `.data.error` present
-means a config error; a `dispatch[]` array means a partial result you can still use.
+Read the precedence most-blocking first: the command was never valid, then the
+config would not load, then a deadline was hit, then every agent failed, then some
+did. **`3` vs `5` is the distinction that matters** — 3 means nothing usable came
+back; 5 means you have an answer with gaps.
 
-> **`ExitUsage` (2) is not emitted.** The PRD and CLAUDE.md define it, but every
-> usage error — unknown flag, missing argument, unknown provider, unknown chair —
-> exits **1**. Do not branch on 2; treat 1 as "bad invocation or general error".
+> Every usage error — unknown flag, missing argument, unknown provider, unknown
+> chair, unknown command — exits **2**. `1` means an unexpected internal failure,
+> so seeing it is worth reporting rather than retrying.
 
 ## Per-Command Exit Codes
 
-| Command | 0 | 1 | 3 | 4 | 5 |
-|---------|---|---|---|---|---|
-| `council` | All agents + synthesis OK | Bad flags; all agents failed | Provider/synthesis error | Timeout | Partial (some failed) |
-| `consult` | Agent responded | Bad flags; missing `--agent` | Provider error, quota exhausted | Timeout | Config error |
-| `review` | Author + reviewer OK | Bad flags | Provider error | Timeout | Config error |
-| `refine` | All rounds completed | Bad flags | Provider error | Timeout | Partial (some reviewers failed) |
-| `status` | All healthy | Error | Some unhealthy¹ | — | — |
-| `config show` | Success | — | — | — | Config error |
+| Command | 0 | 2 | 3 | 4 | 5 | 6 |
+|---------|---|---|---|---|---|---|
+| `council` | Agents + synthesis OK | Bad flags; unknown agent/chair; >5 agents | All agents failed; synthesis failed | Timeout | Some agents failed | Config error |
+| `consult` | Agent responded | Bad flags; missing/unknown `--agent` | Provider error, quota exhausted | Timeout | — | Config error |
+| `review` | Author + reviewer OK | Bad flags; unknown agent | Provider error | Timeout | — | Config error |
+| `refine` | All rounds completed | Bad flags; unknown agent | Provider error | Timeout | Some reviewers failed | Config error |
+| `status` | All healthy | — | Some unhealthy¹ | — | — | Config error |
+| `config show` | Success | Bad flags | — | — | — | Config error |
 
 ¹ An **opt-in** provider (`grok`) that is simply not installed does **not** make
 `status` fail — it is listed as `not installed (optional)` and the command exits 0.

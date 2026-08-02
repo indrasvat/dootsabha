@@ -82,7 +82,8 @@ func newStatusCmd() *cobra.Command {
 
 स्थिति (sthiti) — सभी AI एजेंटों की स्थिति दिखाएं।
 
-Exit codes: 0 all healthy, 1 error, 3 one or more providers unhealthy`,
+Exit codes: 0 all healthy, 3 one or more providers unhealthy, 6 config error
+(an opt-in provider that is simply not installed does not fail this check)`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {

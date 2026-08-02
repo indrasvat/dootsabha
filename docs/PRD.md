@@ -328,15 +328,25 @@ dootsabha/
 1. With no subcommand: show help text with bilingual names
 2. Unknown command: check for `dootsabha-{name}` extension on PATH → show resolved binary path + prompt confirm on first run → exec if trusted → error if not found. Trusted extensions are cached in `~/.dootsabha/trusted-extensions.yaml`.
 
-**Exit codes (highest applicable wins):**
-- `0` — Success
-- `1` — General error
-- `2` — Usage error (bad flags, missing args)
-- `3` — Provider error (CLI failed, auth invalid)
-- `4` — Timeout (at least one agent timed out)
-- `5` — Partial result (some agents failed in council but synthesis produced)
+**Exit codes (highest applicable wins).** Each code maps to exactly one caller action:
 
-**Precedence:** `2 > 4 > 3 > 5 > 1 > 0` — usage errors trump all (fail fast), timeouts next, then provider failures, then partial results. When multiple codes apply, the highest-precedence one is returned. Example: timeout + partial = exit 4.
+| Code | Meaning | Caller does |
+|---|---|---|
+| `0` | Complete and usable | proceed |
+| `1` | Unexpected internal error | report a bug |
+| `2` | Usage — bad flags/args, unknown agent or chair | fix the command |
+| `3` | Provider — every requested agent failed, nothing usable | retry or pick another agent |
+| `4` | Timeout — at least one agent exceeded the deadline | raise `--timeout`, shrink the prompt |
+| `5` | Partial — some agents failed, output still usable | use it, note the gaps |
+| `6` | Config — missing, unreadable, or invalid | fix the config |
+
+**Precedence:** `2 > 6 > 4 > 3 > 5 > 1 > 0` — read most-blocking first: the command was
+never valid, then the config could not be loaded, then a deadline was hit, then every
+agent failed, then some did. Example: timeout + partial = exit 4.
+
+`1` is reserved for genuine internal failures. A bad command line is `2`; a bad config is
+`6`. Splitting config out of `5` matters because `5` promises *usable output* — a config
+error produces none.
 
 **Acceptance criteria:**
 - [ ] FR-ROOT-01: `dootsabha help` shows bilingual names (e.g., `council (sabha)`)

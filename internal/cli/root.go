@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -92,6 +93,11 @@ func Execute() {
 	// error display ourselves. This prevents unstructured stderr in JSON mode
 	// while still showing errors to TTY users (GitHub issue #4, bug 3).
 	rootCmd.SilenceErrors = true
+	// Cobra reports bad flags itself; route them to ExitUsage so a caller can
+	// tell "fix your command" apart from "something failed at runtime".
+	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &ExitError{Code: core.ExitUsage, Message: err.Error()}
+	})
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
@@ -105,13 +111,19 @@ func Execute() {
 			}
 			os.Exit(exitErr.Code)
 		}
-		// Non-ExitError (e.g., unknown command, flag parse) — always show.
+		// Non-ExitError from Cobra: unknown command, or a failed Args validator.
+		// Both mean the invocation was wrong, so they exit ExitUsage rather than
+		// being lumped in with genuine internal failures.
+		code := core.ExitError
+		if isUsageError(err) {
+			code = core.ExitUsage
+		}
 		if jsonOutput && !jsonDocWritten {
 			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
 		}
-		os.Exit(1)
+		os.Exit(code)
 	}
 }
 
@@ -202,4 +214,25 @@ func init() {
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRefineCmd())
 	rootCmd.AddCommand(newPluginCmd())
+}
+
+// isUsageError reports whether a Cobra-produced error means the command line was
+// wrong (unknown command, bad arg count) rather than something failing at run
+// time. Cobra returns these as plain errors, so they are matched by message.
+func isUsageError(err error) bool {
+	msg := err.Error()
+	for _, s := range []string{
+		"unknown command",
+		"unknown flag",
+		"unknown shorthand flag",
+		"accepts ", // "accepts 1 arg(s), received 0"
+		"requires at least",
+		"invalid argument",
+		"flag needs an argument",
+	} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }

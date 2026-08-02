@@ -34,7 +34,8 @@ expectations must remain untouched.
 - **Never use `--output-format json`** — its `.text` concatenates tool-call preambles.
 - **Never pass `--verbatim`** — it strips the `<user_query>` delimiter; grok does not
   rewrite prompts anyway.
-- **Never assert exit code 2** — dootsabha never emits it (pre-existing bug, task 706).
+- **Exit codes were reworked in this PR** — usage errors now emit 2, config errors 6.
+  Precedence `2 > 6 > 4 > 3 > 5 > 1 > 0`. See CLAUDE.md / PRD §6.1.
 - **Never assert an exact patch version** — the binary self-updates.
 
 ## Decision
@@ -323,7 +324,7 @@ folding any of them in here would break the additive constraint.
 | Proposed | Scope | Evidence |
 |---|---|---|
 | **705** — provider hardening | nil-config deref, partial-config dropping defaults, dead `opts.Timeout`, and **`AuthValid` set unconditionally when `--version` exits 0** — so `status` reports healthy for a provider that is out of quota. Needs a real auth probe per provider. Documented in the SKILL for now. | Grok's dogfood review + reproduced quota failure |
-| **706** — `ExitUsage` (2) is unreachable | CLI returns 1 for every usage error; contradicts CLAUDE.md, PRD §6.1, README, SKILL | Verified: 4 distinct usage errors all → exit 1 |
+| ~~**706**~~ — exit-code scheme | **DONE IN THIS PR** — 2 now emitted for usage, 6 added for config (was colliding with partial-result 5), all-agents-failed promoted 1→3. | Verified across 13 scenarios in L5 |
 | **707** — skill `jq` drift | 5 broken `jq` expressions in `skill/references/` + `examples/` (wrong envelope shape, `select(.error == "")` never matches because `error` is `omitempty`) | Skill audit F1–F5, verified against real binary output |
 | ~~**708** — command robustness~~ | **FIXED IN THIS PR** — `--chair <unknown>` now errors (exit 1) and a chair fallback warns on stderr. `refine --reviewers <unknown>` → exit 5 remains, tracked separately. | Skill audit F10–F11 |
 | **709** — SKILL de-duplication | ~150 of 313 SKILL.md lines duplicate `references/`; description written in second person (docs flag this explicitly); missing `allowed-tools: Bash(dootsabha *)` | Skill audit A1–A8 |

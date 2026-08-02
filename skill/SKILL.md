@@ -108,22 +108,22 @@ echo "$RESULT" | jq -r '.dispatch[] | select(.error != null) | .provider'   # wh
 
 ## Exit codes
 
-| Code | Meaning |
-|---|---|
-| 0 | Success |
-| 1 | Error — includes `council` when **all** agents failed |
-| 3 | Provider error — CLI missing, auth invalid, agent crashed |
-| 4 | Timeout |
-| 5 | **Two meanings** — config error, *or* partial result (some agents failed) |
+One code, one action:
 
-Precedence: `4 > 3 > 5 > 1 > 0`.
+| Code | Meaning | Do |
+|---|---|---|
+| 0 | Complete, usable | proceed |
+| 2 | Bad flags/args, unknown agent or chair | fix the command |
+| 3 | Every requested agent failed | retry, or pick another agent |
+| 4 | Timeout | raise `--timeout`, shrink the prompt |
+| 5 | Some agents failed, output usable | use it, note the gaps |
+| 6 | Config missing or invalid | fix the config |
+| 1 | Unexpected internal error | report a bug |
 
-Exit 5 is overloaded on every command. Disambiguate by payload, not exit code:
-`.data.error` present → config error; `dispatch[]` present → partial result you
-can still use.
+Precedence: `2 > 6 > 4 > 3 > 5 > 1 > 0`.
 
-> Exit **2** is documented in the PRD but the CLI does not emit it — usage errors
-> exit 1. Do not branch on 2.
+`3` vs `5` is the distinction that matters: **3 means nothing usable came back, 5
+means you have an answer with gaps.**
 
 Branching patterns: [references/exit-codes.md](references/exit-codes.md).
 

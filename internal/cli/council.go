@@ -34,7 +34,7 @@ and synthesize into a unified answer.
 
 सभा (sabha) — बहु-एजेंट सभा विचार-विमर्श।
 
-Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial result`,
+Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial result, 6 config error`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -57,13 +57,13 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			// Apply flag overrides to config.
 			if cmd.Flags().Changed("chair") || cmd.Flags().Changed("adhyaksha") {
 				if err := validateChair(chair); err != nil {
-					return &ExitError{Code: 1, Message: err.Error()}
+					return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 				}
 				cfg.Council.Chair = chair
 			}
@@ -96,7 +96,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 				agentNames[i] = strings.TrimSpace(agentNames[i])
 			}
 			if len(agentNames) > core.MaxAgents {
-				return &ExitError{Code: 1, Message: fmt.Sprintf("too many agents: %d (max %d)", len(agentNames), core.MaxAgents)}
+				return &ExitError{Code: core.ExitUsage, Message: fmt.Sprintf("too many agents: %d (max %d)", len(agentNames), core.MaxAgents)}
 			}
 
 			// Construct agents.
@@ -105,7 +105,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			for _, name := range agentNames {
 				prov, provErr := getProvider(name, cfg, runner)
 				if provErr != nil {
-					return &ExitError{Code: 1, Message: provErr.Error()}
+					return &ExitError{Code: core.ExitUsage, Message: provErr.Error()}
 				}
 				coreAgents = append(coreAgents, &providerAgent{prov: prov})
 			}
@@ -164,7 +164,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, nil, nil)
 					}
-					return &ExitError{Code: 1, Message: "all agents failed during dispatch"}
+					return &ExitError{Code: core.ExitProvider, Message: "all agents failed during dispatch"}
 				}
 
 				// Stage 2: Peer Review (skip if <2 successes)

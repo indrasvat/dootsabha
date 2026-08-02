@@ -73,7 +73,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 					// An explicitly-named --config that doesn't exist is an error;
 					// a missing default user file just means there's nothing to migrate.
 					if explicit {
-						return &ExitError{Code: 1, Message: fmt.Sprintf("config file not found: %s", path)}
+						return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("config file not found: %s", path)}
 					}
 					return emitMigrateResult(rc, migrateResultView{
 						Path:    path,
@@ -81,7 +81,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 						Message: "no config file found — nothing to migrate (defaults already use agy)",
 					})
 				}
-				return &ExitError{Code: 1, Message: fmt.Sprintf("stat config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("stat config: %s", err)}
 			}
 
 			if dryRun {
@@ -89,7 +89,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 				// matches what an actual migration would do.
 				plan, err := core.PlanMigrationFile(path)
 				if err != nil {
-					return &ExitError{Code: 1, Message: fmt.Sprintf("inspect config: %s", err)}
+					return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("inspect config: %s", err)}
 				}
 				view := migrateResultView{
 					Path:            path,
@@ -109,7 +109,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 
 			res, err := core.MigrateConfigFile(path)
 			if err != nil {
-				return &ExitError{Code: 1, Message: fmt.Sprintf("migrate config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("migrate config: %s", err)}
 			}
 
 			view := migrateResultView{
@@ -198,7 +198,7 @@ func newConfigShowCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			view := cfg.RedactedView(reveal)

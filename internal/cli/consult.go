@@ -30,7 +30,7 @@ func newConsultCmd() *cobra.Command {
 
 परामर्श (paraamarsh) — एकल AI एजेंट से परामर्श करें।
 
-Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
+Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config error`,
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -43,14 +43,14 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			}
 
 			if agent == "" {
-				return &ExitError{Code: 1, Message: "--agent (or --doota) is required"}
+				return &ExitError{Code: core.ExitUsage, Message: "--agent (or --doota) is required"}
 			}
 
 			prompt := args[0]
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			timeout := globalTimeout
@@ -67,7 +67,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			runner := &core.SubprocessRunner{}
 			prov, err := getProvider(agent, cfg, runner)
 			if err != nil {
-				return &ExitError{Code: 1, Message: err.Error()}
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)

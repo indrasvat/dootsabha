@@ -139,13 +139,13 @@ dootsabha config migrate --json     # structured result for agent consumption
 | Code | Meaning | Agent Response |
 |------|---------|---------------|
 | 0 | Success | Use the output |
-| 1 | General error, or bad invocation (flags, missing args, unknown agent/chair) | Fix the command, or try another approach |
+| 1 | Unexpected internal error | Report a bug |
+| 2 | Bad command — flags, args, unknown agent/chair | Fix the command syntax |
+| 6 | Config missing or invalid | Fix the config file |
 | 3 | Provider error | Agent CLI not found or crashed; check `dootsabha status` |
 | 4 | Timeout | Increase `--timeout` or simplify prompt |
 | 5 | Partial result | Some agents failed but output is still usable |
 
-> Exit code **2** (`ExitUsage`) is defined in the PRD but never emitted — usage
-> errors exit 1. Do not branch on 2.
 
 
 ## Common Patterns
