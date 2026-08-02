@@ -20,7 +20,7 @@ func newConfigCmd() *cobra.Command {
 		Long: `View and manage दूतसभा configuration.
 
 विन्यास (vinyaas) — दूतसभा विन्यास प्रबंधित करें।`,
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
@@ -48,7 +48,7 @@ backing up the original before any change. The gemini provider's binary/model/fl
 do not carry over to agy and are replaced with agy defaults (the backup preserves them).
 
 स्थानांतरण (sthaanaantaran) — gemini से agy में विन्यास स्थानांतरित करें।`,
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve the bilingual --pareekshan alias for --dry-run.
@@ -193,7 +193,7 @@ func newConfigShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "show",
 		Short:        "Display merged configuration (with redaction by default)",
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := core.LoadConfig(configFile)

@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -81,7 +80,7 @@ council-mode deliberation, peer review, and synthesis.
 		if found {
 			return execExtension(ext, args[1:])
 		}
-		return fmt.Errorf("unknown command %q — run 'dootsabha --help' for usage", args[0])
+		return &ExitError{Code: core.ExitUsage, Message: fmt.Sprintf("unknown command %q — run 'dootsabha --help' for usage", args[0])}
 	},
 	SilenceUsage: true,
 }
@@ -111,19 +110,16 @@ func Execute() {
 			}
 			os.Exit(exitErr.Code)
 		}
-		// Non-ExitError from Cobra: unknown command, or a failed Args validator.
-		// Both mean the invocation was wrong, so they exit ExitUsage rather than
-		// being lumped in with genuine internal failures.
-		code := core.ExitError
-		if isUsageError(err) {
-			code = core.ExitUsage
-		}
+		// Anything reaching here is NOT an ExitError, which means no code path
+		// classified it — genuinely unexpected. Usage errors are typed at their
+		// source (SetFlagErrorFunc, usageArgs, the unknown-command branch), so
+		// they never arrive untyped.
 		if jsonOutput && !jsonDocWritten {
 			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
 		}
-		os.Exit(code)
+		os.Exit(core.ExitError)
 	}
 }
 
@@ -214,25 +210,4 @@ func init() {
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRefineCmd())
 	rootCmd.AddCommand(newPluginCmd())
-}
-
-// isUsageError reports whether a Cobra-produced error means the command line was
-// wrong (unknown command, bad arg count) rather than something failing at run
-// time. Cobra returns these as plain errors, so they are matched by message.
-func isUsageError(err error) bool {
-	msg := err.Error()
-	for _, s := range []string{
-		"unknown command",
-		"unknown flag",
-		"unknown shorthand flag",
-		"accepts ", // "accepts 1 arg(s), received 0"
-		"requires at least",
-		"invalid argument",
-		"flag needs an argument",
-	} {
-		if strings.Contains(msg, s) {
-			return true
-		}
-	}
-	return false
 }

@@ -84,7 +84,7 @@ func newStatusCmd() *cobra.Command {
 
 Exit codes: 0 all healthy, 3 one or more providers unhealthy, 6 config error
 (an opt-in provider that is simply not installed does not fail this check)`,
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := core.LoadConfig(configFile)

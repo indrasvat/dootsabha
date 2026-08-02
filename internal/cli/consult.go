@@ -31,7 +31,7 @@ func newConsultCmd() *cobra.Command {
 परामर्श (paraamarsh) — एकल AI एजेंट से परामर्श करें।
 
 Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config error`,
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).

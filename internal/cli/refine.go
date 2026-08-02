@@ -70,7 +70,7 @@ func newRefineCmd() *cobra.Command {
 संशोधन (sanshodhan) — लेखक सामग्री बनाता है, समीक्षक क्रमशः समीक्षा करते हैं, लेखक प्रतिक्रिया शामिल करता है।
 
 Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 5 partial result, 6 config error`,
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases.

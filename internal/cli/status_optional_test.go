@@ -4,6 +4,10 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
+
+	"github.com/indrasvat/dootsabha/internal/core"
 )
 
 // A provider that is merely NOT INSTALLED must be reported, but must not fail the
@@ -175,5 +179,50 @@ func TestValidateChairAcceptsKnownNames(t *testing.T) {
 func TestValidateChairAllowsEmpty(t *testing.T) {
 	if err := validateChair(""); err != nil {
 		t.Errorf("empty chair must be allowed (config default), got %v", err)
+	}
+}
+
+// --- usage-error classification -------------------------------------------
+
+// Usage errors must be typed at their source, not recognised afterwards by
+// matching Cobra's error text. Substring matching is brittle in both directions:
+// an internal error mentioning "invalid argument" would be misreported as a
+// usage error, and a usage error Cobra words differently would fall through to
+// the internal-error code.
+func TestUsageArgsWrapsValidatorErrorAsExitUsage(t *testing.T) {
+	validator := usageArgs(cobra.ExactArgs(1))
+
+	// Too few args → must be a typed usage error.
+	err := validator(&cobra.Command{}, []string{})
+	if err == nil {
+		t.Fatal("expected an error for wrong arg count")
+	}
+	var ee *ExitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("err = %T, want *ExitError so Execute() need not guess", err)
+	}
+	if ee.Code != core.ExitUsage {
+		t.Errorf("Code = %d, want %d (ExitUsage)", ee.Code, core.ExitUsage)
+	}
+	if ee.Message == "" {
+		t.Error("usage error must carry Cobra's explanation")
+	}
+}
+
+func TestUsageArgsPassesValidInput(t *testing.T) {
+	validator := usageArgs(cobra.ExactArgs(1))
+	if err := validator(&cobra.Command{}, []string{"prompt"}); err != nil {
+		t.Errorf("valid arg count should pass, got %v", err)
+	}
+}
+
+func TestUsageArgsNoArgs(t *testing.T) {
+	validator := usageArgs(cobra.NoArgs)
+	if err := validator(&cobra.Command{}, nil); err != nil {
+		t.Errorf("no args should pass NoArgs, got %v", err)
+	}
+	var ee *ExitError
+	if err := validator(&cobra.Command{}, []string{"unexpected"}); !errors.As(err, &ee) || ee.Code != core.ExitUsage {
+		t.Errorf("surplus args must yield ExitUsage, got %v", err)
 	}
 }

@@ -3,6 +3,9 @@ package cli
 import (
 	"os"
 
+	"github.com/spf13/cobra"
+
+	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/output"
 )
 
@@ -35,3 +38,18 @@ func emitErrorJSON(provider, errMsg string) {
 // markJSONWritten records a JSON document written directly (e.g. via
 // json.NewEncoder) rather than through the helpers above.
 func markJSONWritten() { jsonDocWritten = true }
+
+// usageArgs wraps a Cobra positional-argument validator so a wrong arg count
+// surfaces as a typed usage error.
+//
+// Cobra returns plain errors from Args validators, which would otherwise force
+// Execute() to recognise them by matching message text. Typing them here keeps
+// the classification structural.
+func usageArgs(v cobra.PositionalArgs) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if err := v(cmd, args); err != nil {
+			return &ExitError{Code: core.ExitUsage, Message: err.Error()}
+		}
+		return nil
+	}
+}

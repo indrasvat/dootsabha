@@ -43,7 +43,7 @@ func newPluginListCmd() *cobra.Command {
 		Use:          "list",
 		Aliases:      []string{"soochi", "सूची"},
 		Short:        "List all plugins and extensions",
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			entries := discoverAll()
@@ -71,7 +71,7 @@ func newPluginInspectCmd() *cobra.Command {
 		Use:          "inspect [name]",
 		Aliases:      []string{"parikshan", "परीक्षण"},
 		Short:        "Inspect a plugin or extension",
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]

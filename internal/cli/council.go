@@ -35,7 +35,7 @@ and synthesize into a unified answer.
 सभा (sabha) — बहु-एजेंट सभा विचार-विमर्श।
 
 Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial result, 6 config error`,
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases.

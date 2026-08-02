@@ -60,7 +60,7 @@ func newReviewCmd() *cobra.Command {
 समीक्षा (sameeksha) — एक एजेंट सामग्री बनाता है, दूसरा उसकी समीक्षा करता है।
 
 Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config error`,
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).
