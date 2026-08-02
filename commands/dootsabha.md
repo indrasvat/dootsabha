@@ -143,7 +143,7 @@ dootsabha config migrate --json     # structured result for agent consumption
 | 2 | Bad command — flags, args, unknown agent/chair | Fix the command syntax |
 | 6 | Config missing or invalid | Fix the config file |
 | 3 | Provider error | Agent CLI not found or crashed; check `dootsabha status` |
-| 4 | Timeout | Increase `--timeout` or simplify prompt |
+| 4 | Timeout | Raise the budget the message names: `--timeout` (one call) or `--session-timeout` (whole pipeline) |
 | 5 | Partial result | Some agents failed but output is still usable |
 
 
@@ -188,7 +188,7 @@ fi
 |------|---------|
 | `--json` | JSON output (always use this from agents) |
 | `--quiet` | Suppress progress output |
-| `--timeout 5m` | Per-agent timeout |
-| `--session-timeout 30m` | Total pipeline timeout |
+| `--timeout 5m` | Budget for one agent call — each call gets its own window |
+| `--session-timeout 30m` | Ceiling for the whole pipeline (0 = unbounded) |
 | `-v` / `-vv` / `-vvv` | Verbosity (info / debug / debug+source) |
 | `--config path` | Custom config file |

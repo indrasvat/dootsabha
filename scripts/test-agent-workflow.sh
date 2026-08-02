@@ -610,6 +610,67 @@ expect_exit 4 "council: ALL agents hang" \
 expect_exit 4 "refine: reviewer hangs" \
   env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" refine "hi" --author claude --reviewers grok --timeout 3s
 
+# Timeout SCOPE (GitHub issue #20). `--timeout` bounds one invocation;
+# `--session-timeout` bounds the whole pipeline. Both still map to exit 4 — the
+# caller's action is the same, "raise a timeout" — but the message must name
+# WHICH one, or the user raises the wrong knob. Before #20 a spent pipeline
+# budget was reported against whichever agent happened to be running.
+expect_exit 4 "review: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --session-timeout 1s
+expect_exit 4 "council: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" council "hi" \
+  --agents claude,codex --timeout 60s --session-timeout 1s
+expect_exit 4 "refine: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" refine "hi" \
+  --author claude --reviewers codex --timeout 60s --session-timeout 1s
+
+# The ceiling must NOT fire on a pipeline that fits inside it — a timeout that
+# triggers early is as bad as one that never triggers.
+expect_exit 0 "session ceiling not reached by a fast pipeline" \
+  "$BINARY" review "hi" --author codex --reviewer claude --timeout 60s --session-timeout 30s
+
+# The two scopes must be distinguishable in the message, not just the exit code.
+SCOPE_OUT=$(MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --session-timeout 1s 2>&1 || true)
+if grep -q "session timeout" <<<"$SCOPE_OUT"; then
+  pass "session timeout is named 'session timeout'"
+else
+  fail "session timeout was not named as such: $SCOPE_OUT"
+fi
+
+SCOPE_OUT=$(env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" consult --agent grok "hi" --timeout 1s 2>&1 || true)
+if grep -q "timeout after 1s" <<<"$SCOPE_OUT"; then
+  pass "consult still reports its single-invocation timeout"
+else
+  fail "consult timeout message changed unexpectedly: $SCOPE_OUT"
+fi
+
+SCOPE_OUT=$(env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" review "hi" \
+  --author grok --reviewer claude --timeout 1s --session-timeout 60s 2>&1 || true)
+if grep -q "invocation timeout" <<<"$SCOPE_OUT"; then
+  pass "per-invocation timeout is named 'invocation timeout'"
+else
+  fail "invocation timeout was not named as such: $SCOPE_OUT"
+fi
+
+# A slow agent must no longer bill its neighbours. Each of these pipelines runs
+# longer in total than one invocation budget, with no single step exceeding it.
+expect_exit 0 "review: slow author does not starve the reviewer" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 1200ms --session-timeout 60s
+expect_exit 0 "refine: every step gets its own budget" \
+  env MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" refine "hi" \
+  --author claude --reviewers codex --timeout 1200ms --session-timeout 60s
+expect_exit 0 "council: every stage gets its own budget" \
+  env MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" council "hi" \
+  --agents claude,codex --chair claude --timeout 1200ms --session-timeout 60s
+
+# The bilingual alias must resolve to the same ceiling as the ASCII flag.
+expect_exit 4 "session ceiling via --satra-seema" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --satra-seema 1s
+
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
 echo ""

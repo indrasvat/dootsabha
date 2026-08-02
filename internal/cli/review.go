@@ -78,16 +78,10 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
-			timeout := globalTimeout
-			if timeout == 0 {
-				timeout = cfg.Timeout
-			}
-			if timeout == 0 {
-				timeout = 5 * 60 * 1_000_000_000 // 5 minutes in nanoseconds
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			// Author and reviewer each get their own invocation window, inside
+			// one pipeline ceiling (issue #20).
+			budget := newBudget(cmd, cfg)
+			defer budget.Close()
 
 			runner := &core.SubprocessRunner{}
 
@@ -103,7 +97,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 			invokeOpts := providers.InvokeOptions{
 				Model:   model,
-				Timeout: timeout,
+				Timeout: budget.PerInvoke(),
 			}
 
 			// Render header (TTY only, not JSON).
@@ -115,13 +109,15 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 
 			// Step 1: Invoke author.
 			totalStart := time.Now()
-			authorResult, err := authorProv.Invoke(ctx, prompt, invokeOpts)
+			authorCtx, cancelAuthor := budget.Step()
+			authorResult, err := authorProv.Invoke(authorCtx, prompt, invokeOpts)
+			cancelAuthor()
 			if err != nil {
 				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
 					exitCode = core.ExitTimeout
-					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
+					msg = timeoutMessage(budget, err)
 				}
 				if rc.IsJSON() {
 					emitErrorJSON(author, msg)
@@ -134,7 +130,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 				"Review the following output from %s. Identify strengths, weaknesses, errors. Be specific.\n\n%s",
 				author, authorResult.Content,
 			)
-			reviewerResult, err := reviewerProv.Invoke(ctx, reviewPrompt, invokeOpts)
+			reviewerCtx, cancelReviewer := budget.Step()
+			reviewerResult, err := reviewerProv.Invoke(reviewerCtx, reviewPrompt, invokeOpts)
+			cancelReviewer()
 			totalDuration := time.Since(totalStart)
 
 			if err != nil {
@@ -145,11 +143,11 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 					renderReviewSection(rc, author, "(author)", authorResult)
 				}
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: core.ExitTimeout, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					return &ExitError{Code: core.ExitTimeout, Message: timeoutMessage(budget, err)}
 				}
 				// The author already produced content, which is in the payload — a
 				// failed reviewer leaves a usable partial result, not nothing.
-				return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
+				return &ExitError{Code: stageExitCode(budget.Session(), err, core.ExitPartial), Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
 			}
 
 			// Render output.

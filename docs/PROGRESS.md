@@ -210,6 +210,22 @@ All 4 items addressed in PRD v1.6.
 | 702 | Provider default model refresh | DONE | — |
 | 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
 | 704 | Add xAI Grok CLI as opt-in fourth provider | DONE | — |
+| 705 | Per-provider timeouts + enforced session timeout (#20) | DONE | — |
+
+### What Works End-to-End (705)
+
+- `--timeout` is the budget for **one agent call**; every call in a pipeline gets
+  its own window. A slow author no longer starves the reviewer (issue #20).
+- `--session-timeout` is enforced for the first time and bounds the **whole
+  pipeline** — unhidden, with a `--satra-seema` alias. `0` disables the ceiling.
+- Both exit `4`; the message names which fired (`invocation timeout after …` /
+  `session timeout after …`) so the caller raises the right knob.
+- `core.Budget` owns the two deadlines; `core.StepContext` derives one call's
+  window. The council engine reads `InvokeOptions.Timeout`, which until now was
+  declared but never used.
+- A single agent hitting its own deadline no longer ends the run: `refine` moves
+  on to the next reviewer, `council` keeps its healthy agents' output.
+- Tests: 21/21 L3 (9 new), 222/222 L5 (17 new), 39 new unit cases, `-race` clean.
 
 ### What Works End-to-End (704)
 

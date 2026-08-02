@@ -88,16 +88,14 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 				}
 			}
 
-			timeout := globalTimeout
-			if timeout == 0 {
-				timeout = cfg.Timeout
-			}
-			if timeout == 0 {
-				timeout = 5 * 60 * 1_000_000_000 // 5 minutes
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			// Dispatch, peer review and synthesis are separate invocations, and
+			// multi-round councils repeat all three. Each call gets its own
+			// window inside one pipeline ceiling (issue #20); the engine derives
+			// the per-invocation context from InvokeOptions.Timeout.
+			budget := newBudget(cmd, cfg)
+			defer budget.Close()
+			ctx := budget.Session()
+			invokeOpts := core.InvokeOptions{Timeout: budget.PerInvoke()}
 
 			// Parse agent names.
 			agentNames := splitAgentList(agents)
@@ -152,7 +150,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					eng.SetProgress(stderrProgress("dispatch", rc.HasColor))
 				}
 
-				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, core.InvokeOptions{Timeout: timeout})
+				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, invokeOpts)
 				if dispErr != nil {
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, nil, nil)
@@ -187,7 +185,10 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 							break
 						}
 					}
-					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), fallback), Message: "all agents failed during dispatch"}
+					return &ExitError{
+						Code:    stageExitCode(ctx, councilDeadline(allDispatches, allReviews, ctx.Err()), fallback),
+						Message: "all agents failed during dispatch",
+					}
 				}
 
 				// Stage 2: Peer Review (skip if <2 successes)
@@ -200,7 +201,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if stderrIsTTY && !quiet && !rc.IsJSON() {
 						eng.SetProgress(stderrProgress("review", rc.HasColor))
 					}
-					reviews, err = eng.PeerReview(ctx, dispatches, core.InvokeOptions{Timeout: timeout})
+					reviews, err = eng.PeerReview(ctx, dispatches, invokeOpts)
 					if err != nil {
 						if rc.IsJSON() {
 							_ = renderCouncilJSON(allDispatches, allReviews, nil)
@@ -218,7 +219,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					fmt.Fprintln(os.Stdout)                                                                                      //nolint:errcheck
 					fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Synthesis", fmt.Sprintf("chair: %s", cfg.Council.Chair))) //nolint:errcheck
 				}
-				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, core.InvokeOptions{Timeout: timeout})
+				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, invokeOpts)
 				if err != nil {
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
@@ -250,23 +251,12 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("write json: %s", err)}
 				}
 				// Return correct exit code even in JSON mode.
-				for _, d := range allDispatches {
-					if d.Error != nil {
-						return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
-					}
-				}
-				return nil
+				return councilExit(budget, allDispatches, allReviews)
 			}
 
 			renderCouncilTTY(rc, allDispatches, allReviews, synthesis)
 
-			// Exit code 5 for partial results.
-			for _, d := range allDispatches {
-				if d.Error != nil {
-					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
-				}
-			}
-			return nil
+			return councilExit(budget, allDispatches, allReviews)
 		},
 	}
 
@@ -289,6 +279,37 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 	_ = f.MarkHidden("samantar")
 
 	return cmd
+}
+
+// councilDeadline returns a deadline error recorded by any agent in the council.
+//
+// With per-invocation budgets (issue #20) one agent can blow its own window
+// while the session stays healthy, so the session context no longer answers
+// "did anything time out?". Exit code 4 outranks the partial result it leaves.
+func councilDeadline(dispatches []core.DispatchResult, reviews []core.ReviewResult, sessionErr error) error {
+	errs := make([]error, 0, len(dispatches)+len(reviews)+1)
+	for _, d := range dispatches {
+		errs = append(errs, d.Error)
+	}
+	for _, r := range reviews {
+		errs = append(errs, r.Error)
+	}
+	errs = append(errs, sessionErr)
+	return firstDeadline(errs...)
+}
+
+// councilExit picks the exit code once the council's output has been rendered.
+// A timeout anywhere outranks a partial result (precedence 4 > 5).
+func councilExit(budget *core.Budget, dispatches []core.DispatchResult, reviews []core.ReviewResult) error {
+	if d := councilDeadline(dispatches, reviews, budget.Session().Err()); d != nil {
+		return &ExitError{Code: core.ExitTimeout, Message: timeoutMessage(budget, d)}
+	}
+	for _, d := range dispatches {
+		if d.Error != nil {
+			return &ExitError{Code: core.ExitPartial, Message: "partial result: some agents failed"}
+		}
+	}
+	return nil
 }
 
 // providerAgent adapts providers.Provider to core.Agent, breaking the import cycle

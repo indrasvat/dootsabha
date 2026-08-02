@@ -32,7 +32,11 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 	if chair != nil {
 		e.notify(chairName, ProgressStarted)
 		slog.Debug("invoking chair", "chair", chairName)
-		result, err := chair.Invoke(ctx, prompt, opts)
+		// Synthesis is the LAST stage, so it was the one starved by a shared
+		// deadline (issue #20). It gets its own window like every other call.
+		chairCtx, cancelChair := StepContext(ctx, opts.Timeout)
+		result, err := chair.Invoke(chairCtx, prompt, opts)
+		cancelChair()
 		if err == nil {
 			slog.Info("synthesis complete", "chair", chairName, "duration", result.Duration, "content_len", len(result.Content))
 			e.notify(chairName, ProgressDone)
@@ -59,7 +63,11 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 	fallbackName := fallback.Name()
 	slog.Info("synthesis fallback", "fallback", fallbackName)
 	e.notify(fallbackName, ProgressStarted)
-	result, err := fallback.Invoke(ctx, prompt, opts)
+	// The chair may have burned its whole window before failing; the fallback
+	// still gets a full one, or it would be reported broken for being second.
+	fallbackCtx, cancelFallback := StepContext(ctx, opts.Timeout)
+	defer cancelFallback()
+	result, err := fallback.Invoke(fallbackCtx, prompt, opts)
 	if err != nil {
 		e.notify(fallbackName, ProgressFailed)
 		return nil, fmt.Errorf("synthesize fallback %s: %w", fallbackName, err)

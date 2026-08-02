@@ -129,5 +129,129 @@ else
   fail "mock-grok emits INVALID NDJSON for a quoted multi-line prompt"
 fi
 
+# ---------------------------------------------------------------------------
+# Timeout scoping (GitHub issue #20)
+#
+# `--timeout` is the budget for ONE provider invocation; `--session-timeout` is
+# the ceiling for the whole pipeline. The bug was a single deadline shared by
+# every call, so a slow author starved the reviewer and the reviewer took the
+# blame. Each case below runs a pipeline whose TOTAL runtime exceeds the
+# per-invocation budget while no SINGLE step does — that combination fails under
+# the shared-deadline model and passes under per-invocation budgets.
+#
+# Mock delays are driven by MOCK_<PROVIDER>_DELAY (seconds).
+# ---------------------------------------------------------------------------
+export DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$MOCK_DIR/mock-claude"
+export DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex"
+export DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy"
+
+# Each step sleeps STEP_DELAY; each step is allowed STEP_BUDGET. A pipeline of
+# 2-3 steps therefore outlives one budget without any step exceeding it.
+STEP_DELAY=0.7
+STEP_BUDGET=1200ms
+
+# run_pipeline <desc> <expected-exit> <expected-stdout-substring> -- <args...>
+# Runs the binary with mock delays applied, checks exit code and output.
+run_pipeline() {
+  local desc="$1" want_exit="$2" want_text="$3"; shift 4  # shift past the "--"
+  local out rc=0
+  out=$(MOCK_CLAUDE_DELAY="$STEP_DELAY" MOCK_CODEX_DELAY="$STEP_DELAY" MOCK_AGY_DELAY="$STEP_DELAY" \
+        "$BINARY" "$@" --config /dev/null 2>&1) || rc=$?
+  if [[ "$rc" -ne "$want_exit" ]]; then
+    fail "$desc (exit $rc, want $want_exit)"
+    return
+  fi
+  if [[ -n "$want_text" ]] && ! grep -qF "$want_text" <<<"$out"; then
+    fail "$desc (output missing '$want_text')"
+    return
+  fi
+  pass "$desc"
+}
+
+# Test 11: review — a slow author must not starve the reviewer. THE issue #20 case.
+run_pipeline "review: author and reviewer each get their own budget" 0 '"claude": "ok"' -- \
+  review --json --author codex --reviewer claude --timeout "$STEP_BUDGET" --session-timeout 60s \
+  "say something"
+
+# Test 12: review — reviewer content actually lands in the JSON, not just exit 0.
+REVIEW_JSON=$(MOCK_CLAUDE_DELAY="$STEP_DELAY" MOCK_CODEX_DELAY="$STEP_DELAY" \
+  "$BINARY" review --json --author codex --reviewer claude --timeout "$STEP_BUDGET" \
+  --session-timeout 60s --config /dev/null "say something" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+assert d["author"]["content"], "author content empty"
+assert d["review"]["content"], "reviewer content empty"
+assert d["meta"]["providers"]["claude"] == "ok", "reviewer not ok"
+' <<<"$REVIEW_JSON" 2>/dev/null; then
+  pass "review: both agents produce content under a per-invocation budget"
+else
+  fail "review: reviewer produced no content — starved by the author"
+fi
+
+# Test 13: review — the session ceiling still fires, and says so.
+run_pipeline "review: session ceiling fires and is named" 4 "session timeout" -- \
+  review --author codex --reviewer claude --timeout 60s --session-timeout 1s \
+  "say something"
+
+# Test 14: review — a genuinely slow single call is still an invocation timeout.
+OUT=$(MOCK_CODEX_DELAY=5 "$BINARY" review --author codex --reviewer claude \
+  --timeout 400ms --session-timeout 60s --config /dev/null "say something" 2>&1 || true)
+if grep -qF "invocation timeout" <<<"$OUT"; then
+  pass "review: invocation timeout is named as such"
+else
+  fail "review: expected 'invocation timeout' in: $OUT"
+fi
+
+# Test 15: refine — v1 → review → incorporate are three separate budgets.
+run_pipeline "refine: every pipeline step gets its own budget" 0 "" -- \
+  refine --json --author claude --reviewers codex --timeout "$STEP_BUDGET" \
+  --session-timeout 60s "say something"
+
+# Test 16: refine — the incorporation step actually ran (v2 exists).
+REFINE_JSON=$(MOCK_CLAUDE_DELAY="$STEP_DELAY" MOCK_CODEX_DELAY="$STEP_DELAY" \
+  "$BINARY" refine --json --author claude --reviewers codex --timeout "$STEP_BUDGET" \
+  --session-timeout 60s --config /dev/null "say something" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+assert d["final"]["version"] >= 2, "final version is not >= 2 — incorporation never ran"
+assert d["meta"]["providers"]["codex"] == "ok", "reviewer not ok"
+' <<<"$REFINE_JSON" 2>/dev/null; then
+  pass "refine: reviewer + incorporation both completed"
+else
+  fail "refine: pipeline stopped early — a later step inherited a spent budget"
+fi
+
+# Test 17: council — dispatch, peer review and synthesis are separate budgets.
+run_pipeline "council: dispatch/review/synthesis each get their own budget" 0 "" -- \
+  council --json --agents claude,codex --chair claude --rounds 1 \
+  --timeout "$STEP_BUDGET" --session-timeout 60s "say something"
+
+# Test 18: council — synthesis produced content rather than dying of starvation.
+COUNCIL_JSON=$(MOCK_CLAUDE_DELAY="$STEP_DELAY" MOCK_CODEX_DELAY="$STEP_DELAY" \
+  "$BINARY" council --json --agents claude,codex --chair claude --rounds 1 \
+  --timeout "$STEP_BUDGET" --session-timeout 60s --config /dev/null "say something" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+assert d["synthesis"] and d["synthesis"]["content"], "no synthesis content"
+assert all(v == "ok" for v in d["meta"]["providers"].values()), d["meta"]["providers"]
+' <<<"$COUNCIL_JSON" 2>/dev/null; then
+  pass "council: synthesis ran after dispatch and peer review"
+else
+  fail "council: synthesis starved by the earlier stages"
+fi
+
+# Test 19: a timeout in JSON mode still emits exactly ONE JSON document.
+TIMEOUT_JSON=$(MOCK_CLAUDE_DELAY="$STEP_DELAY" MOCK_CODEX_DELAY="$STEP_DELAY" \
+  "$BINARY" review --json --author codex --reviewer claude --timeout 60s \
+  --session-timeout 1s --config /dev/null "say something" 2>/dev/null || true)
+if python3 -c 'import json,sys; json.load(sys.stdin)' <<<"$TIMEOUT_JSON" 2>/dev/null; then
+  pass "session timeout emits exactly one JSON document"
+else
+  fail "session timeout produced unparseable stdout: $TIMEOUT_JSON"
+fi
+
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

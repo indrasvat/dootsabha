@@ -55,10 +55,13 @@ council:
   parallel: true      # Run dispatch phase in parallel (false = sequential)
   rounds: 1           # Number of deliberation rounds (max 5)
 
-# Global invocation timeout — applies to each agent call.
-# Formats: 30s, 5m, 1h. Set to 0 to disable.
+# Per-invocation timeout — the budget for ONE agent call. Every call in a
+# pipeline gets its own window, so a slow author does not starve the reviewer.
+# Formats: 30s, 5m, 1h. Set to 0 to fall back to the 5m built-in default.
 timeout: 5m
 
-# Session timeout — max total duration for multi-agent pipelines.
-# Formats: 30m, 1h, 2h. Set to 0 to disable.
+# Session timeout — the ceiling for a WHOLE pipeline (review, refine, council),
+# across every agent call it makes. It always wins over `timeout`: a call is cut
+# short if the session budget runs out first.
+# Formats: 30m, 1h, 2h. Set to 0 to disable the ceiling.
 session_timeout: 30m

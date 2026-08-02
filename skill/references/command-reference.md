@@ -49,9 +49,14 @@ Notes when using it:
 | `--json` | | `false` | Output as structured JSON |
 | `--verbose` | `-v` | `0` | Verbosity level (-v=info, -vv=debug, -vvv=debug+source) |
 | `--quiet` | `-q` | `false` | Suppress non-essential output |
-| `--timeout` | | `5m` | Per-invocation timeout (e.g., 5m, 30s) |
-| `--session-timeout` | | `30m` | Max total duration for multi-agent pipelines |
+| `--timeout` | | `5m` | Budget for ONE agent call — each call in a pipeline gets its own window |
+| `--session-timeout` | | `30m` | Ceiling for the whole pipeline, across every call (0 = unbounded) |
 | `--config` | | auto-detected | Path to config file (YAML) |
+
+`--timeout` and `--session-timeout` are independent budgets. `review --timeout 8m
+--session-timeout 20m` gives the author up to 8m and the reviewer up to 8m, while
+the run as a whole cannot exceed 20m. Exit code `4` covers both; the message says
+which fired (`invocation timeout after …` vs `session timeout after …`).
 
 ## council (sabha / सभा)
 

@@ -14,6 +14,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Test hook: simulate a slow provider so timeout scoping can be exercised
+# end-to-end (GitHub issue #20). Unset in normal runs, so this is a no-op.
+sleep "${MOCK_CODEX_DELAY:-0}"
+
 # JSON-escape a string so prompts containing quotes/newlines/backslashes cannot
 # produce invalid JSON. council/refine embed prior agent responses in the prompt,
 # so multi-line input is the normal case, not an edge case.
