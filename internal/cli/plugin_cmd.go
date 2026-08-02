@@ -31,6 +31,16 @@ func newPluginCmd() *cobra.Command {
 		Long: `Discover and inspect available plugins and PATH extensions.
 
 विस्तारक (vistaarak) — प्लगइन्स और एक्सटेंशन की सूची और जानकारी।`,
+		// Without these, `plugin bogus` printed help to STDOUT and exited 0 —
+		// breaking both the exit contract and the one-JSON-document guarantee.
+		Args:         usageArgs(cobra.NoArgs),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: "plugin requires a subcommand: list or inspect",
+			}
+		},
 	}
 
 	cmd.AddCommand(newPluginListCmd())
@@ -99,7 +109,10 @@ func newPluginInspectCmd() *cobra.Command {
 			}
 
 			if found == nil {
-				return fmt.Errorf("plugin or extension %q not found", name)
+				return &ExitError{
+					Code:    core.ExitUsage,
+					Message: fmt.Sprintf("plugin or extension %q not found", name),
+				}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)

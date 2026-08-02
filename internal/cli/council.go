@@ -156,7 +156,10 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					}
 					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("dispatch: %s", dispErr)}
 				}
-				allDispatches = dispatches
+				// Accumulate across rounds. Assigning here reported only the FINAL
+				// round, so a 3-round council under-reported its own cost by ~2/3
+				// and discarded earlier rounds' agent output entirely.
+				allDispatches = append(allDispatches, dispatches...)
 
 				// Count successes.
 				successes := 0
@@ -188,10 +191,13 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 						if rc.IsJSON() {
 							_ = renderCouncilJSON(allDispatches, allReviews, nil)
 						}
-						return &ExitError{Code: stageExitCode(ctx, err, core.ExitProvider), Message: fmt.Sprintf("peer review: %s", err)}
+						// Dispatch already produced usable agent output, so this is
+						// a partial result — not "nothing usable". Reporting 3 here
+						// told callers to discard content they had already paid for.
+						return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("peer review: %s", err)}
 					}
 				}
-				allReviews = reviews
+				allReviews = append(allReviews, reviews...)
 
 				// Stage 3: Synthesis
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
@@ -203,7 +209,9 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					return &ExitError{Code: stageExitCode(ctx, err, core.ExitProvider), Message: fmt.Sprintf("synthesis: %s", err)}
+					// Same reasoning as peer review: the dispatch output is in the
+					// payload and is usable, so this is partial, not total failure.
+					return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("synthesis: %s", err)}
 				}
 
 				// Surface a chair fallback. It is recorded in JSON as

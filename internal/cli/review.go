@@ -147,7 +147,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 				if errors.Is(err, context.DeadlineExceeded) {
 					return &ExitError{Code: core.ExitTimeout, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
 				}
-				return &ExitError{Code: core.ExitProvider, Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
+				// The author already produced content, which is in the payload — a
+				// failed reviewer leaves a usable partial result, not nothing.
+				return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
 			}
 
 			// Render output.

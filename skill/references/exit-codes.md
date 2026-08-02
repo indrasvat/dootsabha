@@ -33,9 +33,9 @@ back; 5 means you have an answer with gaps.
 
 | Command | 0 | 2 | 3 | 4 | 5 | 6 |
 |---------|---|---|---|---|---|---|
-| `council` | Agents + synthesis OK | Bad flags; unknown agent/chair; >5 agents | All agents failed; synthesis failed | Timeout | Some agents failed | Config error |
+| `council` | Agents + synthesis OK | Bad flags; unknown agent/chair; >5 agents; >5 rounds | **Every** agent failed | Timeout | Some agents failed; peer-review or synthesis failed after a good dispatch | Config error |
 | `consult` | Agent responded | Bad flags; missing/unknown `--agent` | Provider error, quota exhausted | Timeout | — | Config error |
-| `review` | Author + reviewer OK | Bad flags; unknown agent | Provider error | Timeout | — | Config error |
+| `review` | Author + reviewer OK | Bad flags; unknown agent | **Author** failed — nothing to review | Timeout | **Reviewer** failed — author content still usable | Config error |
 | `refine` | All rounds completed | Bad flags; unknown agent | Provider error | Timeout | Some reviewers failed | Config error |
 | `status` | All usable | Bad flags | **Nothing** usable | — | Degraded — some broken, others work¹ | Config error |
 | `config show` | Success | Bad flags | — | — | — | Config error |

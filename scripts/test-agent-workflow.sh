@@ -79,11 +79,8 @@ else
 fi
 
 # 2b. unknown provider exits 1
-if "$BINARY" consult --agent nonexistent "test" >/dev/null 2>&1; then
-  fail "unknown provider should exit non-zero"
-else
-  pass "unknown provider exits non-zero"
-fi
+# (removed: asserted only "non-zero" where the contract says exactly 2;
+#  `expect_exit 2 "unknown provider"` covers this precisely.)
 
 # 2c. bad flag exits non-zero
 if "$BINARY" --badFlag >/dev/null 2>&1; then
@@ -154,7 +151,17 @@ else
 fi
 
 # 4c. status JSON has providers
-if "$BINARY" status --json | python3 -c "import json,sys; d=json.load(sys.stdin); assert len(d) >= 1, 'no providers'"; then
+if "$BINARY" status --json | python3 -c "
+import json,sys
+d = json.load(sys.stdin)
+rows = d['data']
+assert isinstance(rows, list) and rows, 'data is not a non-empty list'
+need = {'Name','Healthy','Version','Model','Auth','Installed'}
+for r in rows:
+    missing = need - set(r)
+    assert not missing, 'row %r missing %s' % (r.get('Name'), missing)
+assert {r['Name'] for r in rows} >= {'claude','codex','agy','grok'}, 'built-in provider missing'
+"; then
   pass "status JSON has providers"
 else
   fail "status JSON missing providers"
@@ -356,6 +363,14 @@ fi
 echo ""
 echo "--- Exit-code contract ---"
 
+# Asserts the exit code in BOTH text and --json mode.
+#
+# These were previously tested on separate axes — expect_exit never passed
+# --json, and the JSON-document tests never checked an exit code. That blind
+# spot let `status --json` return 0 for every health state, and then let the
+# identical defect ship in `refine --json` in the very run that claimed the
+# class was closed. --json is the mode agents are told to use; it must never
+# be the more forgiving one.
 expect_exit() {
   local want="$1" desc="$2"; shift 2
   local rc=0
@@ -364,6 +379,15 @@ expect_exit() {
     pass "exit $want — $desc"
   else
     fail "exit $rc (want $want) — $desc"
+  fi
+
+  # Same invocation, plus --json. The code must be identical.
+  local jrc=0
+  "$@" --json >/dev/null 2>&1 || jrc=$?
+  if [ "$jrc" -eq "$want" ]; then
+    pass "exit $want — $desc [--json]"
+  else
+    fail "exit $jrc (want $want) — $desc [--json] — JSON mode disagrees with text mode"
   fi
 }
 

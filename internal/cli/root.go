@@ -92,6 +92,21 @@ func Execute() {
 	// error display ourselves. This prevents unstructured stderr in JSON mode
 	// while still showing errors to TTY users (GitHub issue #4, bug 3).
 	rootCmd.SilenceErrors = true
+	// Cobra aborts on a bad flag BEFORE binding --json, so jsonOutput would still
+	// be false when Execute() chooses an error channel — stdout came back empty
+	// and `jq` exits 0 on empty input, so wrappers saw success. Detect the flag
+	// from argv so the output contract does not depend on argument order.
+	if !jsonOutput {
+		for _, a := range os.Args[1:] {
+			if a == "--json" || a == "--json=true" {
+				jsonOutput = true
+				break
+			}
+			if a == "--" {
+				break // everything after is a positional
+			}
+		}
+	}
 	// Cobra reports bad flags itself; route them to ExitUsage so a caller can
 	// tell "fix your command" apart from "something failed at runtime".
 	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {

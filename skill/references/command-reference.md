@@ -120,15 +120,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All agents responded, synthesis complete |
-| 3 | All agents failed — nothing usable |
-| 3 | Provider error |
-| 4 | At least one agent timed out |
-| 5 | Partial result (some agents failed, synthesis may be incomplete) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`3` only when **every** agent failed. A peer-review or synthesis failure after a successful dispatch is `5` — the agent output is in the payload and usable.
 
 ## consult (paraamarsh / परामर्श)
 
@@ -172,15 +166,9 @@ Extract content: `jq -r '.data.Content'`
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error |
-| 3 | Provider error (CLI not found, auth invalid) |
-| 4 | Timeout |
-| 6 | Config error |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+Single agent, so there is no partial state: a provider failure is `3`.
 
 ## review (sameeksha / समीक्षा)
 
@@ -239,15 +227,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Author and reviewer both succeeded |
-| 1 | Error |
-| 3 | Provider error |
-| 4 | Timeout |
-| 6 | Config error |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`3` if the **author** fails (nothing to review). A failed **reviewer** is `5` — the author's content is still in the payload.
 
 ## refine (sanshodhan / संशोधन)
 
@@ -312,15 +294,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All rounds completed |
-| 1 | Error |
-| 3 | Provider error |
-| 4 | Timeout |
-| 5 | Partial result (some reviewers failed) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`5` if any reviewer fails or times out; the versions produced so far are in the payload.
 
 ## status (sthiti / स्थिति)
 
@@ -368,15 +344,9 @@ installed but broken, exits 3.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All providers healthy |
-| 1 | Error |
-| 5 | Degraded — some providers unhealthy, at least one still usable |
-| 3 | Nothing usable — no healthy provider at all |
-| 6 | Config error |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`0` all usable · `5` degraded (some broken, at least one usable) · `3` nothing usable. An opt-in provider that is not installed is reported but does not degrade.
 
 ## config show (vinyaas / विन्यास)
 
@@ -394,12 +364,9 @@ dootsabha config show [flags]
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 6 | Config error (file not found, parse error) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`6` for a missing, unreadable or invalid config.
 
 ## config migrate
 
@@ -419,12 +386,9 @@ dootsabha config migrate [flags]
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Migration applied (or dry-run completed, or nothing to migrate) |
-| 6 | Config error (file not found, parse error, write failed) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`6` for a missing, unreadable or invalid config.
 
 ## plugin list / inspect (vistaarak / विस्तारक)
 
