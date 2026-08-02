@@ -185,7 +185,6 @@ func printMigrationChanges(v migrateResultView) {
 
 func newConfigShowCmd() *cobra.Command {
 	var (
-		showJSON     bool
 		showComments bool
 		reveal       bool
 	)
@@ -203,10 +202,9 @@ func newConfigShowCmd() *cobra.Command {
 
 			view := cfg.RedactedView(reveal)
 
-			useJSON := showJSON || jsonOutput
-			rc := output.NewRenderContext(os.Stdout, useJSON)
+			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
-			if rc.IsJSON() || showJSON {
+			if rc.IsJSON() {
 				return emitJSON(view)
 			}
 
@@ -216,7 +214,6 @@ func newConfigShowCmd() *cobra.Command {
 	}
 
 	f := cmd.Flags()
-	f.BoolVar(&showJSON, "json", false, "Output as JSON")
 	f.BoolVar(&showComments, "commented", false, "Include field descriptions as comments")
 	f.BoolVar(&reveal, "reveal", false, "Reveal sensitive values (disables redaction)")
 

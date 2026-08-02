@@ -78,6 +78,12 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			if cfg.Council.Rounds < 1 {
 				cfg.Council.Rounds = 1
 			}
+			if cfg.Council.Rounds > core.MaxRounds {
+				return &ExitError{
+					Code:    core.ExitUsage,
+					Message: fmt.Sprintf("too many rounds: %d (max %d)", cfg.Council.Rounds, core.MaxRounds),
+				}
+			}
 
 			timeout := globalTimeout
 			if timeout == 0 {

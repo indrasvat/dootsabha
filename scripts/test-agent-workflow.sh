@@ -379,6 +379,24 @@ expect_exit 2 "unknown --author (refine)"     "$BINARY" refine "hi" --author def
 expect_exit 2 "unknown --author (review)"     "$BINARY" review "hi" --author definitely-not-an-agent
 expect_exit 2 "stray comma in --agents"       "$BINARY" council "hi" --agents claude,,codex
 expect_exit 2 "stray comma in --reviewers"    "$BINARY" refine "hi" --reviewers codex,,agy
+
+# --json must carry the SAME exit code as human mode. It is the mode agents are
+# told to always use, so a status that reports 0 with zero healthy providers
+# breaks every health gate built on it.
+expect_exit 3 "status --json: nothing usable" \
+  env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x DOOTSABHA_PROVIDERS_AGY_BINARY=/x DOOTSABHA_PROVIDERS_GROK_BINARY=/x "$BINARY" status --json
+expect_exit 5 "status --json: degraded" \
+  env DOOTSABHA_PROVIDERS_AGY_BINARY=/x "$BINARY" status --json
+expect_exit 6 "plugin list: bad --config"     "$BINARY" plugin list --config /nope/nope.yaml
+expect_exit 2 "council: --rounds above max"   "$BINARY" council "hi" --agents claude --rounds 99
+
+# config show --json must emit a JSON document on failure like every other
+# command; it was emitting zero bytes, and `jq` exits 0 on empty input.
+if { "$BINARY" config show --json --config /nope/nope.yaml 2>/dev/null || true; } | one_json; then
+  pass "config show --json emits one document on config error"
+else
+  fail "config show --json emitted no/invalid JSON on config error"
+fi
 expect_exit 2 "unknown command"               "$BINARY" definitely-not-a-command
 expect_exit 6 "config file missing"           "$BINARY" consult --agent claude "hi" --config /nope/nope.yaml
 expect_exit 6 "config missing (council)"      "$BINARY" council "hi" --config /nope/nope.yaml

@@ -70,7 +70,7 @@ case $? in
   5) echo "Partial result — some agents failed"; jq -r '.synthesis.content' result.json ;;
   4) echo "Timed out — try with fewer agents or longer timeout" ;;
   3) echo "Provider error — check agent health" ;;
-  1) echo "All agents failed" ;;
+  3) echo "All agents failed — nothing usable" ;;
 esac
 ```
 
@@ -81,7 +81,7 @@ output=$(dootsabha consult --json --agent claude "Explain this error" 2>&1)
 exit_code=$?
 
 if [ $exit_code -ne 0 ]; then
-  # exit 5 is overloaded: config error vs partial result. Check the payload.
+  # 5 is a usable partial result; a config error is its own code (6).
   reason=$(echo "$output" | jq -r '.data.error // "agent failure"' 2>/dev/null)
   echo "dootsabha failed (exit $exit_code): $reason" >&2
   exit 1

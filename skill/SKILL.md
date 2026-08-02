@@ -15,7 +15,8 @@ allowed-tools: Bash(dootsabha:*), Bash(./bin/dootsabha:*)
 Runs several AI coding CLIs against one prompt, cross-reviews their answers, and
 synthesizes a result. Output is JSON with exit codes designed for branching.
 
-**Prerequisite:** `dootsabha` on `$PATH`. Verify with `dootsabha status --json`.
+**Prerequisite:** `dootsabha` on `$PATH` (or `./bin/dootsabha` after `make build`
+in the repo). Verify with `dootsabha status --json`.
 
 ## Agents
 

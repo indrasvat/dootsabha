@@ -129,11 +129,15 @@ reported but does not degrade the result.`,
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return emitJSON(rows)
+				if err := emitJSON(rows); err != nil {
+					return &ExitError{Code: core.ExitError, Message: err.Error()}
+				}
+			} else {
+				renderStatusTable(rc, rows)
 			}
 
-			renderStatusTable(rc, rows)
-
+			// The exit code is the same in both modes. --json is the mode agents
+			// are told to use, so it must not be the one that under-reports.
 			return statusExitError(rows)
 		},
 	}

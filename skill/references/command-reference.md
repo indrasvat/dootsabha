@@ -123,7 +123,7 @@ Written directly (no envelope wrapper). All fields snake_case.
 | Code | Meaning |
 |------|---------|
 | 0 | All agents responded, synthesis complete |
-| 1 | All agents failed |
+| 3 | All agents failed — nothing usable |
 | 3 | Provider error |
 | 4 | At least one agent timed out |
 | 5 | Partial result (some agents failed, synthesis may be incomplete) |
@@ -178,7 +178,7 @@ Extract content: `jq -r '.data.Content'`
 | 1 | Error |
 | 3 | Provider error (CLI not found, auth invalid) |
 | 4 | Timeout |
-| 5 | Config error |
+| 6 | Config error |
 
 ---
 
@@ -245,7 +245,7 @@ Written directly (no envelope wrapper). All fields snake_case.
 | 1 | Error |
 | 3 | Provider error |
 | 4 | Timeout |
-| 5 | Config error |
+| 6 | Config error |
 
 ---
 
@@ -397,7 +397,7 @@ dootsabha config show [flags]
 | Code | Meaning |
 |------|---------|
 | 0 | Success |
-| 5 | Config error (file not found, parse error) |
+| 6 | Config error (file not found, parse error) |
 
 ---
 
@@ -422,7 +422,7 @@ dootsabha config migrate [flags]
 | Code | Meaning |
 |------|---------|
 | 0 | Migration applied (or dry-run completed, or nothing to migrate) |
-| 5 | Config error (file not found, parse error, write failed) |
+| 6 | Config error (file not found, parse error, write failed) |
 
 ---
 

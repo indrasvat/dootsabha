@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/output"
 	"github.com/indrasvat/dootsabha/internal/plugin"
 )
@@ -46,6 +47,12 @@ func newPluginListCmd() *cobra.Command {
 		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Honour --config even though the listing does not read it: silently
+			// ignoring a bad path contradicts the contract every other command
+			// follows, and hides a typo.
+			if _, err := core.LoadConfig(configFile); err != nil {
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
+			}
 			entries := discoverAll()
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
@@ -74,6 +81,12 @@ func newPluginInspectCmd() *cobra.Command {
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Honour --config even though the listing does not read it: silently
+			// ignoring a bad path contradicts the contract every other command
+			// follows, and hides a typo.
+			if _, err := core.LoadConfig(configFile); err != nil {
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
+			}
 			name := args[0]
 			entries := discoverAll()
 
