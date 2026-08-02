@@ -23,7 +23,6 @@ SCRATCH_HANG="$(mktemp -t dootsabha-hang)"
 # shellcheck disable=SC2016  # $1 is the generated script's own arg, not ours
 printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "0.0.0"; exit 0; }\nsleep 300\n' > "$SCRATCH_HANG"
 chmod +x "$SCRATCH_HANG"
-trap 'rm -f "$SCRATCH_HANG"' EXIT
 
 echo "Running L5 agent workflow tests..."
 echo "  Binary: $BINARY"
@@ -478,6 +477,31 @@ expect_exit 5 "status degraded"               env DOOTSABHA_PROVIDERS_AGY_BINARY
 expect_exit 3 "status nothing usable"         env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x DOOTSABHA_PROVIDERS_AGY_BINARY=/x DOOTSABHA_PROVIDERS_GROK_BINARY=/x "$BINARY" status
 expect_exit 6 "config error (council)"        "$BINARY" council "hi" --config /nope/nope.yaml
 expect_exit 6 "config error (status)"         "$BINARY" status --config /nope/nope.yaml
+
+# Invalid config VALUES, not just unparseable YAML. Viper coerces garbage to zero
+# values, so `timeout: 5 minutes` silently ran with the built-in default.
+CFG_DUR="$(mktemp -t ds-dur)"; CFG_HUMAN="$(mktemp -t ds-human)"
+CFG_PROV="$(mktemp -t ds-prov)"; CFG_ROUNDS="$(mktemp -t ds-rounds)"
+trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$SCRATCH_HANG"' EXIT
+printf 'timeout: "not a duration"\n'       > "$CFG_DUR"
+printf 'timeout: 5 minutes\n'              > "$CFG_HUMAN"
+printf 'providers:\n  claude: "scalar"\n' > "$CFG_PROV"
+printf 'council:\n  rounds: "three"\n'    > "$CFG_ROUNDS"
+expect_exit 6 "config: unparseable duration"  "$BINARY" status --config "$CFG_DUR"
+expect_exit 6 "config: human duration typo"   "$BINARY" status --config "$CFG_HUMAN"
+expect_exit 6 "config: provider not a map"    "$BINARY" status --config "$CFG_PROV"
+expect_exit 6 "config: rounds not a number"   "$BINARY" status --config "$CFG_ROUNDS"
+
+# A character device is read to EOF by viper and never returns. `--config <(...)`
+# is a real idiom, so this must fail fast rather than hang.
+if [ -c /dev/zero ]; then
+  RC=0; timeout 10 "$BINARY" status --config /dev/zero >/dev/null 2>&1 || RC=$?
+  if [ "$RC" -eq 6 ]; then
+    pass "config: character device rejected (no hang)"
+  else
+    fail "config: /dev/zero gave $RC (want 6; 124 means it hung)"
+  fi
+fi
 expect_exit 2 "precedence: bad flag beats bad config" "$BINARY" council "hi" --zzz --config /nope/nope.yaml
 
 # A timeout during a council must report 4, not be masked by the downstream

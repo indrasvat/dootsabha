@@ -89,14 +89,85 @@ func LoadConfig(cfgFile string) (*Config, error) {
 
 	if cfgFile != "" {
 		source = ConfigSource{Type: "file", Path: cfgFile}
+		if err := checkRegularFile(cfgFile); err != nil {
+			return nil, err
+		}
 		v.SetConfigFile(cfgFile)
 		v.SetConfigType("yaml")
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("read config %q: %w", cfgFile, err)
 		}
+		if err := validateRawConfig(v); err != nil {
+			return nil, fmt.Errorf("invalid config %q: %w", cfgFile, err)
+		}
 	}
 
 	return buildConfig(v, source), nil
+}
+
+// checkRegularFile rejects anything that is not a regular file.
+//
+// Viper reads the path to EOF, so a character device or FIFO (`--config
+// /dev/zero`, or `--config <(gen-config)` fed by an endless producer) never
+// returns. A config that cannot be read in bounded time is not a config.
+func checkRegularFile(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("read config %q: %w", path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("read config %q: is a directory, expected a regular file", path)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("read config %q: not a regular file (mode %s)", path, info.Mode().Type())
+	}
+	return nil
+}
+
+// validateRawConfig rejects values viper would otherwise coerce to a zero value.
+//
+// Without this, `timeout: 5 minutes` parses as a YAML string, coerces to 0, and
+// silently falls back to the built-in default — the run behaves differently from
+// what the file says, with no signal. The exit-code contract reserves 6 for a
+// config that is "missing, unreadable, or invalid"; these are invalid.
+func validateRawConfig(v *viper.Viper) error {
+	for _, key := range []string{"timeout", "session_timeout"} {
+		raw := v.Get(key)
+		if raw == nil {
+			continue
+		}
+		if s, ok := raw.(string); ok {
+			if _, err := time.ParseDuration(s); err != nil {
+				return fmt.Errorf("%s: %q is not a duration (try 30s, 5m, 1h)", key, s)
+			}
+			continue
+		}
+		if _, ok := raw.(int); !ok {
+			return fmt.Errorf("%s: expected a duration string, got %T", key, raw)
+		}
+	}
+
+	if raw := v.Get("council.rounds"); raw != nil {
+		switch raw.(type) {
+		case int, int32, int64, float64:
+		default:
+			return fmt.Errorf("council.rounds: expected a number, got %T", raw)
+		}
+	}
+
+	if raw := v.Get("providers"); raw != nil {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			return fmt.Errorf("providers: expected a mapping, got %T", raw)
+		}
+		for name, entry := range m {
+			if _, ok := entry.(map[string]any); !ok {
+				return fmt.Errorf("providers.%s: expected a mapping, got %T", name, entry)
+			}
+		}
+	}
+
+	return nil
 }
 
 // defaultConfigPath returns the standard user config file when it exists.
