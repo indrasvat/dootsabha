@@ -8,15 +8,19 @@
 
 ## Exit Code Table
 
-| Code | Constant | Meaning | Precedence |
-|------|----------|---------|------------|
-| 0 | ExitSuccess | Everything OK | 1 (lowest) |
-| 1 | ExitError | General error; also usage errors, and `council` when **all** agents failed | 2 |
-| 3 | ExitProvider | Provider error (CLI not found, auth invalid, agent crashed) | 4 |
-| 4 | ExitTimeout | At least one agent timed out | 5 (highest in practice) |
-| 5 | ExitPartial | Partial result (some agents failed) | 3 |
+| Code | Constant | Meaning |
+|------|----------|---------|
+| 0 | ExitSuccess | Everything OK |
+| 1 | ExitError | General error; also usage errors, and `council` when **all** agents failed |
+| 3 | ExitProvider | Provider error (CLI not found, auth invalid, agent crashed, quota exhausted) |
+| 4 | ExitTimeout | At least one agent timed out |
+| 5 | ExitPartial | **Config error, or** partial result (some agents failed) |
 
-Highest-precedence code wins: `4 > 3 > 5 > 1 > 0`.
+When several apply, the highest wins: `4 > 3 > 5 > 1 > 0`.
+
+**Exit 5 is overloaded on every command** — a bad `--config` and a partial council
+result both exit 5. Branch on the payload, not the code: `.data.error` present
+means a config error; a `dispatch[]` array means a partial result you can still use.
 
 > **`ExitUsage` (2) is not emitted.** The PRD and CLAUDE.md define it, but every
 > usage error — unknown flag, missing argument, unknown provider, unknown chair —
@@ -27,7 +31,7 @@ Highest-precedence code wins: `4 > 3 > 5 > 1 > 0`.
 | Command | 0 | 1 | 3 | 4 | 5 |
 |---------|---|---|---|---|---|
 | `council` | All agents + synthesis OK | Bad flags; all agents failed | Provider/synthesis error | Timeout | Partial (some failed) |
-| `consult` | Agent responded | Bad flags; missing `--agent` | Provider error | Timeout | Config error |
+| `consult` | Agent responded | Bad flags; missing `--agent` | Provider error, quota exhausted | Timeout | Config error |
 | `review` | Author + reviewer OK | Bad flags | Provider error | Timeout | Config error |
 | `refine` | All rounds completed | Bad flags | Provider error | Timeout | Partial (some reviewers failed) |
 | `status` | All healthy | Error | Some unhealthy¹ | — | — |
@@ -70,13 +74,10 @@ esac
 output=$(dootsabha consult --json --agent claude "Explain this error" 2>&1)
 exit_code=$?
 
-if [ $exit_code -eq 2 ]; then
-  echo "Usage error: $output" >&2
-  exit 1
-fi
-
 if [ $exit_code -ne 0 ]; then
-  echo "Agent error (exit $exit_code)" >&2
+  # exit 5 is overloaded: config error vs partial result. Check the payload.
+  reason=$(echo "$output" | jq -r '.data.error // "agent failure"' 2>/dev/null)
+  echo "dootsabha failed (exit $exit_code): $reason" >&2
   exit 1
 fi
 

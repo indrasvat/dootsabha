@@ -345,12 +345,26 @@ Wrapped in envelope. Fields are PascalCase (no json tags on healthRow struct).
     "Version": "string",
     "Model": "string",
     "Auth": "string",
-    "Error": "string"
+    "Error": "string",
+    "Installed": true
   }]
 }
 ```
 
 Extract healthy agents: `jq '[.data[] | select(.Healthy)] | length'`
+
+`Installed` reports whether the provider's binary resolved on `$PATH`. It separates
+the two reasons a provider can be unhealthy:
+
+| `Healthy` | `Installed` | Meaning | STATUS column |
+|---|---|---|---|
+| `true` | `true` | usable (but see the quota caveat in SKILL.md) | `OK` |
+| `false` | `false` | CLI not installed | `not installed (optional)` for opt-in agents, else `FAIL` |
+| `false` | `true` | installed but broken — bad auth, crash, wrong version | `FAIL <reason>` |
+
+An **opt-in** provider (`grok`) that is not installed does not fail the command —
+`status` still exits 0. A required provider that is absent, or any provider that is
+installed but broken, exits 3.
 
 ### Exit Codes
 

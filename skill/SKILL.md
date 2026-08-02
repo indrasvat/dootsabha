@@ -7,7 +7,7 @@ description: >
   gaps, iterative refinement through reviewer feedback, or checking agent health.
   Replaces manual `codex exec` / `agy -p` / `grok -p` subprocess calls with
   structured JSON and exit codes built for agent control flow.
-allowed-tools: Bash(dootsabha:*)
+allowed-tools: Bash(dootsabha:*), Bash(./bin/dootsabha:*)
 ---
 
 # दूतसभा — Multi-Agent Council Orchestrator
@@ -25,6 +25,9 @@ synthesizes a result. Output is JSON with exit codes designed for branching.
 | `codex` | ✅ | — | — | ✅ |
 | `agy` | — | — | — | ✅ |
 | `grok` | ✅ | ✅ | ✅ | ❌ **opt-in** |
+
+Responses report `Model` as the *backend* id (`grok-4.5-build`), which differs from
+the configured `grok-4.5`. Match on prefix, not equality.
 
 `agy` runs plain-text print mode, so its token/cost/session fields are `0`/empty.
 
@@ -86,7 +89,12 @@ Two envelope shapes — this trips up most callers:
 | Commands | Shape | Extract |
 |---|---|---|
 | `consult`, `status`, `config`, `plugin` | `{meta, data}`, **PascalCase** fields | `jq -r '.data.Content'` |
+| …the same, **on failure** | `data` becomes `{provider, error}` — **lowercase** | `jq -r '.data.error'` |
 | `council`, `review`, `refine` | top-level object, **snake_case** fields | `jq -r '.synthesis.content'` |
+
+> Reading the wrong shape yields **`null`, not an error** — `jq -r '.Content'` on a
+> consult prints `null` and exits 0. If a field comes back null, check the envelope
+> before assuming the agent returned nothing.
 
 ```bash
 RESULT=$(dootsabha council --json "Redis or Memcached for session caching?")
@@ -106,9 +114,13 @@ echo "$RESULT" | jq -r '.dispatch[] | select(.error != null) | .provider'   # wh
 | 1 | Error — includes `council` when **all** agents failed |
 | 3 | Provider error — CLI missing, auth invalid, agent crashed |
 | 4 | Timeout |
-| 5 | Partial — some agents failed, result still usable |
+| 5 | **Two meanings** — config error, *or* partial result (some agents failed) |
 
 Precedence: `4 > 3 > 5 > 1 > 0`.
+
+Exit 5 is overloaded on every command. Disambiguate by payload, not exit code:
+`.data.error` present → config error; `dispatch[]` present → partial result you
+can still use.
 
 > Exit **2** is documented in the PRD but the CLI does not emit it — usage errors
 > exit 1. Do not branch on 2.
