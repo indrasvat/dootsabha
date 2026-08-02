@@ -209,7 +209,26 @@ All 4 items addressed in PRD v1.6.
 |------|-------------|--------|-------|
 | 702 | Provider default model refresh | DONE | — |
 | 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
-| 704 | Add xAI Grok CLI as opt-in fourth provider | IN PROGRESS | — |
+| 704 | Add xAI Grok CLI as opt-in fourth provider | DONE | — |
+
+### What Works End-to-End (704)
+
+- `grok` (xAI Grok CLI, `grok-4.5`) is a fourth agent, **opt-in**: default council,
+  refine reviewers and review defaults are unchanged. Select with `--agent grok`,
+  `--agents …,grok`, `--chair grok`, `--reviewers …,grok`.
+- Parses `--output-format streaming-messages-json`, taking the last `type=="result"`
+  line. `--output-format json` is unusable — its `.text` concatenates tool-call
+  preambles into the answer.
+- Runs with `--sandbox read-only` and an isolated `$HOME`, which severs Claude Code
+  harness inheritance (6 MCP servers, 53 hooks, `CLAUDE.md`) and cuts tokens ~85%.
+- Richest telemetry of any provider: content + tokens + cost + session id.
+- **Exit codes reworked** to one code per caller action:
+  `0` proceed · `1` internal bug · `2` fix the command · `3` retry/other agent ·
+  `4` raise timeout · `5` usable with gaps · `6` fix the config.
+  Precedence `2 > 6 > 4 > 3 > 5 > 1 > 0`, computed via `core.HighestExitCode`.
+- `--json` carries the same exit code as text mode, and stdout is always exactly
+  one JSON document — both now enforced by the harness on every case.
+- L3 8 → 12, L5 27 → 183 tests.
 
 ### What Works End-to-End (703)
 - Gemini CLI retired (sunset 2026-06-18) → replaced by `agy` (Antigravity CLI) as the 3rd agent

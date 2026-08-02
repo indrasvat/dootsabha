@@ -1,6 +1,6 @@
 # Task 704: Add xAI Grok CLI as Fourth Provider
 
-**Status:** PENDING
+**Status:** DONE
 **Depends On:** 105 (codex provider), 302 (extract providers), 703 (agy provider)
 **Parallelizable With:** —
 
@@ -43,7 +43,8 @@ expectations must remain untouched.
 **Additive and opt-in.** grok is fully wired into every command and fully tested, but:
 
 - Default council stays `claude,codex,agy` (`codex,agy` inside Claude Code) — `council.go` **unchanged**.
-- `refine --reviewers` default stays `codex,agy` — `refine.go` **unchanged**.
+- `refine --reviewers` default stays `codex,agy`. (`refine.go` itself was later changed
+  for reasons unrelated to grok — see the exit-code work below.)
 - `review --author/--reviewer` defaults stay `codex`/`claude` — `review.go` **unchanged**.
 - Users opt in explicitly: `--agent grok`, `--agents claude,codex,grok`, `--chair grok`, etc.
 
@@ -82,9 +83,11 @@ neither. Stated explicitly so review does not flag it as missing.
 | `internal/providers/types.go`, `internal/cli/root.go` | package/long-description doc strings |
 | `Makefile` | `grok-provider` in `build-plugins` |
 
-`internal/cli/status.go` needs **no change** — `collectHealthRows` iterates `cfg.Providers`,
-so the grok row appears automatically. `internal/core/migrate.go` needs **no change** — it
-is the gemini→agy rename and grok is not a migration.
+`internal/cli/status.go` needs no change *for grok discovery* — `collectHealthRows`
+iterates `cfg.Providers`, so the row appears automatically. It was nonetheless
+rewritten later: adding an opt-in provider exposed that `status` failed the whole
+command when one was merely absent, which led to the wider exit-code work below.
+`internal/core/migrate.go` needs **no change** — it is the gemini→agy rename.
 
 ### EDIT — test infrastructure
 
@@ -315,6 +318,26 @@ Checked and deliberately **not** changed:
 Coverage added: L3 `8 → 12` tests, L5 `27 → 41` tests. The new L5 suite exercises
 the absent-provider path that was previously **unreachable**, because the harness
 supplied a mock binary for every provider.
+
+## Scope note — what this task actually became
+
+The grok provider itself is small and additive. But adding an **opt-in** provider
+exposed that several contracts only held for the three always-present ones, and
+five agent-driven review passes turned that into the larger half of this branch:
+
+- `status` failed the whole command when an opt-in provider was merely absent
+- `--json` discarded the exit code in `status`, then in `refine`
+- exit codes overlapped: `5` meant both "config error" and "partial result";
+  `1` covered usage errors, internal errors and all-agents-failed; `2` was
+  documented everywhere and emitted nowhere
+- a timeout was reported as the downstream failure it caused
+- `3` was returned with usable, already-paid-for output in the payload
+- invalid config *values* were silently coerced to zero values
+- the test suite checked exit codes on the text path and JSON without exit codes,
+  so the same defect class kept surviving one command at a time
+
+All are fixed here rather than deferred. The harness now crosses exit code ×
+output mode × payload validity, which is what stops the next one.
 
 ## Follow-ups (NOT this task — each is a behaviour change to existing code)
 
