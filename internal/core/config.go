@@ -97,9 +97,16 @@ func LoadConfig(cfgFile string) (*Config, error) {
 		if err := v.ReadInConfig(); err != nil {
 			return nil, fmt.Errorf("read config %q: %w", cfgFile, err)
 		}
-		if err := validateRawConfig(v); err != nil {
+	}
+
+	// Validate on EVERY path, not only when a file was read. Environment
+	// overrides (DOOTSABHA_TIMEOUT, DOOTSABHA_COUNCIL_ROUNDS, …) apply to the
+	// built-in defaults too, and viper coerces a bad value to zero just the same.
+	if err := validateRawConfig(v); err != nil {
+		if cfgFile != "" {
 			return nil, fmt.Errorf("invalid config %q: %w", cfgFile, err)
 		}
+		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return buildConfig(v, source), nil

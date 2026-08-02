@@ -80,8 +80,12 @@ func (s *grokPluginServer) HealthCheck(ctx context.Context) (*gen.HealthCheckRes
 
 func (s *grokPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesResponse, error) {
 	return &gen.CapabilitiesResponse{
-		SupportsJson:      true,
-		SupportsStreaming: true,
+		SupportsJson: true,
+		// The grok CLI streams, but this plugin cannot: the gRPC Invoke RPC is
+		// unary and GrokProvider.Invoke buffers the whole subprocess output before
+		// returning. Advertising streaming would promise consumers a mode that is
+		// unreachable through this interface.
+		SupportsStreaming: false,
 		SupportedModels:   []string{"grok-4.5"},
 		DefaultModel:      "grok-4.5",
 		MaxContextTokens:  500000,

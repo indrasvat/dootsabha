@@ -198,3 +198,18 @@ func TestHealthRowReachableNotAuth(t *testing.T) {
 		t.Errorf("JSON should expose Reachable: %s", b)
 	}
 }
+
+// The chair must be validated after every source is resolved. Validating only
+// on `--chair` meant an unknown chair from YAML or DOOTSABHA_COUNCIL_CHAIR
+// slipped through, and synthesis silently fell back to another agent while
+// reporting success.
+func TestValidateChairCoversResolvedValue(t *testing.T) {
+	if err := validateChair("definitely-not-an-agent"); err == nil {
+		t.Fatal("an unknown chair must be rejected regardless of where it came from")
+	}
+	for _, ok := range []string{"", "claude", "grok"} {
+		if err := validateChair(ok); err != nil {
+			t.Errorf("validateChair(%q) = %v, want nil", ok, err)
+		}
+	}
+}

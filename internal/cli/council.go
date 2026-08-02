@@ -62,10 +62,13 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 
 			// Apply flag overrides to config.
 			if cmd.Flags().Changed("chair") || cmd.Flags().Changed("adhyaksha") {
-				if err := validateChair(chair); err != nil {
-					return &ExitError{Code: core.ExitUsage, Message: err.Error()}
-				}
 				cfg.Council.Chair = chair
+			}
+			// Validate the RESOLVED chair. Checking only the flag let an unknown
+			// chair from YAML or DOOTSABHA_COUNCIL_CHAIR through, after which
+			// synthesis silently fell back to another agent and reported success.
+			if err := validateChair(cfg.Council.Chair); err != nil {
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 			if cmd.Flags().Changed("rounds") || cmd.Flags().Changed("chakra") {
 				cfg.Council.Rounds = rounds

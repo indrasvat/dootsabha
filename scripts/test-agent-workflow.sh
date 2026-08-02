@@ -488,7 +488,7 @@ expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINAR
 # discard content they already paid for.
 FAILN="$(mktemp -t ds-failn)"
 CTR="$(mktemp -t ds-ctr)"
-trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$SCRATCH_HANG" "$FAILN" "$CTR"' EXIT
+trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$CFG_CHAIR" "$SCRATCH_HANG" "$FAILN" "$CTR"' EXIT
 # shellcheck disable=SC2016  # $1/$C belong to the generated script
 printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -ge "${MOCK_OK:-1}" ]; then echo gone >&2; exit 1; fi\necho "{\\"result\\":\\"r\\",\\"session_id\\":\\"s\\",\\"cost_usd\\":0,\\"model\\":\\"m\\",\\"duration_ms\\":1}"\n' > "$FAILN"
 chmod +x "$FAILN"
@@ -568,6 +568,24 @@ expect_exit 6 "config: unparseable duration"  "$BINARY" status --config "$CFG_DU
 expect_exit 6 "config: human duration typo"   "$BINARY" status --config "$CFG_HUMAN"
 expect_exit 6 "config: provider not a map"    "$BINARY" status --config "$CFG_PROV"
 expect_exit 6 "config: rounds not a number"   "$BINARY" status --config "$CFG_ROUNDS"
+
+# Validation must cover the built-in path too: env overrides apply to defaults,
+# and viper coerces a bad value to zero there just the same. ISOHOME keeps the
+# user's real ~/.config/dootsabha/config.yaml out of the picture.
+ISOHOME="$(mktemp -d -t ds-isohome)"
+expect_exit 6 "config: bad env duration, no file" \
+  env HOME="$ISOHOME" DOOTSABHA_TIMEOUT=not-a-duration "$BINARY" status
+expect_exit 6 "config: bad env rounds, no file" \
+  env HOME="$ISOHOME" DOOTSABHA_COUNCIL_ROUNDS=three "$BINARY" status
+
+# An unknown chair must be rejected wherever it came from — flag, YAML or env.
+CFG_CHAIR="$(mktemp -t ds-chair)"
+printf 'council:\n  chair: definitely-not-an-agent\n' > "$CFG_CHAIR"
+expect_exit 2 "chair: unknown via YAML" \
+  "$BINARY" council "hi" --agents claude,codex --config "$CFG_CHAIR"
+expect_exit 2 "chair: unknown via env" \
+  env HOME="$ISOHOME" DOOTSABHA_COUNCIL_CHAIR=definitely-not-an-agent \
+  "$BINARY" council "hi" --agents claude
 
 # A character device is read to EOF by viper and never returns. `--config <(...)`
 # is a real idiom, so this must fail fast rather than hang.

@@ -102,3 +102,36 @@ func TestLoadConfigRejectsDirectory(t *testing.T) {
 }
 
 func timeoutAfter() <-chan time.Time { return time.After(5 * time.Second) }
+
+// Validation must run on the built-in path too. It used to sit inside the
+// `cfgFile != ""` branch, so with no config file — the common default — an env
+// override like DOOTSABHA_TIMEOUT=not-a-duration was coerced to zero and the
+// command silently used the fallback instead of the documented config error.
+func TestLoadConfigValidatesEnvWithNoFile(t *testing.T) {
+	t.Setenv("HOME", t.TempDir()) // ensure no default config is discovered
+	t.Setenv("DOOTSABHA_TIMEOUT", "not-a-duration")
+
+	if _, err := core.LoadConfig(""); err == nil {
+		t.Error("an invalid env duration must be rejected even with no config file")
+	}
+}
+
+func TestLoadConfigValidatesEnvRounds(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("DOOTSABHA_COUNCIL_ROUNDS", "three")
+
+	if _, err := core.LoadConfig(""); err == nil {
+		t.Error("a non-numeric env rounds value must be rejected")
+	}
+}
+
+func TestLoadConfigBuiltInDefaultsStillLoad(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg, err := core.LoadConfig("")
+	if err != nil {
+		t.Fatalf("built-in defaults must load cleanly: %v", err)
+	}
+	if cfg.Timeout == 0 {
+		t.Error("default timeout should be set")
+	}
+}
