@@ -150,7 +150,7 @@ type migrateResultView struct {
 
 func emitMigrateResult(rc *output.RenderContext, v migrateResultView) error {
 	if rc.IsJSON() {
-		return output.WriteJSON(os.Stdout, v)
+		return emitJSON(v)
 	}
 
 	switch v.Status {
@@ -207,7 +207,7 @@ func newConfigShowCmd() *cobra.Command {
 			rc := output.NewRenderContext(os.Stdout, useJSON)
 
 			if rc.IsJSON() || showJSON {
-				return output.WriteJSON(os.Stdout, view)
+				return emitJSON(view)
 			}
 
 			renderConfigView(view, showComments)

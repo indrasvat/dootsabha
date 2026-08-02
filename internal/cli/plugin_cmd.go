@@ -51,7 +51,7 @@ func newPluginListCmd() *cobra.Command {
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, entries)
+				return emitJSON(entries)
 			}
 
 			if len(entries) == 0 {
@@ -92,7 +92,7 @@ func newPluginInspectCmd() *cobra.Command {
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, found)
+				return emitJSON(found)
 			}
 
 			renderPluginInspect(rc, *found)

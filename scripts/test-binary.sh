@@ -99,5 +99,35 @@ else
   fail "mock-grok not found/executable"
 fi
 
+# Test 10: mocks stay valid JSON for prompts containing quotes and newlines.
+#
+# REGRESSION GUARD. council/refine/review build multi-line prompts (they embed
+# prior agent responses), so a mock that naively interpolates $PROMPT into a JSON
+# string emits invalid JSON — and those pipelines were being exercised against
+# garbage rather than a faithful stand-in for the real CLI.
+NASTY='Line one
+Line "two" with quotes and \backslash'
+
+if "$MOCK_DIR/mock-claude" -p "$NASTY" --output-format json 2>/dev/null \
+   | python3 -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; then
+  pass "mock-claude emits valid JSON for a quoted multi-line prompt"
+else
+  fail "mock-claude emits INVALID JSON for a quoted multi-line prompt"
+fi
+
+if "$MOCK_DIR/mock-codex" "$NASTY" 2>/dev/null \
+   | python3 -c 'import json,sys; [json.loads(l) for l in sys.stdin if l.strip()]' 2>/dev/null; then
+  pass "mock-codex emits valid JSONL for a quoted multi-line prompt"
+else
+  fail "mock-codex emits INVALID JSONL for a quoted multi-line prompt"
+fi
+
+if "$MOCK_DIR/mock-grok" -p "$NASTY" --output-format streaming-messages-json 2>/dev/null \
+   | python3 -c 'import json,sys; [json.loads(l) for l in sys.stdin if l.strip()]' 2>/dev/null; then
+  pass "mock-grok emits valid NDJSON for a quoted multi-line prompt"
+else
+  fail "mock-grok emits INVALID NDJSON for a quoted multi-line prompt"
+fi
+
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

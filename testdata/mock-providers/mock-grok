@@ -15,9 +15,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# JSON-escape a string so prompts containing quotes/newlines/backslashes cannot
+# produce invalid JSON. council/refine embed prior agent responses in the prompt,
+# so multi-line input is the normal case, not an edge case.
+json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read()))'; }
+
 SESSION="019fbc10-9c47-77f2-a8d4-046ae03de003"
 echo '{"type":"system","subtype":"init","session_id":"'"$SESSION"'","model":"grok-4.5"}'
 # An assistant text block that is NOT the answer — proves dootsabha reads the
 # result event rather than concatenating assistant blocks (the `.text` trap).
 echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me look at that."}]}}'
-printf '{"type":"result","subtype":"success","is_error":false,"result":"Mock response to: %s","stop_reason":"end_turn","session_id":"%s","duration_ms":1234,"num_turns":1,"total_cost_usd":0.0102368,"usage":{"input_tokens":3322,"output_tokens":29,"cache_read_input_tokens":1024,"cache_creation_input_tokens":0},"modelUsage":{"grok-4.5-build":{"inputTokens":3322,"outputTokens":29,"costUSD":0.0102368}}}\n' "$PROMPT" "$SESSION"
+PROMPT_JSON=$(printf '%s' "Mock response to: $PROMPT" | json_str)
+printf '{"type":"result","subtype":"success","is_error":false,"result":%s,"stop_reason":"end_turn","session_id":"%s","duration_ms":1234,"num_turns":1,"total_cost_usd":0.0102368,"usage":{"input_tokens":3322,"output_tokens":29,"cache_read_input_tokens":1024,"cache_creation_input_tokens":0},"modelUsage":{"grok-4.5-build":{"inputTokens":3322,"outputTokens":29,"costUSD":0.0102368}}}\n' "$PROMPT_JSON" "$SESSION"

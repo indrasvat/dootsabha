@@ -287,6 +287,34 @@ committed**; attached to the PR as review evidence). Full captions in that direc
 | `TokensIn` is uncached-only, under-reporting prompt size | ⚠️ **Accepted** — deliberate, consistent with `claude.go`; documented in the struct |
 | `--cwd` in the documented contract but never injected | ✅ **Doc corrected** — cwd is inherited; containment comes from `--sandbox read-only` |
 
+## Graceful degradation — verified across the failure matrix
+
+Driven against the real binary with mock providers (absent / failing / hanging /
+empty / malformed), across `status`, `consult`, `council`, `review`, `refine`.
+Every issue found was fixed **in this PR**, each with a failing test first.
+
+| # | Issue | Origin | Fix |
+|---|---|---|---|
+| 1 | `status` exited 3 when an opt-in provider was merely absent — i.e. on every machine without the grok CLI | **Introduced here** | `Installed` field + `statusExitError` rule; absent opt-in reads `not installed (optional)` |
+| 2 | `--json` emitted **two** JSON documents on any failure path, so `… --json \| jq` died with "Extra data" | **Pre-existing** (reproduced on `main` with `agy`) | `jsonDocWritten` guard — the command's specific document wins, `Execute()` no longer appends a generic one |
+| 3 | All three mocks emitted **invalid JSON** for prompts containing quotes/newlines — so council/refine were tested against garbage | mock-grok **here**; claude/codex **pre-existing** | `json_str()` escaping in all three mocks |
+| 4 | `--chair bogus` silently accepted: fell back to another agent and exited 0 | **Pre-existing** | `validateChair` rejects unknown names (exit 1), matching `--agent` |
+| 5 | Chair fallback was invisible to humans (recorded only in JSON) | **Pre-existing** | stderr warning naming the requested and actual chair |
+
+Checked and deliberately **not** changed:
+
+- **`council` exits 1 when all agents fail** — documented in its own `--help`
+  ("Exit codes: 0 success, 1 all failed, …"). Intentional, not an inconsistency to
+  "fix" by breaking a published contract.
+- **ANSI in piped output when a provider's *content* contains escapes** — दूतसभा
+  adds no ANSI of its own; relaying provider content verbatim is correct, and
+  stripping it would corrupt legitimate output.
+- **No panics, nil derefs, or stack traces** were observed in any scenario.
+
+Coverage added: L3 `8 → 12` tests, L5 `27 → 41` tests. The new L5 suite exercises
+the absent-provider path that was previously **unreachable**, because the harness
+supplied a mock binary for every provider.
+
 ## Follow-ups (NOT this task — each is a behaviour change to existing code)
 
 Surfaced by research/dogfooding while scoping 704. Each deserves its own branch and review;
@@ -297,7 +325,7 @@ folding any of them in here would break the additive constraint.
 | **705** — provider hardening | nil-config deref, partial-config dropping defaults, dead `opts.Timeout`, `AuthValid` proven only by `--version` — across `claude.go`/`codex.go`/`agy.go` | Grok's dogfood review, each finding verified against source |
 | **706** — `ExitUsage` (2) is unreachable | CLI returns 1 for every usage error; contradicts CLAUDE.md, PRD §6.1, README, SKILL | Verified: 4 distinct usage errors all → exit 1 |
 | **707** — skill `jq` drift | 5 broken `jq` expressions in `skill/references/` + `examples/` (wrong envelope shape, `select(.error == "")` never matches because `error` is `omitempty`) | Skill audit F1–F5, verified against real binary output |
-| **708** — command robustness | `--chair <unknown>` silently succeeds (exit 0, silent fallback); `refine --reviewers <unknown>` → exit 5 instead of the exit-1 `unknown provider` used by consult/council/review | Skill audit F10–F11 |
+| ~~**708** — command robustness~~ | **FIXED IN THIS PR** — `--chair <unknown>` now errors (exit 1) and a chair fallback warns on stderr. `refine --reviewers <unknown>` → exit 5 remains, tracked separately. | Skill audit F10–F11 |
 | **709** — SKILL de-duplication | ~150 of 313 SKILL.md lines duplicate `references/`; description written in second person (docs flag this explicitly); missing `allowed-tools: Bash(dootsabha *)` | Skill audit A1–A8 |
 
 ## Commit

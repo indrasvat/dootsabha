@@ -62,6 +62,9 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			// Apply flag overrides to config.
 			if cmd.Flags().Changed("chair") || cmd.Flags().Changed("adhyaksha") {
+				if err := validateChair(chair); err != nil {
+					return &ExitError{Code: 1, Message: err.Error()}
+				}
 				cfg.Council.Chair = chair
 			}
 			if cmd.Flags().Changed("rounds") || cmd.Flags().Changed("chakra") {
@@ -195,6 +198,15 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
 					return &ExitError{Code: 3, Message: fmt.Sprintf("synthesis: %s", err)}
+				}
+
+				// Surface a chair fallback. It is recorded in JSON as
+				// `chair_fallback`, but a human reading the terminal would
+				// otherwise believe their chosen chair wrote the synthesis when a
+				// different agent actually did.
+				if synthesis != nil && synthesis.ChairFallback != "" && !rc.IsJSON() && !quiet {
+					fmt.Fprintf(os.Stderr, "Warning: chair %q unavailable — synthesized by %q instead\n", //nolint:errcheck
+						cfg.Council.Chair, synthesis.ChairFallback)
 				}
 
 				// Multi-round: feed synthesis into next round's prompt.
@@ -411,6 +423,7 @@ func renderCouncilJSON(dispatches []core.DispatchResult, reviews []core.ReviewRe
 
 	out.Meta.DurationMs = totalDuration.Milliseconds()
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(out); err != nil {

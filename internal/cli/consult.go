@@ -87,13 +87,13 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 				}
 				if rc.IsJSON() {
 					// Emit error JSON so programmatic callers can parse the failure.
-					_ = output.WriteErrorJSON(os.Stdout, agent, msg)
+					emitErrorJSON(agent, msg)
 				}
 				return &ExitError{Code: exitCode, Message: msg}
 			}
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, result)
+				return emitJSON(result)
 			}
 
 			renderConsultResult(rc, prov.Name(), result)
@@ -127,6 +127,22 @@ func getProvider(name string, cfg *core.Config, runner providers.Runner) (provid
 	default:
 		return nil, fmt.Errorf("unknown provider: %q — valid values: claude, codex, agy, grok", name)
 	}
+}
+
+// validateChair rejects an unknown chair name up front.
+//
+// Without this, `--chair bogus` was silently accepted: synthesis fell back to
+// another agent and the command exited 0, so a typo looked like success while a
+// different agent wrote the answer. `--agent` already rejects unknown names.
+// An empty chair means "use the configured default" and stays valid.
+func validateChair(name string) error {
+	if name == "" {
+		return nil
+	}
+	if _, err := getProvider(name, nil, nil); err != nil {
+		return fmt.Errorf("unknown chair: %q — valid values: claude, codex, agy, grok", name)
+	}
+	return nil
 }
 
 // providerColor returns the lipgloss color for a given provider name.

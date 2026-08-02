@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"sort"
 
 	"github.com/spf13/cobra"
@@ -21,6 +22,55 @@ type healthRow struct {
 	Model   string
 	Auth    string
 	Error   string
+	// Installed reports whether the provider's binary was resolvable on $PATH.
+	// It distinguishes "you never installed this" from "it is installed but
+	// broken" — only the latter is a problem for an opt-in provider.
+	Installed bool
+}
+
+// optionalProviders are opt-in agents: they are listed by `status` for
+// discoverability but belong to no default pipeline, so a user who never
+// installed one must not be told their setup is unhealthy.
+//
+// Promoting a provider to a council default means removing it from this set.
+var optionalProviders = map[string]bool{
+	"grok": true,
+}
+
+func isOptionalProvider(name string) bool { return optionalProviders[name] }
+
+// statusLabelPlain is the un-styled STATUS cell for a row. Kept separate from
+// rendering so the wording is testable without a RenderContext.
+func statusLabelPlain(r healthRow) string {
+	switch {
+	case r.Healthy:
+		return "OK"
+	case isOptionalProvider(r.Name) && !r.Installed:
+		return "not installed (optional)"
+	default:
+		if r.Error != "" {
+			return "FAIL " + r.Error
+		}
+		return "FAIL"
+	}
+}
+
+// statusExitError applies the exit-code rule for `dootsabha status`.
+//
+// A provider is a problem when it is unhealthy AND either it is required, or it
+// is installed (so the user clearly intended to use it). An opt-in provider that
+// is simply absent is informational.
+func statusExitError(rows []healthRow) error {
+	for _, r := range rows {
+		if r.Healthy {
+			continue
+		}
+		if isOptionalProvider(r.Name) && !r.Installed {
+			continue // opt-in and never installed — not the user's problem
+		}
+		return &ExitError{Code: 3, Message: "one or more providers are unhealthy"}
+	}
+	return nil
 }
 
 func newStatusCmd() *cobra.Command {
@@ -58,18 +108,12 @@ Exit codes: 0 all healthy, 1 error, 3 one or more providers unhealthy`,
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, rows)
+				return emitJSON(rows)
 			}
 
 			renderStatusTable(rc, rows)
 
-			// Exit 3 if any provider is unhealthy.
-			for _, r := range rows {
-				if !r.Healthy {
-					return &ExitError{Code: 3, Message: "one or more providers are unhealthy"}
-				}
-			}
-			return nil
+			return statusExitError(rows)
 		},
 	}
 }
@@ -86,12 +130,17 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 
 	rows := make([]healthRow, 0, len(names))
 	for _, name := range names {
+		installed := providerInstalled(cfg, name)
+
 		prov, err := getProvider(name, cfg, runner)
 		if err != nil {
-			// Provider name is in config but not a known built-in.
+			// Provider name is in config but not a known built-in. This is a
+			// config error regardless of installation, so Installed stays true
+			// to keep it failing the status check.
 			rows = append(rows, healthRow{
-				Name:  name,
-				Error: fmt.Sprintf("unknown provider type: %s", name),
+				Name:      name,
+				Error:     fmt.Sprintf("unknown provider type: %s", name),
+				Installed: true,
 			})
 			continue
 		}
@@ -99,8 +148,9 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 		status, err := prov.HealthCheck(ctx)
 		if err != nil {
 			rows = append(rows, healthRow{
-				Name:  name,
-				Error: err.Error(),
+				Name:      name,
+				Error:     err.Error(),
+				Installed: installed,
 			})
 			continue
 		}
@@ -111,15 +161,30 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 		}
 
 		rows = append(rows, healthRow{
-			Name:    name,
-			Healthy: status.Healthy,
-			Version: status.CLIVersion,
-			Model:   status.Model,
-			Auth:    authStr,
-			Error:   status.Error,
+			Name:      name,
+			Healthy:   status.Healthy,
+			Version:   status.CLIVersion,
+			Model:     status.Model,
+			Auth:      authStr,
+			Error:     status.Error,
+			Installed: installed,
 		})
 	}
 	return rows
+}
+
+// providerInstalled reports whether the provider's configured binary resolves on
+// $PATH (or as an explicit path). Used to tell "never installed" apart from
+// "installed but broken".
+func providerInstalled(cfg *core.Config, name string) bool {
+	binary := name
+	if cfg != nil {
+		if pc, ok := cfg.Providers[name]; ok && pc.Binary != "" {
+			binary = pc.Binary
+		}
+	}
+	_, err := exec.LookPath(binary)
+	return err == nil
 }
 
 // renderStatusTable writes the health table to stdout using the output package helpers.
@@ -136,7 +201,14 @@ func renderStatusTable(rc *output.RenderContext, rows []healthRow) {
 		name := dot + " " + r.Name
 
 		status := output.StatusOK(rc)
-		if !r.Healthy {
+		switch {
+		case r.Healthy:
+			// keep OK
+		case isOptionalProvider(r.Name) && !r.Installed:
+			// Opt-in and never installed: nothing is broken, so don't shout FAIL
+			// or dump a fork/exec error at the user.
+			status = "not installed (optional)"
+		default:
 			status = output.StatusFail(rc)
 			if r.Error != "" {
 				status += " " + r.Error

@@ -172,6 +172,171 @@ else
   fail "status only lists $FOUND/4 providers"
 fi
 
+# ── Workflow 5b: Absent providers degrade gracefully ─────────────────────────
+#
+# REGRESSION GUARD. Every other test here supplies a mock binary for every
+# provider, so the "provider not installed" path was never exercised. Adding
+# grok as a built-in then made `status` exit 3 on any machine without the grok
+# CLI — for an agent the user never opted into. These tests pin the contract.
+
+echo ""
+echo "--- Absent provider handling ---"
+
+# 5b. An OPT-IN provider that is absent must NOT fail status.
+RC=0; OUT=$(DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" status 2>&1) || RC=$?
+if [ "$RC" -eq 0 ]; then
+  pass "absent opt-in provider (grok) keeps status exit 0"
+else
+  fail "absent opt-in provider made status exit $RC (want 0)"
+fi
+
+# 5c. ...and it is still listed, described as not installed rather than FAIL.
+if echo "$OUT" | grep -qi 'grok' && echo "$OUT" | grep -qi 'not installed'; then
+  pass "absent opt-in provider is listed as not installed"
+else
+  fail "absent opt-in provider not described as not installed: $OUT"
+fi
+
+# 5d. No raw exec plumbing leaks into the user-facing table.
+if echo "$OUT" | grep -q 'fork/exec'; then
+  fail "raw fork/exec error leaked into status output"
+else
+  pass "no raw exec error in status output for absent opt-in provider"
+fi
+
+# 5e. A REQUIRED provider that is absent MUST still fail status.
+RC=0; DOOTSABHA_PROVIDERS_AGY_BINARY=/nonexistent/agy "$BINARY" status >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 3 ]; then
+  pass "absent required provider (agy) still exits 3"
+else
+  fail "absent required provider exited $RC (want 3)"
+fi
+
+# 5f. Explicitly consulting an absent provider is a provider error (exit 3).
+RC=0; DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok "hi" >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 3 ]; then
+  pass "consulting an absent provider exits 3"
+else
+  fail "consulting an absent provider exited $RC (want 3)"
+fi
+
+# 5g. status --json stays valid JSON when a provider is absent.
+if DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" status --json 2>/dev/null \
+     | python3 -c "import json,sys; d=json.load(sys.stdin); g=[p for p in d['data'] if p['Name']=='grok'][0]; assert g['Healthy'] is False; assert g['Installed'] is False"; then
+  pass "status --json stays valid and marks absent provider uninstalled"
+else
+  fail "status --json invalid or mislabelled for an absent provider"
+fi
+
+# ── Workflow 5h: --json emits EXACTLY ONE document, even on failure ──────────
+#
+# REGRESSION GUARD. Commands render their own JSON envelope, and Execute() also
+# emits an error envelope for any ExitError in JSON mode. Together they wrote
+# TWO documents to stdout, so `... --json | jq` failed with "Extra data" on
+# every failure path — precisely when automation most needs to parse the output.
+
+echo ""
+echo "--- JSON single-document guarantee ---"
+
+# Parses stdin as exactly one JSON value; fails on trailing documents.
+one_json() {
+  python3 -c "
+import json,sys
+raw = sys.stdin.read()
+try:
+    json.JSONDecoder().raw_decode(raw.lstrip())
+except Exception as e:
+    sys.exit('not JSON: %s' % e)
+obj, end = json.JSONDecoder().raw_decode(raw.lstrip())
+if raw.lstrip()[end:].strip():
+    sys.exit('extra document after the first')
+"
+}
+
+# 5h. consult failure
+if { DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok "hi" --json 2>/dev/null || true; } | one_json; then
+  pass "consult --json emits one document on provider failure"
+else
+  fail "consult --json emitted malformed/multiple documents on failure"
+fi
+
+# 5i. council partial failure — successful agents must still be reported.
+if { DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+   "$BINARY" council "hi" --agents claude,codex,grok --json 2>/dev/null || true; } | one_json; then
+  pass "council --json emits one document on partial failure"
+else
+  fail "council --json emitted malformed/multiple documents on partial failure"
+fi
+
+# 5j. review failure
+if { DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+   "$BINARY" review "hi" --author grok --reviewer claude --json 2>/dev/null || true; } | one_json; then
+  pass "review --json emits one document on author failure"
+else
+  fail "review --json emitted malformed/multiple documents on author failure"
+fi
+
+# 5k. refine failure
+if { DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+   "$BINARY" refine "hi" --author claude --reviewers grok --json 2>/dev/null || true; } | one_json; then
+  pass "refine --json emits one document on reviewer failure"
+else
+  fail "refine --json emitted malformed/multiple documents on reviewer failure"
+fi
+
+# 5l. council partial failure must PRESERVE the successful agents' output.
+PARTIAL=$(DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+  "$BINARY" council "hi" --agents claude,codex,grok --json 2>/dev/null || true)
+if echo "$PARTIAL" | python3 -c "
+import json,sys
+d = json.JSONDecoder().raw_decode(sys.stdin.read().lstrip())[0]
+ok = [x for x in d.get('dispatch', []) if not x.get('error')]
+assert len(ok) >= 2, 'successful agents lost: %r' % d.get('dispatch')
+" 2>/dev/null; then
+  pass "council preserves successful agents' output on partial failure"
+else
+  fail "council lost successful agents' output on partial failure"
+fi
+
+# ── Workflow 5m: chair validation and fallback visibility ───────────────────
+#
+# REGRESSION GUARD. `--chair bogus` used to be silently accepted: synthesis fell
+# back to another agent and the command exited 0, so a typo looked like success
+# while a different agent wrote the answer.
+
+echo ""
+echo "--- Chair handling ---"
+
+# 5m. An unknown chair name is rejected, like an unknown --agent.
+RC=0; OUT=$("$BINARY" council "hi" --agents claude,codex --chair definitely-not-an-agent 2>&1) || RC=$?
+if [ "$RC" -ne 0 ] && echo "$OUT" | grep -q 'unknown chair'; then
+  pass "unknown --chair is rejected with a clear error"
+else
+  fail "unknown --chair not rejected (exit $RC): $OUT"
+fi
+
+# 5n. A valid-but-unavailable chair still works, but says so.
+RC=0; ERROUT=$(DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+  "$BINARY" council "hi" --agents claude,codex --chair grok 2>&1 >/dev/null) || RC=$?
+if echo "$ERROUT" | grep -qi 'chair .* unavailable'; then
+  pass "chair fallback is surfaced to the user"
+else
+  fail "chair fallback happened silently: $ERROUT"
+fi
+
+# 5o. ...and the fallback is recorded in JSON for programmatic callers.
+if DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok \
+   "$BINARY" council "hi" --agents claude,codex --chair grok --json 2>/dev/null \
+   | python3 -c "
+import json,sys
+d = json.JSONDecoder().raw_decode(sys.stdin.read().lstrip())[0]
+assert d['synthesis']['chair_fallback'], 'chair_fallback not recorded'
+"; then
+  pass "chair fallback recorded in JSON"
+else
+  fail "chair fallback missing from JSON"
+fi
+
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
 echo ""

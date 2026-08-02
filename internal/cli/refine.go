@@ -438,6 +438,7 @@ func renderRefineJSON(versions []refineVersionJSON, finalVersion int, finalConte
 		},
 	}
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {

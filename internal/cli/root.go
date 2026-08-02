@@ -95,7 +95,9 @@ func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
-			if jsonOutput {
+			// Only emit the generic error envelope when the command has not
+			// already written its own — two documents make stdout unparseable.
+			if jsonOutput && !jsonDocWritten {
 				// Emit JSON error so automation always gets parseable stdout.
 				_ = output.WriteErrorJSON(os.Stdout, "", exitErr.Message)
 			} else {
@@ -104,7 +106,7 @@ func Execute() {
 			os.Exit(exitErr.Code)
 		}
 		// Non-ExitError (e.g., unknown command, flag parse) — always show.
-		if jsonOutput {
+		if jsonOutput && !jsonDocWritten {
 			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck

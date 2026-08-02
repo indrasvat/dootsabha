@@ -124,7 +124,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
-					_ = output.WriteErrorJSON(os.Stdout, author, msg)
+					emitErrorJSON(author, msg)
 				}
 				return &ExitError{Code: exitCode, Message: msg}
 			}
@@ -234,6 +234,7 @@ func renderReviewJSON(authorResult, reviewerResult *providers.ProviderResult, au
 		},
 	}
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {
