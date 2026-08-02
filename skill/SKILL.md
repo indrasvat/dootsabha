@@ -40,6 +40,18 @@ dootsabha status --json | jq -r '.data[] | select(.Name=="grok" and .Healthy) | 
 Non-empty output means grok is usable. Reach for it when a task benefits from a
 fourth, independent perspective — it reports full token and cost data.
 
+### `status` proves liveness, not quota
+
+`status` runs each CLI's `--version`. A `Healthy: true` / `Auth: ✓` row means the
+binary is installed and runnable — it does **not** check credentials or remaining
+quota. An agent can look healthy and still fail mid-call with a rate-limit or
+quota-exhausted error. `agy` hits this most often.
+
+Treat it as routine, not as a broken tool: the provider's own error text is
+surfaced at exit **3** (that agent failed) or exit **5** (council — others
+succeeded). Retry with a different agent, or read `meta.providers` to see who is
+still working.
+
 ## Always use `--json`
 
 ```bash
