@@ -104,10 +104,10 @@ Output structure (envelope format):
 {
   "meta": { "schema_version": 1 },
   "data": [
-    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "Gemini 3.5 Flash (High)", "Auth": "\u2713", "Installed": true },
-    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "claude-opus-4-8", "Auth": "\u2713", "Installed": true },
-    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "gpt-5.5", "Auth": "\u2713", "Installed": true },
-    { "Name": "grok", "Healthy": false, "Version": "", "Model": "", "Auth": "\u2014", "Error": "...", "Installed": false }
+    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "Gemini 3.5 Flash (High)", "Reachable": "\u2713", "Installed": true },
+    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "claude-opus-4-8", "Reachable": "\u2713", "Installed": true },
+    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "gpt-5.5", "Reachable": "\u2713", "Installed": true },
+    { "Name": "grok", "Healthy": false, "Version": "", "Model": "", "Reachable": "\u2014", "Error": "...", "Installed": false }
   ]
 }
 ```

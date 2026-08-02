@@ -20,8 +20,12 @@ type healthRow struct {
 	Healthy bool
 	Version string
 	Model   string
-	Auth    string
-	Error   string
+	// Reachable reports that the CLI ran and answered --version. It deliberately
+	// does NOT claim credentials are valid: no provider verifies auth, so the
+	// old "Auth ✓" asserted something never checked (see the quota caveat in
+	// skill/SKILL.md).
+	Reachable string
+	Error     string
 	// Installed reports whether the provider's binary was resolvable on $PATH.
 	// It distinguishes "you never installed this" from "it is installed but
 	// broken" — only the latter is a problem for an opt-in provider.
@@ -180,9 +184,9 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 			continue
 		}
 
-		authStr := "—"
+		reachable := "—"
 		if status.AuthValid {
-			authStr = "✓"
+			reachable = "✓"
 		}
 
 		rows = append(rows, healthRow{
@@ -190,7 +194,7 @@ func collectHealthRows(ctx context.Context, cfg *core.Config, runner providers.R
 			Healthy:   status.Healthy,
 			Version:   status.CLIVersion,
 			Model:     status.Model,
-			Auth:      authStr,
+			Reachable: reachable,
 			Error:     status.Error,
 			Installed: installed,
 		})
@@ -219,7 +223,7 @@ func providerInstalled(cfg *core.Config, name string) bool {
 // Piped: tab-separated rows, no ANSI.
 func renderStatusTable(rc *output.RenderContext, rows []healthRow) {
 	tbl := output.NewTable(rc).
-		Headers("PROVIDER", "VERSION", "MODEL", "AUTH", "STATUS")
+		Headers("PROVIDER", "VERSION", "MODEL", "REACHABLE", "STATUS")
 
 	for _, r := range rows {
 		dot := output.ProviderDot(rc, providerColor(r.Name))
@@ -240,7 +244,7 @@ func renderStatusTable(rc *output.RenderContext, rows []healthRow) {
 			}
 		}
 
-		tbl.Row(name, r.Version, r.Model, r.Auth, status)
+		tbl.Row(name, r.Version, r.Model, r.Reachable, status)
 	}
 
 	tbl.Render(os.Stdout)

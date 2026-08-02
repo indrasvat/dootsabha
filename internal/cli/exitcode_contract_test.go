@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -152,5 +153,48 @@ func TestValidateAgentNamesEmptyEntry(t *testing.T) {
 	var ee *ExitError
 	if !errors.As(err, &ee) || ee.Code != core.ExitUsage {
 		t.Errorf("empty agent name must be ExitUsage, got %v", err)
+	}
+}
+
+// `dootsabha` with no args prints help and exits 0 — conventional. But
+// `dootsabha --json` is an agent asking for a machine-readable answer; printing
+// help text to stdout breaks the one-document guarantee and reports success.
+func TestRootNoSubcommandJSONIsUsageError(t *testing.T) {
+	err := rootNoCommandError(true)
+	if err == nil {
+		t.Fatal("--json with no subcommand must be a usage error")
+	}
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != core.ExitUsage {
+		t.Errorf("err = %v, want ExitUsage", err)
+	}
+}
+
+func TestRootNoSubcommandTextShowsHelp(t *testing.T) {
+	if err := rootNoCommandError(false); err != nil {
+		t.Errorf("bare invocation should fall through to help, got %v", err)
+	}
+}
+
+// The AUTH column showed ✓ purely because `--version` exited 0 — it asserted
+// something never checked. A stub that exits 0 with no output reported
+// "Healthy: true, Auth: ✓". The column now says what is actually known:
+// the CLI is reachable.
+func TestHealthRowReachableNotAuth(t *testing.T) {
+	row := healthRow{Name: "grok", Healthy: true, Installed: true, Reachable: "✓"}
+	if row.Reachable != "✓" {
+		t.Errorf("Reachable = %q", row.Reachable)
+	}
+
+	// The struct must not carry an `Auth` field claiming verified credentials.
+	b, err := json.Marshal(row)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(b), `"Auth"`) {
+		t.Errorf("JSON still exposes an Auth field, which nothing verifies: %s", b)
+	}
+	if !strings.Contains(string(b), `"Reachable"`) {
+		t.Errorf("JSON should expose Reachable: %s", b)
 	}
 }

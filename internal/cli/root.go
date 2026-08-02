@@ -73,6 +73,9 @@ council-mode deliberation, peer review, and synthesis.
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
+			if err := rootNoCommandError(jsonOutput); err != nil {
+				return err
+			}
 			return cmd.Help()
 		}
 		// Check for extension binary (dootsabha-{name} on $PATH or plugins/).
@@ -229,4 +232,20 @@ func init() {
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRefineCmd())
 	rootCmd.AddCommand(newPluginCmd())
+}
+
+// rootNoCommandError reports the usage error for a bare invocation in JSON mode.
+//
+// A bare `dootsabha` printing help and exiting 0 is conventional. `dootsabha
+// --json` is not the same thing: it is an agent asking for a machine-readable
+// answer, and help text on stdout both breaks the one-document guarantee and
+// reports success for an invocation that did nothing.
+func rootNoCommandError(jsonMode bool) error {
+	if !jsonMode {
+		return nil
+	}
+	return &ExitError{
+		Code:    core.ExitUsage,
+		Message: "no command given — run 'dootsabha --help' for usage",
+	}
 }

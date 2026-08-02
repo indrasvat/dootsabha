@@ -46,8 +46,9 @@ fourth, independent perspective — it reports full token and cost data.
 
 ### `status` proves liveness, not quota
 
-`status` runs each CLI's `--version`. A `Healthy: true` / `Auth: ✓` row means the
-binary is installed and runnable — it does **not** check credentials or remaining
+`status` runs each CLI's `--version`. A `Healthy: true` / `Reachable: ✓` row means the
+binary is installed and answered `--version` — the column is named *Reachable*
+because that is all it proves. It does **not** check credentials or remaining
 quota. An agent can look healthy and still fail mid-call with a rate-limit or
 quota-exhausted error. `agy` hits this most often.
 

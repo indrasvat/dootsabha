@@ -155,7 +155,7 @@ import json,sys
 d = json.load(sys.stdin)
 rows = d['data']
 assert isinstance(rows, list) and rows, 'data is not a non-empty list'
-need = {'Name','Healthy','Version','Model','Auth','Installed'}
+need = {'Name','Healthy','Version','Model','Reachable','Installed'}
 for r in rows:
     missing = need - set(r)
     assert not missing, 'row %r missing %s' % (r.get('Name'), missing)

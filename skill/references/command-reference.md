@@ -320,7 +320,7 @@ Wrapped in envelope. Fields are PascalCase (no json tags on healthRow struct).
     "Healthy": true,
     "Version": "string",
     "Model": "string",
-    "Auth": "string",
+    "Reachable": "string",
     "Error": "string",
     "Installed": true
   }]
