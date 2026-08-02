@@ -271,7 +271,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			renderRefineTTY(rc, currentContent, currentVersion, len(reviewerNames), author, totalDuration, totalCost, totalIn, totalOut)
 
 			if partial {
-				return &ExitError{Code: core.ExitPartial, Message: "partial result: one or more reviewers failed"}
+				return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: one or more reviewers failed"}
 			}
 			return nil
 		},

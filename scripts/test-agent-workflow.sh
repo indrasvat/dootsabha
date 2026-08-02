@@ -18,6 +18,13 @@ export DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex"
 export DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy"
 export DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok"
 
+# A provider that never returns, for timeout tests.
+SCRATCH_HANG="$(mktemp -t dootsabha-hang)"
+# shellcheck disable=SC2016  # $1 is the generated script's own arg, not ours
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "0.0.0"; exit 0; }\nsleep 300\n' > "$SCRATCH_HANG"
+chmod +x "$SCRATCH_HANG"
+trap 'rm -f "$SCRATCH_HANG"' EXIT
+
 echo "Running L5 agent workflow tests..."
 echo "  Binary: $BINARY"
 echo "  Mocks:  $MOCK_DIR"
@@ -378,6 +385,17 @@ expect_exit 3 "status nothing usable"         env DOOTSABHA_PROVIDERS_CLAUDE_BIN
 expect_exit 6 "config error (council)"        "$BINARY" council "hi" --config /nope/nope.yaml
 expect_exit 6 "config error (status)"         "$BINARY" status --config /nope/nope.yaml
 expect_exit 2 "precedence: bad flag beats bad config" "$BINARY" council "hi" --zzz --config /nope/nope.yaml
+
+# A timeout during a council must report 4, not be masked by the downstream
+# synthesis failure it causes. Precedence says 4 > 5 > 3, and consult/review/
+# refine already map DeadlineExceeded to 4 — council did not.
+HANG="$SCRATCH_HANG"
+expect_exit 4 "council: agent hangs (timeout beats partial)" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" --agents claude,grok --timeout 3s
+expect_exit 4 "council: ALL agents hang" \
+  env DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$HANG" DOOTSABHA_PROVIDERS_CODEX_BINARY="$HANG" "$BINARY" council "hi" --agents claude,codex --timeout 3s
+expect_exit 4 "refine: reviewer hangs" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" refine "hi" --author claude --reviewers grok --timeout 3s
 
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
