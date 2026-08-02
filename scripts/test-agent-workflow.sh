@@ -390,6 +390,53 @@ expect_exit 5 "status --json: degraded" \
 expect_exit 6 "plugin list: bad --config"     "$BINARY" plugin list --config /nope/nope.yaml
 expect_exit 2 "council: --rounds above max"   "$BINARY" council "hi" --agents claude --rounds 99
 
+# CLAUDE.md mandates a Devanagari alias for every command. An alias that diverges
+# from its ASCII form on an error path is a silent trap, so parity is asserted on
+# BOTH success and failure.
+echo ""
+echo "--- Bilingual alias parity ---"
+
+alias_parity() {
+  local ascii="$1" deva="$2"; shift 2
+  local a=0 d=0
+  "$BINARY" "$ascii" "$@" >/dev/null 2>&1 || a=$?
+  "$BINARY" "$deva"  "$@" >/dev/null 2>&1 || d=$?
+  if [ "$a" -eq "$d" ]; then
+    pass "$ascii / $deva agree (exit $a)"
+  else
+    fail "$ascii exited $a but $deva exited $d"
+  fi
+}
+
+alias_parity status  "स्थिति"
+alias_parity status  "स्थिति" --config /nope/nope.yaml
+alias_parity council "सभा" "hi" --agents claude
+alias_parity council "सभा" "hi" --agents definitely-not-an-agent
+alias_parity consult "परामर्श" "hi" --agent claude
+alias_parity consult "परामर्श" "hi" --agent definitely-not-an-agent
+alias_parity refine  "संशोधन" "hi" --reviewers definitely-not-an-agent
+
+# A provider's output must never break the JSON contract, whatever it emits.
+echo ""
+echo "--- Hostile provider output ---"
+
+HOSTILE_DIR="$(mktemp -d -t dootsabha-hostile)"
+trap 'rm -rf "$HOSTILE_DIR"' EXIT
+# shellcheck disable=SC2016  # $1 belongs to the generated script
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nprintf "\\033[31mRED\\033[0m answer\\n"\n' > "$HOSTILE_DIR/ansi"
+# shellcheck disable=SC2016
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nprintf %%s "{\\"type\\":\\"result\\",\\"result\\":\\"trunc"\n' > "$HOSTILE_DIR/trunc"
+chmod +x "$HOSTILE_DIR/ansi" "$HOSTILE_DIR/trunc"
+
+for hostile in ansi trunc; do
+  if { DOOTSABHA_PROVIDERS_GROK_BINARY="$HOSTILE_DIR/$hostile" \
+       "$BINARY" consult --agent grok "hi" --json 2>/dev/null || true; } | one_json; then
+    pass "provider emitting $hostile output still yields one JSON document"
+  else
+    fail "provider emitting $hostile output broke the JSON contract"
+  fi
+done
+
 # config show --json must emit a JSON document on failure like every other
 # command; it was emitting zero bytes, and `jq` exits 0 on empty input.
 if { "$BINARY" config show --json --config /nope/nope.yaml 2>/dev/null || true; } | one_json; then
