@@ -85,7 +85,15 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			}
 
 			prompt := args[0]
+			// Validate the raw list (empties preserved) so a stray comma is a
+			// usage error rather than a silently shortened reviewer list.
+			if err := validateAgentNames(splitAgentList(reviewersRaw), "--reviewers"); err != nil {
+				return err
+			}
 			reviewerNames := parseReviewerList(reviewersRaw)
+			if err := validateAgentNames([]string{author}, "--author"); err != nil {
+				return err
+			}
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {

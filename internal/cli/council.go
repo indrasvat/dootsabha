@@ -91,9 +91,9 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			defer cancel()
 
 			// Parse agent names.
-			agentNames := strings.Split(agents, ",")
-			for i := range agentNames {
-				agentNames[i] = strings.TrimSpace(agentNames[i])
+			agentNames := splitAgentList(agents)
+			if err := validateAgentNames(agentNames, "--agents"); err != nil {
+				return err
 			}
 			if len(agentNames) > core.MaxAgents {
 				return &ExitError{Code: core.ExitUsage, Message: fmt.Sprintf("too many agents: %d (max %d)", len(agentNames), core.MaxAgents)}

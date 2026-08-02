@@ -374,6 +374,11 @@ expect_exit 2 "missing --agent"               "$BINARY" consult "hi"
 expect_exit 2 "unknown provider"              "$BINARY" consult --agent definitely-not-an-agent "hi"
 expect_exit 2 "unknown chair"                 "$BINARY" council "hi" --chair definitely-not-an-agent
 expect_exit 2 "unknown agent in --agents"     "$BINARY" council "hi" --agents claude,definitely-not-an-agent
+expect_exit 2 "unknown --reviewers (refine)"  "$BINARY" refine "hi" --reviewers definitely-not-an-agent
+expect_exit 2 "unknown --author (refine)"     "$BINARY" refine "hi" --author definitely-not-an-agent
+expect_exit 2 "unknown --author (review)"     "$BINARY" review "hi" --author definitely-not-an-agent
+expect_exit 2 "stray comma in --agents"       "$BINARY" council "hi" --agents claude,,codex
+expect_exit 2 "stray comma in --reviewers"    "$BINARY" refine "hi" --reviewers codex,,agy
 expect_exit 2 "unknown command"               "$BINARY" definitely-not-a-command
 expect_exit 6 "config file missing"           "$BINARY" consult --agent claude "hi" --config /nope/nope.yaml
 expect_exit 6 "config missing (council)"      "$BINARY" council "hi" --config /nope/nope.yaml

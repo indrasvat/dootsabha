@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -141,6 +142,44 @@ func validateChair(name string) error {
 	}
 	if _, err := getProvider(name, nil, nil); err != nil {
 		return fmt.Errorf("unknown chair: %q — valid values: claude, codex, agy, grok", name)
+	}
+	return nil
+}
+
+// splitAgentList splits a comma-separated agent list, trimming whitespace but
+// PRESERVING empty entries so validateAgentNames can reject them.
+//
+// Silently dropping empties hides a real footgun: `--agents "$UNSET,codex"`
+// would quietly become a one-agent run instead of the two the user meant.
+func splitAgentList(raw string) []string {
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+// validateAgentNames rejects unknown or empty agent names up front, before any
+// model call is made.
+//
+// Without this, `refine --reviewers typo` spent a real invocation on the author
+// and only then "skipped" the unknown reviewer, reporting a partial result (5)
+// for what is really a bad command (2). consult, council and review all reject
+// unknown names, so refine was the odd one out.
+func validateAgentNames(names []string, flag string) error {
+	for _, name := range names {
+		if name == "" {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: fmt.Sprintf("%s contains an empty agent name", flag),
+			}
+		}
+		if _, err := getProvider(name, nil, nil); err != nil {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: fmt.Sprintf("%s: unknown agent %q — valid values: claude, codex, agy, grok", flag, name),
+			}
+		}
 	}
 	return nil
 }

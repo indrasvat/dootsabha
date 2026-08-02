@@ -118,3 +118,39 @@ func TestProviderInstalledNilConfig(t *testing.T) {
 }
 
 func timePast() time.Time { return time.Now().Add(-time.Hour) }
+
+// Every command rejects an unknown agent name with ExitUsage — refine used to
+// treat one as a failed reviewer instead, downgrading a typo to a "partial
+// result" (5) AFTER spending a real model call on the author. A misspelled
+// --reviewers should fail before any work starts, like --agents and --chair do.
+func TestValidateAgentNamesRejectsUnknown(t *testing.T) {
+	err := validateAgentNames([]string{"claude", "definitely-not-an-agent"}, "--reviewers")
+	if err == nil {
+		t.Fatal("an unknown agent name must be rejected")
+	}
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != core.ExitUsage {
+		t.Fatalf("err = %v, want *ExitError{Code:%d}", err, core.ExitUsage)
+	}
+	if !strings.Contains(ee.Message, "definitely-not-an-agent") {
+		t.Errorf("message %q must name the offending value", ee.Message)
+	}
+	if !strings.Contains(ee.Message, "--reviewers") {
+		t.Errorf("message %q must name the flag it came from", ee.Message)
+	}
+}
+
+func TestValidateAgentNamesAcceptsKnown(t *testing.T) {
+	if err := validateAgentNames([]string{"claude", "codex", "agy", "grok"}, "--agents"); err != nil {
+		t.Errorf("all known agents must validate, got %v", err)
+	}
+}
+
+func TestValidateAgentNamesEmptyEntry(t *testing.T) {
+	// "codex,,agy" — a stray comma must be a usage error, not a silent skip.
+	err := validateAgentNames([]string{"codex", "", "agy"}, "--agents")
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != core.ExitUsage {
+		t.Errorf("empty agent name must be ExitUsage, got %v", err)
+	}
+}
