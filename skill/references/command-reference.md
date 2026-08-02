@@ -372,7 +372,9 @@ installed but broken, exits 3.
 |------|---------|
 | 0 | All providers healthy |
 | 1 | Error |
-| 3 | One or more providers unhealthy |
+| 5 | Degraded — some providers unhealthy, at least one still usable |
+| 3 | Nothing usable — no healthy provider at all |
+| 6 | Config error |
 
 ---
 

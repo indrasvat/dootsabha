@@ -114,9 +114,9 @@ One code, one action:
 |---|---|---|
 | 0 | Complete, usable | proceed |
 | 2 | Bad flags/args, unknown agent or chair | fix the command |
-| 3 | Every requested agent failed | retry, or pick another agent |
+| 3 | Every requested agent failed — nothing usable (incl. `status` with no healthy agent) | retry, or pick another agent |
 | 4 | Timeout | raise `--timeout`, shrink the prompt |
-| 5 | Some agents failed, output usable | use it, note the gaps |
+| 5 | Some agents failed, output usable (incl. `status` degraded) | use it, note the gaps |
 | 6 | Config missing or invalid | fix the config |
 | 1 | Unexpected internal error | report a bug |
 

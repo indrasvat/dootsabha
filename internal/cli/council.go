@@ -148,7 +148,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, nil, nil)
 					}
-					return &ExitError{Code: 1, Message: fmt.Sprintf("dispatch: %s", dispErr)}
+					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("dispatch: %s", dispErr)}
 				}
 				allDispatches = dispatches
 
@@ -182,7 +182,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 						if rc.IsJSON() {
 							_ = renderCouncilJSON(allDispatches, allReviews, nil)
 						}
-						return &ExitError{Code: 3, Message: fmt.Sprintf("peer review: %s", err)}
+						return &ExitError{Code: core.ExitProvider, Message: fmt.Sprintf("peer review: %s", err)}
 					}
 				}
 				allReviews = reviews
@@ -197,7 +197,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					return &ExitError{Code: 3, Message: fmt.Sprintf("synthesis: %s", err)}
+					return &ExitError{Code: core.ExitProvider, Message: fmt.Sprintf("synthesis: %s", err)}
 				}
 
 				// Surface a chair fallback. It is recorded in JSON as
@@ -219,12 +219,12 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			// Render output.
 			if rc.IsJSON() {
 				if err := renderCouncilJSON(allDispatches, allReviews, synthesis); err != nil {
-					return &ExitError{Code: 1, Message: fmt.Sprintf("write json: %s", err)}
+					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("write json: %s", err)}
 				}
 				// Return correct exit code even in JSON mode.
 				for _, d := range allDispatches {
 					if d.Error != nil {
-						return &ExitError{Code: 5, Message: "partial result: some agents failed"}
+						return &ExitError{Code: core.ExitPartial, Message: "partial result: some agents failed"}
 					}
 				}
 				return nil
@@ -235,7 +235,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			// Exit code 5 for partial results.
 			for _, d := range allDispatches {
 				if d.Error != nil {
-					return &ExitError{Code: 5, Message: "partial result: some agents failed"}
+					return &ExitError{Code: core.ExitPartial, Message: "partial result: some agents failed"}
 				}
 			}
 			return nil

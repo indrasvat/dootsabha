@@ -30,7 +30,7 @@ func newConsultCmd() *cobra.Command {
 
 परामर्श (paraamarsh) — एकल AI एजेंट से परामर्श करें।
 
-Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config error`,
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config error`,
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -79,10 +79,10 @@ Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config erro
 				Timeout:  timeout,
 			})
 			if err != nil {
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("provider error: %s", err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {

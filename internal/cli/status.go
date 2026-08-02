@@ -55,22 +55,41 @@ func statusLabelPlain(r healthRow) string {
 	}
 }
 
-// statusExitError applies the exit-code rule for `dootsabha status`.
+// statusExitError applies the exit-code rule for `dootsabha status`, using the
+// same contract as every other command:
 //
-// A provider is a problem when it is unhealthy AND either it is required, or it
-// is installed (so the user clearly intended to use it). An opt-in provider that
-// is simply absent is informational.
+//	0  every agent the user cares about is usable
+//	5  degraded — some are broken, but at least one still works
+//	3  nothing is usable
+//
+// A provider counts as a *problem* when it is unhealthy and either required, or
+// installed (so the user clearly meant to use it). An opt-in provider that was
+// never installed is informational and never degrades the result — but it also
+// cannot make the setup usable, which is why "nothing healthy" is judged
+// separately.
 func statusExitError(rows []healthRow) error {
+	healthy, problems := 0, 0
 	for _, r := range rows {
-		if r.Healthy {
-			continue
+		switch {
+		case r.Healthy:
+			healthy++
+		case isOptionalProvider(r.Name) && !r.Installed:
+			// opt-in and never installed — not the user's problem
+		default:
+			problems++
 		}
-		if isOptionalProvider(r.Name) && !r.Installed {
-			continue // opt-in and never installed — not the user's problem
-		}
-		return &ExitError{Code: 3, Message: "one or more providers are unhealthy"}
 	}
-	return nil
+
+	switch {
+	case healthy == 0:
+		// 3 means "nothing usable" — true even if the only entries were opt-in
+		// providers that were never installed.
+		return &ExitError{Code: core.ExitProvider, Message: "no usable providers"}
+	case problems > 0:
+		return &ExitError{Code: core.ExitPartial, Message: "one or more providers are unhealthy"}
+	default:
+		return nil
+	}
 }
 
 func newStatusCmd() *cobra.Command {
@@ -82,14 +101,15 @@ func newStatusCmd() *cobra.Command {
 
 स्थिति (sthiti) — सभी AI एजेंटों की स्थिति दिखाएं।
 
-Exit codes: 0 all healthy, 3 one or more providers unhealthy, 6 config error
-(an opt-in provider that is simply not installed does not fail this check)`,
+Exit codes: 0 all usable, 5 degraded (some broken, others work), 3 nothing usable,
+2 bad command, 6 config error. An opt-in provider that is simply not installed is
+reported but does not degrade the result.`,
 		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			timeout := globalTimeout

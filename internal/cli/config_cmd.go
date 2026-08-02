@@ -61,7 +61,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 			if path == "" {
 				p, err := core.UserConfigPath()
 				if err != nil {
-					return &ExitError{Code: 1, Message: err.Error()}
+					return &ExitError{Code: core.ExitConfig, Message: err.Error()}
 				}
 				path = p
 			}

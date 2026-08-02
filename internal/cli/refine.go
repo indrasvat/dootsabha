@@ -69,7 +69,7 @@ func newRefineCmd() *cobra.Command {
 
 संशोधन (sanshodhan) — लेखक सामग्री बनाता है, समीक्षक क्रमशः समीक्षा करते हैं, लेखक प्रतिक्रिया शामिल करता है।
 
-Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 5 partial result, 6 config error`,
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial result, 6 config error`,
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -140,10 +140,10 @@ Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 5 partial res
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
 				}
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed on v1: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
@@ -271,7 +271,7 @@ Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 5 partial res
 			renderRefineTTY(rc, currentContent, currentVersion, len(reviewerNames), author, totalDuration, totalCost, totalIn, totalOut)
 
 			if partial {
-				return &ExitError{Code: 5, Message: "partial result: one or more reviewers failed"}
+				return &ExitError{Code: core.ExitPartial, Message: "partial result: one or more reviewers failed"}
 			}
 			return nil
 		},

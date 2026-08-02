@@ -40,9 +40,11 @@ func TestStatusExitOptionalProviderInstalledButBroken(t *testing.T) {
 	if err == nil {
 		t.Fatal("an installed-but-broken provider must fail status")
 	}
+	// Degraded, not unusable: claude still works, so the caller can proceed
+	// with fewer agents rather than giving up.
 	var ee *ExitError
-	if !errors.As(err, &ee) || ee.Code != 3 {
-		t.Errorf("err = %v, want *ExitError{Code:3}", err)
+	if !errors.As(err, &ee) || ee.Code != core.ExitPartial {
+		t.Errorf("err = %v, want *ExitError{Code:%d} (degraded)", err, core.ExitPartial)
 	}
 }
 
@@ -224,5 +226,65 @@ func TestUsageArgsNoArgs(t *testing.T) {
 	var ee *ExitError
 	if err := validator(&cobra.Command{}, []string{"unexpected"}); !errors.As(err, &ee) || ee.Code != core.ExitUsage {
 		t.Errorf("surplus args must yield ExitUsage, got %v", err)
+	}
+}
+
+// --- status exit semantics -------------------------------------------------
+
+// `status` must use the same contract as every other command:
+//
+//	0 everything works · 5 degraded but workable · 3 nothing usable · 6 config
+//
+// Returning 3 for "some unhealthy" contradicted 3's meaning ("nothing usable")
+// and told a caller to give up when most agents were fine.
+func TestStatusExitDegradedIsPartial(t *testing.T) {
+	rows := []healthRow{
+		{Name: "claude", Healthy: true, Installed: true},
+		{Name: "codex", Healthy: true, Installed: true},
+		{Name: "agy", Healthy: false, Installed: true, Error: "quota exceeded"},
+	}
+	err := statusExitError(rows)
+	var ee *ExitError
+	if !errors.As(err, &ee) {
+		t.Fatalf("expected an ExitError, got %v", err)
+	}
+	if ee.Code != core.ExitPartial {
+		t.Errorf("Code = %d, want %d (ExitPartial) — other agents still work", ee.Code, core.ExitPartial)
+	}
+}
+
+// Nothing healthy at all is the case 3 actually describes.
+func TestStatusExitNothingHealthyIsProvider(t *testing.T) {
+	rows := []healthRow{
+		{Name: "claude", Healthy: false, Installed: true, Error: "auth invalid"},
+		{Name: "codex", Healthy: false, Installed: false, Error: "not found"},
+	}
+	err := statusExitError(rows)
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != core.ExitProvider {
+		t.Errorf("err = %v, want ExitProvider (%d) — no agent is usable", err, core.ExitProvider)
+	}
+}
+
+// An opt-in provider that was never installed is not a problem, so a setup with
+// every required agent healthy still exits 0.
+func TestStatusExitOptionalAbsentStillClean(t *testing.T) {
+	rows := []healthRow{
+		{Name: "claude", Healthy: true, Installed: true},
+		{Name: "grok", Healthy: false, Installed: false},
+	}
+	if err := statusExitError(rows); err != nil {
+		t.Errorf("absent opt-in provider must not degrade status, got %v", err)
+	}
+}
+
+// ...but if NOTHING is healthy, that is still unusable even when the only
+// unhealthy provider is an uninstalled opt-in one.
+func TestStatusExitNoHealthyEvenIfOnlyOptional(t *testing.T) {
+	rows := []healthRow{{Name: "grok", Healthy: false, Installed: false}}
+	err := statusExitError(rows)
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != core.ExitProvider {
+		t.Errorf("err = %v, want ExitProvider — no usable agent at all", err)
 	}
 }

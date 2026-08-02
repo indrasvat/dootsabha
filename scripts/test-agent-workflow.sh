@@ -204,12 +204,14 @@ else
   pass "no raw exec error in status output for absent opt-in provider"
 fi
 
-# 5e. A REQUIRED provider that is absent MUST still fail status.
+# 5e. A REQUIRED provider that is absent MUST still fail status — but as
+# DEGRADED (5), because the other agents still work. Only a setup with no usable
+# agent at all is 3.
 RC=0; DOOTSABHA_PROVIDERS_AGY_BINARY=/nonexistent/agy "$BINARY" status >/dev/null 2>&1 || RC=$?
-if [ "$RC" -eq 3 ]; then
-  pass "absent required provider (agy) still exits 3"
+if [ "$RC" -eq 5 ]; then
+  pass "absent required provider degrades status to 5"
 else
-  fail "absent required provider exited $RC (want 3)"
+  fail "absent required provider exited $RC (want 5, degraded)"
 fi
 
 # 5f. Explicitly consulting an absent provider is a provider error (exit 3).
@@ -371,6 +373,11 @@ expect_exit 6 "config missing (council)"      "$BINARY" council "hi" --config /n
 expect_exit 3 "single agent unavailable"      env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok "hi"
 expect_exit 3 "ALL agents failed"             env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x "$BINARY" council "hi" --agents claude,codex
 expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" council "hi" --agents claude,grok
+expect_exit 5 "status degraded"               env DOOTSABHA_PROVIDERS_AGY_BINARY=/x "$BINARY" status
+expect_exit 3 "status nothing usable"         env DOOTSABHA_PROVIDERS_CLAUDE_BINARY=/x DOOTSABHA_PROVIDERS_CODEX_BINARY=/x DOOTSABHA_PROVIDERS_AGY_BINARY=/x DOOTSABHA_PROVIDERS_GROK_BINARY=/x "$BINARY" status
+expect_exit 6 "config error (council)"        "$BINARY" council "hi" --config /nope/nope.yaml
+expect_exit 6 "config error (status)"         "$BINARY" status --config /nope/nope.yaml
+expect_exit 2 "precedence: bad flag beats bad config" "$BINARY" council "hi" --zzz --config /nope/nope.yaml
 
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 

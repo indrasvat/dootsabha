@@ -59,7 +59,7 @@ func newReviewCmd() *cobra.Command {
 
 समीक्षा (sameeksha) — एक एजेंट सामग्री बनाता है, दूसरा उसकी समीक्षा करता है।
 
-Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config error`,
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config error`,
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -117,10 +117,10 @@ Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config erro
 			totalStart := time.Now()
 			authorResult, err := authorProv.Invoke(ctx, prompt, invokeOpts)
 			if err != nil {
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
@@ -145,9 +145,9 @@ Exit codes: 0 success, 2 bad command, 3 provider error, 4 timeout, 6 config erro
 					renderReviewSection(rc, author, "(author)", authorResult)
 				}
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					return &ExitError{Code: core.ExitTimeout, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
 				}
-				return &ExitError{Code: 3, Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
+				return &ExitError{Code: core.ExitProvider, Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
 			}
 
 			// Render output.

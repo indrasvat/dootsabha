@@ -37,12 +37,15 @@ back; 5 means you have an answer with gaps.
 | `consult` | Agent responded | Bad flags; missing/unknown `--agent` | Provider error, quota exhausted | Timeout | — | Config error |
 | `review` | Author + reviewer OK | Bad flags; unknown agent | Provider error | Timeout | — | Config error |
 | `refine` | All rounds completed | Bad flags; unknown agent | Provider error | Timeout | Some reviewers failed | Config error |
-| `status` | All healthy | — | Some unhealthy¹ | — | — | Config error |
+| `status` | All usable | Bad flags | **Nothing** usable | — | Degraded — some broken, others work¹ | Config error |
 | `config show` | Success | Bad flags | — | — | — | Config error |
 
-¹ An **opt-in** provider (`grok`) that is simply not installed does **not** make
-`status` fail — it is listed as `not installed (optional)` and the command exits 0.
-An installed-but-broken provider, or any absent required provider, still exits 3.
+¹ `status` follows the same 3-vs-5 rule as the pipelines: **5 means degraded but
+workable** (some agents broken, at least one still usable), **3 means nothing is
+usable at all**. An **opt-in** provider (`grok`) that was never installed is
+reported as `not installed (optional)` and does not degrade the result — but it
+also cannot make a setup usable, so a config whose only agent is an uninstalled
+opt-in one still exits 3.
 
 ## Conditional Patterns
 
