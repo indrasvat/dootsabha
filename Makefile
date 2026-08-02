@@ -188,6 +188,7 @@ build-plugins: ## Build plugin binaries (providers + strategy)
 	go build -o $(PLUGIN_BIN)/claude-provider ./plugins/claude
 	go build -o $(PLUGIN_BIN)/codex-provider ./plugins/codex
 	go build -o $(PLUGIN_BIN)/agy-provider ./plugins/agy
+	go build -o $(PLUGIN_BIN)/grok-provider ./plugins/grok
 	go build -o $(PLUGIN_BIN)/council-strategy ./plugins/council-strategy
 	@printf "$(COLOR_GREEN)>> Plugins built$(COLOR_RESET)\n"
 

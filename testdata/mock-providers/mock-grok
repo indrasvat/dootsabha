@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Simulates the xAI Grok CLI for smoke tests — no API calls.
+# Emits the streaming-messages-json NDJSON stream: system init, an assistant
+# preamble block, then the final `result` event that dootsabha actually parses.
+set -euo pipefail
+PROMPT=""
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --version) echo "grok 0.2.118 (mock) [stable]"; exit 0 ;;
+    -p|--single) PROMPT="$2"; shift 2 ;;
+    --output-format|-m|--model|--reasoning-effort|--effort) shift 2 ;;
+    --sandbox|--permission-mode|--max-turns|--cwd|--prompt-file) shift 2 ;;
+    --always-approve|--no-plan|--no-subagents|--no-auto-update) shift ;;
+    *) PROMPT="${PROMPT:-$1}"; shift ;;
+  esac
+done
+
+# JSON-escape a string so prompts containing quotes/newlines/backslashes cannot
+# produce invalid JSON. council/refine embed prior agent responses in the prompt,
+# so multi-line input is the normal case, not an edge case.
+json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read()))'; }
+
+SESSION="019fbc10-9c47-77f2-a8d4-046ae03de003"
+echo '{"type":"system","subtype":"init","session_id":"'"$SESSION"'","model":"grok-4.5"}'
+# An assistant text block that is NOT the answer — proves dootsabha reads the
+# result event rather than concatenating assistant blocks (the `.text` trap).
+echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me look at that."}]}}'
+PROMPT_JSON=$(printf '%s' "Mock response to: $PROMPT" | json_str)
+printf '{"type":"result","subtype":"success","is_error":false,"result":%s,"stop_reason":"end_turn","session_id":"%s","duration_ms":1234,"num_turns":1,"total_cost_usd":0.0102368,"usage":{"input_tokens":3322,"output_tokens":29,"cache_read_input_tokens":1024,"cache_creation_input_tokens":0},"modelUsage":{"grok-4.5-build":{"inputTokens":3322,"outputTokens":29,"costUSD":0.0102368}}}\n' "$PROMPT_JSON" "$SESSION"

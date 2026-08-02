@@ -13,9 +13,17 @@ while [[ $# -gt 0 ]]; do
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
+
+# JSON-escape a string so prompts containing quotes/newlines/backslashes cannot
+# produce invalid JSON. council/refine embed prior agent responses in the prompt,
+# so multi-line input is the normal case, not an edge case.
+json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read()))'; }
+
 [[ -n "$ERROR" ]] && { echo "Error: $ERROR" >&2; exit 3; }
 if [ "$FORMAT" = "json" ]; then
-  echo '{"result":"Mock: '"$PROMPT"'","session_id":"mock_123","cost_usd":0.001,"model":"'"$MODEL"'","duration_ms":150}'
+  RESULT_JSON=$(printf '%s' "Mock: $PROMPT" | json_str)
+  MODEL_JSON=$(printf '%s' "$MODEL" | json_str)
+  printf '{"result":%s,"session_id":"mock_123","cost_usd":0.001,"model":%s,"duration_ms":150}\n' "$RESULT_JSON" "$MODEL_JSON"
 else
   echo "Mock response to: $PROMPT"
 fi

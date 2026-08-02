@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/output"
 	"github.com/indrasvat/dootsabha/internal/plugin"
 )
@@ -30,6 +31,16 @@ func newPluginCmd() *cobra.Command {
 		Long: `Discover and inspect available plugins and PATH extensions.
 
 विस्तारक (vistaarak) — प्लगइन्स और एक्सटेंशन की सूची और जानकारी।`,
+		// Without these, `plugin bogus` printed help to STDOUT and exited 0 —
+		// breaking both the exit contract and the one-JSON-document guarantee.
+		Args:         usageArgs(cobra.NoArgs),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: "plugin requires a subcommand: list or inspect",
+			}
+		},
 	}
 
 	cmd.AddCommand(newPluginListCmd())
@@ -43,15 +54,21 @@ func newPluginListCmd() *cobra.Command {
 		Use:          "list",
 		Aliases:      []string{"soochi", "सूची"},
 		Short:        "List all plugins and extensions",
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Honour --config even though the listing does not read it: silently
+			// ignoring a bad path contradicts the contract every other command
+			// follows, and hides a typo.
+			if _, err := core.LoadConfig(configFile); err != nil {
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
+			}
 			entries := discoverAll()
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, entries)
+				return emitJSON(entries)
 			}
 
 			if len(entries) == 0 {
@@ -71,9 +88,15 @@ func newPluginInspectCmd() *cobra.Command {
 		Use:          "inspect [name]",
 		Aliases:      []string{"parikshan", "परीक्षण"},
 		Short:        "Inspect a plugin or extension",
-		Args:         cobra.ExactArgs(1),
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Honour --config even though the listing does not read it: silently
+			// ignoring a bad path contradicts the contract every other command
+			// follows, and hides a typo.
+			if _, err := core.LoadConfig(configFile); err != nil {
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
+			}
 			name := args[0]
 			entries := discoverAll()
 
@@ -86,13 +109,16 @@ func newPluginInspectCmd() *cobra.Command {
 			}
 
 			if found == nil {
-				return fmt.Errorf("plugin or extension %q not found", name)
+				return &ExitError{
+					Code:    core.ExitUsage,
+					Message: fmt.Sprintf("plugin or extension %q not found", name),
+				}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, found)
+				return emitJSON(found)
 			}
 
 			renderPluginInspect(rc, *found)

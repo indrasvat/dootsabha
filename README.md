@@ -43,8 +43,14 @@ You need at least one of these AI CLI tools installed:
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` |
 | [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) |
+| [Grok CLI](https://docs.x.ai) | xAI Grok Build TUI (`grok`) — optional, opt-in |
 
 > **Note:** `agy` is Google's Go-built [Antigravity CLI](https://github.com/google/antigravity), the official successor to the retired Gemini CLI (Google sunset the Gemini CLI on 2026-06-18). The dootsabha provider name and binary are both `agy`.
+
+> **Note:** `grok` is xAI's Grok CLI. It is **opt-in** — it is not part of any
+> default council. Select it explicitly with `--agent grok`, `--agents claude,codex,grok`,
+> or `--chair grok`. dootsabha runs it read-only and with an isolated `$HOME`, so it
+> does not inherit your Claude Code skills, hooks, or MCP servers.
 
 Verify they're on your PATH:
 
@@ -52,6 +58,7 @@ Verify they're on your PATH:
 claude --version
 codex --version
 agy --version
+grok --version   # optional
 ```
 
 ## Install
@@ -242,6 +249,12 @@ providers:
     model: Gemini 3.5 Flash (High)
     flags:
       - --dangerously-skip-permissions
+  grok:
+    binary: grok
+    model: grok-4.5
+    flags:
+      - --reasoning-effort
+      - high
 
 council:
   chair: claude       # Agent that synthesizes final output (fallback: first healthy non-chair)
@@ -267,6 +280,7 @@ Environment variables use `DOOTSABHA_` prefix with `_` separators:
 ```bash
 export DOOTSABHA_PROVIDERS_CLAUDE_MODEL=claude-opus-4-8
 export DOOTSABHA_PROVIDERS_AGY_BINARY=agy
+export DOOTSABHA_PROVIDERS_GROK_BINARY=grok
 export DOOTSABHA_COUNCIL_CHAIR=codex
 export DOOTSABHA_TIMEOUT=10m
 ```
@@ -294,11 +308,10 @@ dootsabha council "question" | cat
 dootsabha council "question" --quiet
 ```
 
-> **Note on token/cost data:** `claude` and `codex` report full token counts,
-> cost, and session IDs in `--json` output. `agy` runs in plain-text print mode
-> (`agy -p "<prompt>"`) and has no JSON output, so it returns no token counts, no
-> cost, and no session ID — those fields are `0`/empty for `agy` in dootsabha's
-> JSON.
+> **Note on token/cost data:** `claude`, `codex` and `grok` report token counts
+> in `--json` output; `claude` and `grok` also report cost and session IDs.
+> `agy` runs in plain-text print mode (`agy -p "<prompt>"`) and has no JSON
+> output, so its token, cost and session fields are `0`/empty.
 
 ---
 
@@ -307,11 +320,14 @@ dootsabha council "question" --quiet
 | Code | Meaning | Example |
 |------|---------|---------|
 | 0 | Success | All agents responded |
-| 1 | General error | Internal failure |
-| 2 | Usage error | Bad flag, missing argument |
+| 1 | Unexpected internal error | A bug — please report |
+| 2 | Bad command | Unknown flag, missing argument, unknown agent or chair |
+| 6 | Config error | Config file missing, unreadable, or invalid |
 | 3 | Provider error | Agent CLI not found or crashed |
 | 4 | Timeout | Agent exceeded deadline |
 | 5 | Partial result | Some agents failed, result still useful |
+
+
 
 ---
 

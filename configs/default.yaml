@@ -34,6 +34,20 @@ providers:
     model: Gemini 3.5 Flash (High)    # Display-name model id (see `agy models`)
     flags:
       - --dangerously-skip-permissions  # yolo equivalent — auto-approve tool permissions
+  grok:                               # xAI Grok CLI — opt-in via --agent/--agents, not a council default
+    binary: grok
+    model: grok-4.5                   # Only model on the Grok subscription (see `grok models`)
+    flags:
+      - --reasoning-effort            # high | medium | low
+      - high
+    # Correctness-critical flags are PINNED by the provider and stripped from the
+    # list above, so they cannot be overridden here:
+    #   --output-format streaming-messages-json  (json's .text merges tool preambles)
+    #   --sandbox read-only                      (containment; --cwd restricts nothing)
+    #   --permission-mode bypassPermissions, --always-approve
+    #   --no-plan, --no-subagents, --no-auto-update, -m
+    # grok also runs with an isolated $HOME so it does not inherit the caller's
+    # Claude Code harness (skills, hooks, MCP servers, CLAUDE.md).
 
 # Council deliberation settings.
 council:

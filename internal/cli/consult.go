@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
@@ -30,8 +31,8 @@ func newConsultCmd() *cobra.Command {
 
 परामर्श (paraamarsh) — एकल AI एजेंट से परामर्श करें।
 
-Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
-		Args:         cobra.ExactArgs(1),
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config error`,
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).
@@ -43,14 +44,14 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			}
 
 			if agent == "" {
-				return &ExitError{Code: 1, Message: "--agent (or --doota) is required"}
+				return &ExitError{Code: core.ExitUsage, Message: "--agent (or --doota) is required"}
 			}
 
 			prompt := args[0]
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			timeout := globalTimeout
@@ -67,7 +68,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			runner := &core.SubprocessRunner{}
 			prov, err := getProvider(agent, cfg, runner)
 			if err != nil {
-				return &ExitError{Code: 1, Message: err.Error()}
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
@@ -79,21 +80,21 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 				Timeout:  timeout,
 			})
 			if err != nil {
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("provider error: %s", err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
 					// Emit error JSON so programmatic callers can parse the failure.
-					_ = output.WriteErrorJSON(os.Stdout, agent, msg)
+					emitErrorJSON(agent, msg)
 				}
 				return &ExitError{Code: exitCode, Message: msg}
 			}
 
 			if rc.IsJSON() {
-				return output.WriteJSON(os.Stdout, result)
+				return emitJSON(result)
 			}
 
 			renderConsultResult(rc, prov.Name(), result)
@@ -102,7 +103,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 	}
 
 	f := cmd.Flags()
-	f.StringVarP(&agent, "agent", "a", "", "Agent to query: claude, codex, agy")
+	f.StringVarP(&agent, "agent", "a", "", "Agent to query: claude, codex, agy, grok")
 	f.String("doota", "", "Alias for --agent (दूत)")
 	_ = cmd.Flags().MarkHidden("doota")
 	f.StringVar(&model, "model", "", "Override model for this invocation")
@@ -122,9 +123,65 @@ func getProvider(name string, cfg *core.Config, runner providers.Runner) (provid
 		return providers.NewCodexProvider(cfg, runner), nil
 	case "agy":
 		return providers.NewAgyProvider(cfg, runner), nil
+	case "grok":
+		return providers.NewGrokProvider(cfg, runner), nil
 	default:
-		return nil, fmt.Errorf("unknown provider: %q — valid values: claude, codex, agy", name)
+		return nil, fmt.Errorf("unknown provider: %q — valid values: claude, codex, agy, grok", name)
 	}
+}
+
+// validateChair rejects an unknown chair name up front.
+//
+// Without this, `--chair bogus` was silently accepted: synthesis fell back to
+// another agent and the command exited 0, so a typo looked like success while a
+// different agent wrote the answer. `--agent` already rejects unknown names.
+// An empty chair means "use the configured default" and stays valid.
+func validateChair(name string) error {
+	if name == "" {
+		return nil
+	}
+	if _, err := getProvider(name, nil, nil); err != nil {
+		return fmt.Errorf("unknown chair: %q — valid values: claude, codex, agy, grok", name)
+	}
+	return nil
+}
+
+// splitAgentList splits a comma-separated agent list, trimming whitespace but
+// PRESERVING empty entries so validateAgentNames can reject them.
+//
+// Silently dropping empties hides a real footgun: `--agents "$UNSET,codex"`
+// would quietly become a one-agent run instead of the two the user meant.
+func splitAgentList(raw string) []string {
+	parts := strings.Split(raw, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+// validateAgentNames rejects unknown or empty agent names up front, before any
+// model call is made.
+//
+// Without this, `refine --reviewers typo` spent a real invocation on the author
+// and only then "skipped" the unknown reviewer, reporting a partial result (5)
+// for what is really a bad command (2). consult, council and review all reject
+// unknown names, so refine was the odd one out.
+func validateAgentNames(names []string, flag string) error {
+	for _, name := range names {
+		if name == "" {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: fmt.Sprintf("%s contains an empty agent name", flag),
+			}
+		}
+		if _, err := getProvider(name, nil, nil); err != nil {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: fmt.Sprintf("%s: unknown agent %q — valid values: claude, codex, agy, grok", flag, name),
+			}
+		}
+	}
+	return nil
 }
 
 // providerColor returns the lipgloss color for a given provider name.
@@ -136,6 +193,8 @@ func providerColor(name string) lipgloss.Color {
 		return output.CodexColor
 	case "agy":
 		return output.AgyColor
+	case "grok":
+		return output.GrokColor
 	default:
 		return output.MutedColor
 	}

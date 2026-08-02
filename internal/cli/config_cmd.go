@@ -20,10 +20,16 @@ func newConfigCmd() *cobra.Command {
 		Long: `View and manage दूतसभा configuration.
 
 विन्यास (vinyaas) — दूतसभा विन्यास प्रबंधित करें।`,
-		Args:         cobra.NoArgs,
+		// Without a RunE, a bare `config` (or `config --json`) printed help to
+		// STDOUT and exited 0 — an invocation an agent plausibly makes, and one
+		// `plugin` already handles as a usage error.
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return &ExitError{
+				Code:    core.ExitUsage,
+				Message: "config requires a subcommand: show or migrate",
+			}
 		},
 	}
 
@@ -48,7 +54,7 @@ backing up the original before any change. The gemini provider's binary/model/fl
 do not carry over to agy and are replaced with agy defaults (the backup preserves them).
 
 स्थानांतरण (sthaanaantaran) — gemini से agy में विन्यास स्थानांतरित करें।`,
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve the bilingual --pareekshan alias for --dry-run.
@@ -61,7 +67,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 			if path == "" {
 				p, err := core.UserConfigPath()
 				if err != nil {
-					return &ExitError{Code: 1, Message: err.Error()}
+					return &ExitError{Code: core.ExitConfig, Message: err.Error()}
 				}
 				path = p
 			}
@@ -73,7 +79,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 					// An explicitly-named --config that doesn't exist is an error;
 					// a missing default user file just means there's nothing to migrate.
 					if explicit {
-						return &ExitError{Code: 1, Message: fmt.Sprintf("config file not found: %s", path)}
+						return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("config file not found: %s", path)}
 					}
 					return emitMigrateResult(rc, migrateResultView{
 						Path:    path,
@@ -81,7 +87,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 						Message: "no config file found — nothing to migrate (defaults already use agy)",
 					})
 				}
-				return &ExitError{Code: 1, Message: fmt.Sprintf("stat config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("stat config: %s", err)}
 			}
 
 			if dryRun {
@@ -89,7 +95,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 				// matches what an actual migration would do.
 				plan, err := core.PlanMigrationFile(path)
 				if err != nil {
-					return &ExitError{Code: 1, Message: fmt.Sprintf("inspect config: %s", err)}
+					return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("inspect config: %s", err)}
 				}
 				view := migrateResultView{
 					Path:            path,
@@ -109,7 +115,7 @@ do not carry over to agy and are replaced with agy defaults (the backup preserve
 
 			res, err := core.MigrateConfigFile(path)
 			if err != nil {
-				return &ExitError{Code: 1, Message: fmt.Sprintf("migrate config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("migrate config: %s", err)}
 			}
 
 			view := migrateResultView{
@@ -150,7 +156,7 @@ type migrateResultView struct {
 
 func emitMigrateResult(rc *output.RenderContext, v migrateResultView) error {
 	if rc.IsJSON() {
-		return output.WriteJSON(os.Stdout, v)
+		return emitJSON(v)
 	}
 
 	switch v.Status {
@@ -185,7 +191,6 @@ func printMigrationChanges(v migrateResultView) {
 
 func newConfigShowCmd() *cobra.Command {
 	var (
-		showJSON     bool
 		showComments bool
 		reveal       bool
 	)
@@ -193,21 +198,20 @@ func newConfigShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "show",
 		Short:        "Display merged configuration (with redaction by default)",
-		Args:         cobra.NoArgs,
+		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			view := cfg.RedactedView(reveal)
 
-			useJSON := showJSON || jsonOutput
-			rc := output.NewRenderContext(os.Stdout, useJSON)
+			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
-			if rc.IsJSON() || showJSON {
-				return output.WriteJSON(os.Stdout, view)
+			if rc.IsJSON() {
+				return emitJSON(view)
 			}
 
 			renderConfigView(view, showComments)
@@ -216,7 +220,6 @@ func newConfigShowCmd() *cobra.Command {
 	}
 
 	f := cmd.Flags()
-	f.BoolVar(&showJSON, "json", false, "Output as JSON")
 	f.BoolVar(&showComments, "commented", false, "Include field descriptions as comments")
 	f.BoolVar(&reveal, "reveal", false, "Reveal sensitive values (disables redaction)")
 

@@ -12,6 +12,7 @@ var (
 	ClaudeColor  = lipgloss.Color("#F59E0B") // Amber/gold
 	CodexColor   = lipgloss.Color("#10B981") // Emerald
 	AgyColor     = lipgloss.Color("#3B82F6") // Blue (Antigravity)
+	GrokColor    = lipgloss.Color("#A855F7") // Purple (xAI Grok)
 	ErrorColor   = lipgloss.Color("#EF4444") // Red
 	SuccessColor = lipgloss.Color("#22C55E") // Green
 	WarnColor    = lipgloss.Color("#EAB308") // Yellow

@@ -34,8 +34,8 @@ and synthesize into a unified answer.
 
 सभा (sabha) — बहु-एजेंट सभा विचार-विमर्श।
 
-Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial result`,
-		Args:         cobra.ExactArgs(1),
+Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial result, 6 config error`,
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases.
@@ -57,12 +57,18 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			// Apply flag overrides to config.
 			if cmd.Flags().Changed("chair") || cmd.Flags().Changed("adhyaksha") {
 				cfg.Council.Chair = chair
+			}
+			// Validate the RESOLVED chair. Checking only the flag let an unknown
+			// chair from YAML or DOOTSABHA_COUNCIL_CHAIR through, after which
+			// synthesis silently fell back to another agent and reported success.
+			if err := validateChair(cfg.Council.Chair); err != nil {
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 			if cmd.Flags().Changed("rounds") || cmd.Flags().Changed("chakra") {
 				cfg.Council.Rounds = rounds
@@ -74,6 +80,12 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			}
 			if cfg.Council.Rounds < 1 {
 				cfg.Council.Rounds = 1
+			}
+			if cfg.Council.Rounds > core.MaxRounds {
+				return &ExitError{
+					Code:    core.ExitUsage,
+					Message: fmt.Sprintf("too many rounds: %d (max %d)", cfg.Council.Rounds, core.MaxRounds),
+				}
 			}
 
 			timeout := globalTimeout
@@ -88,12 +100,12 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			defer cancel()
 
 			// Parse agent names.
-			agentNames := strings.Split(agents, ",")
-			for i := range agentNames {
-				agentNames[i] = strings.TrimSpace(agentNames[i])
+			agentNames := splitAgentList(agents)
+			if err := validateAgentNames(agentNames, "--agents"); err != nil {
+				return err
 			}
 			if len(agentNames) > core.MaxAgents {
-				return &ExitError{Code: 1, Message: fmt.Sprintf("too many agents: %d (max %d)", len(agentNames), core.MaxAgents)}
+				return &ExitError{Code: core.ExitUsage, Message: fmt.Sprintf("too many agents: %d (max %d)", len(agentNames), core.MaxAgents)}
 			}
 
 			// Construct agents.
@@ -102,7 +114,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			for _, name := range agentNames {
 				prov, provErr := getProvider(name, cfg, runner)
 				if provErr != nil {
-					return &ExitError{Code: 1, Message: provErr.Error()}
+					return &ExitError{Code: core.ExitUsage, Message: provErr.Error()}
 				}
 				coreAgents = append(coreAgents, &providerAgent{prov: prov})
 			}
@@ -145,9 +157,12 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, nil, nil)
 					}
-					return &ExitError{Code: 1, Message: fmt.Sprintf("dispatch: %s", dispErr)}
+					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("dispatch: %s", dispErr)}
 				}
-				allDispatches = dispatches
+				// Accumulate across rounds. Assigning here reported only the FINAL
+				// round, so a 3-round council under-reported its own cost by ~2/3
+				// and discarded earlier rounds' agent output entirely.
+				allDispatches = append(allDispatches, dispatches...)
 
 				// Count successes.
 				successes := 0
@@ -159,9 +174,20 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 
 				if successes == 0 {
 					if rc.IsJSON() {
-						_ = renderCouncilJSON(allDispatches, nil, nil)
+						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					return &ExitError{Code: 1, Message: "all agents failed during dispatch"}
+					// Judge from the ACCUMULATED payload, not just this round. With
+					// multi-round accumulation an earlier round's output may still be
+					// in the JSON, and reporting "nothing usable" would tell callers
+					// to discard content they already paid for.
+					fallback := core.ExitProvider
+					for _, d := range allDispatches {
+						if d.Error == nil {
+							fallback = core.ExitPartial
+							break
+						}
+					}
+					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), fallback), Message: "all agents failed during dispatch"}
 				}
 
 				// Stage 2: Peer Review (skip if <2 successes)
@@ -179,10 +205,13 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 						if rc.IsJSON() {
 							_ = renderCouncilJSON(allDispatches, allReviews, nil)
 						}
-						return &ExitError{Code: 3, Message: fmt.Sprintf("peer review: %s", err)}
+						// Dispatch already produced usable agent output, so this is
+						// a partial result — not "nothing usable". Reporting 3 here
+						// told callers to discard content they had already paid for.
+						return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("peer review: %s", err)}
 					}
 				}
-				allReviews = reviews
+				allReviews = append(allReviews, reviews...)
 
 				// Stage 3: Synthesis
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
@@ -194,7 +223,18 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					return &ExitError{Code: 3, Message: fmt.Sprintf("synthesis: %s", err)}
+					// Same reasoning as peer review: the dispatch output is in the
+					// payload and is usable, so this is partial, not total failure.
+					return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("synthesis: %s", err)}
+				}
+
+				// Surface a chair fallback. It is recorded in JSON as
+				// `chair_fallback`, but a human reading the terminal would
+				// otherwise believe their chosen chair wrote the synthesis when a
+				// different agent actually did.
+				if synthesis != nil && synthesis.ChairFallback != "" && !rc.IsJSON() && !quiet {
+					fmt.Fprintf(os.Stderr, "Warning: chair %q unavailable — synthesized by %q instead\n", //nolint:errcheck
+						cfg.Council.Chair, synthesis.ChairFallback)
 				}
 
 				// Multi-round: feed synthesis into next round's prompt.
@@ -207,12 +247,12 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			// Render output.
 			if rc.IsJSON() {
 				if err := renderCouncilJSON(allDispatches, allReviews, synthesis); err != nil {
-					return &ExitError{Code: 1, Message: fmt.Sprintf("write json: %s", err)}
+					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("write json: %s", err)}
 				}
 				// Return correct exit code even in JSON mode.
 				for _, d := range allDispatches {
 					if d.Error != nil {
-						return &ExitError{Code: 5, Message: "partial result: some agents failed"}
+						return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
 					}
 				}
 				return nil
@@ -223,7 +263,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 			// Exit code 5 for partial results.
 			for _, d := range allDispatches {
 				if d.Error != nil {
-					return &ExitError{Code: 5, Message: "partial result: some agents failed"}
+					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
 				}
 			}
 			return nil
@@ -235,7 +275,7 @@ Exit codes: 0 success, 1 all failed, 3 provider error, 4 timeout, 5 partial resu
 	if core.InsideClaude {
 		defaultAgents = "codex,agy" // Claude is already the host session
 	}
-	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names")
+	f.StringVar(&agents, "agents", defaultAgents, "Comma-separated agent names (claude, codex, agy, grok)")
 	f.String("dootas", "", "Alias for --agents (दूत)")
 	_ = f.MarkHidden("dootas")
 	f.StringVar(&chair, "chair", "", "Chair agent for synthesis (default: from config)")
@@ -411,6 +451,7 @@ func renderCouncilJSON(dispatches []core.DispatchResult, reviews []core.ReviewRe
 
 	out.Meta.DurationMs = totalDuration.Milliseconds()
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(out); err != nil {

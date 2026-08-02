@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Short: "dootsabha (दूतसभा) — AI council orchestrator",
 	Long: `दूतसभा (dootsabha) — Council of AI Messengers
 
-Orchestrate multiple AI coding agents (Claude, Codex, Antigravity) in
+Orchestrate multiple AI coding agents (Claude, Codex, Antigravity, Grok) in
 council-mode deliberation, peer review, and synthesis.
 
 दूतसभा — AI दूतों की सभा (Council of AI Messengers)
@@ -73,6 +73,9 @@ council-mode deliberation, peer review, and synthesis.
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
+			if err := rootNoCommandError(jsonOutput); err != nil {
+				return err
+			}
 			return cmd.Help()
 		}
 		// Check for extension binary (dootsabha-{name} on $PATH or plugins/).
@@ -80,7 +83,7 @@ council-mode deliberation, peer review, and synthesis.
 		if found {
 			return execExtension(ext, args[1:])
 		}
-		return fmt.Errorf("unknown command %q — run 'dootsabha --help' for usage", args[0])
+		return &ExitError{Code: core.ExitUsage, Message: fmt.Sprintf("unknown command %q — run 'dootsabha --help' for usage", args[0])}
 	},
 	SilenceUsage: true,
 }
@@ -92,10 +95,32 @@ func Execute() {
 	// error display ourselves. This prevents unstructured stderr in JSON mode
 	// while still showing errors to TTY users (GitHub issue #4, bug 3).
 	rootCmd.SilenceErrors = true
+	// Cobra aborts on a bad flag BEFORE binding --json, so jsonOutput would still
+	// be false when Execute() chooses an error channel — stdout came back empty
+	// and `jq` exits 0 on empty input, so wrappers saw success. Detect the flag
+	// from argv so the output contract does not depend on argument order.
+	if !jsonOutput {
+		for _, a := range os.Args[1:] {
+			if a == "--json" || a == "--json=true" {
+				jsonOutput = true
+				break
+			}
+			if a == "--" {
+				break // everything after is a positional
+			}
+		}
+	}
+	// Cobra reports bad flags itself; route them to ExitUsage so a caller can
+	// tell "fix your command" apart from "something failed at runtime".
+	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return &ExitError{Code: core.ExitUsage, Message: err.Error()}
+	})
 	if err := rootCmd.Execute(); err != nil {
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
-			if jsonOutput {
+			// Only emit the generic error envelope when the command has not
+			// already written its own — two documents make stdout unparseable.
+			if jsonOutput && !jsonDocWritten {
 				// Emit JSON error so automation always gets parseable stdout.
 				_ = output.WriteErrorJSON(os.Stdout, "", exitErr.Message)
 			} else {
@@ -103,13 +128,16 @@ func Execute() {
 			}
 			os.Exit(exitErr.Code)
 		}
-		// Non-ExitError (e.g., unknown command, flag parse) — always show.
-		if jsonOutput {
+		// Anything reaching here is NOT an ExitError, which means no code path
+		// classified it — genuinely unexpected. Usage errors are typed at their
+		// source (SetFlagErrorFunc, usageArgs, the unknown-command branch), so
+		// they never arrive untyped.
+		if jsonOutput && !jsonDocWritten {
 			_ = output.WriteErrorJSON(os.Stdout, "", err.Error())
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
 		}
-		os.Exit(1)
+		os.Exit(core.ExitError)
 	}
 }
 
@@ -191,6 +219,10 @@ func init() {
 	f.Duration("kaalseema", 0, "Alias for --timeout (कालसीमा)")
 	_ = f.MarkHidden("kaalseema")
 	f.DurationVar(&sessionTimeout, "session-timeout", 0, "Max session duration (e.g. 30m)")
+	// TODO(704): session_timeout is parsed and stored but never enforced.
+	// Hidden rather than advertised — a flag that silently does nothing is worse
+	// than one that is absent, since PRD §6.1 names it a council stop condition.
+	_ = rootCmd.PersistentFlags().MarkHidden("session-timeout")
 	f.StringVar(&configFile, "config", "", "Path to config file (YAML)")
 
 	rootCmd.AddCommand(newConsultCmd())
@@ -200,4 +232,20 @@ func init() {
 	rootCmd.AddCommand(newReviewCmd())
 	rootCmd.AddCommand(newRefineCmd())
 	rootCmd.AddCommand(newPluginCmd())
+}
+
+// rootNoCommandError reports the usage error for a bare invocation in JSON mode.
+//
+// A bare `dootsabha` printing help and exiting 0 is conventional. `dootsabha
+// --json` is not the same thing: it is an agent asking for a machine-readable
+// answer, and help text on stdout both breaks the one-document guarantee and
+// reports success for an invocation that did nothing.
+func rootNoCommandError(jsonMode bool) error {
+	if !jsonMode {
+		return nil
+	}
+	return &ExitError{
+		Code:    core.ExitUsage,
+		Message: "no command given — run 'dootsabha --help' for usage",
+	}
 }

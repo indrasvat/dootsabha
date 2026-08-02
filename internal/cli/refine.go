@@ -69,8 +69,8 @@ func newRefineCmd() *cobra.Command {
 
 संशोधन (sanshodhan) — लेखक सामग्री बनाता है, समीक्षक क्रमशः समीक्षा करते हैं, लेखक प्रतिक्रिया शामिल करता है।
 
-Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
-		Args:         cobra.ExactArgs(1),
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial result, 6 config error`,
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases.
@@ -85,11 +85,19 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 			}
 
 			prompt := args[0]
+			// Validate the raw list (empties preserved) so a stray comma is a
+			// usage error rather than a silently shortened reviewer list.
+			if err := validateAgentNames(splitAgentList(reviewersRaw), "--reviewers"); err != nil {
+				return err
+			}
 			reviewerNames := parseReviewerList(reviewersRaw)
+			if err := validateAgentNames([]string{author}, "--author"); err != nil {
+				return err
+			}
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			timeout := globalTimeout
@@ -107,7 +115,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 
 			authorProv, err := getProvider(author, cfg, runner)
 			if err != nil {
-				return &ExitError{Code: 1, Message: err.Error()}
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
@@ -140,10 +148,10 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
 				}
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed on v1: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
@@ -263,25 +271,29 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 partial result`,
 
 			totalDuration := time.Since(totalStart)
 
-			// Output.
+			// Output. Render in whichever mode, then fall through to the SHARED
+			// exit decision — returning early from the JSON branch is how this
+			// command reported success for partial results and timeouts.
 			if rc.IsJSON() {
-				return renderRefineJSON(versions, currentVersion, currentContent, anonymous, totalDuration, totalCost, totalIn, totalOut, providerStatus)
+				if err := renderRefineJSON(versions, currentVersion, currentContent, anonymous, totalDuration, totalCost, totalIn, totalOut, providerStatus); err != nil {
+					return &ExitError{Code: core.ExitError, Message: err.Error()}
+				}
+			} else {
+				renderRefineTTY(rc, currentContent, currentVersion, len(reviewerNames), author, totalDuration, totalCost, totalIn, totalOut)
 			}
 
-			renderRefineTTY(rc, currentContent, currentVersion, len(reviewerNames), author, totalDuration, totalCost, totalIn, totalOut)
-
 			if partial {
-				return &ExitError{Code: 5, Message: "partial result: one or more reviewers failed"}
+				return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: one or more reviewers failed"}
 			}
 			return nil
 		},
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&author, "author", "claude", "Agent that produces and refines content")
+	f.StringVar(&author, "author", "claude", "Agent that produces and refines content (claude, codex, agy, grok)")
 	f.String("kartaa", "", "Alias for --author (कर्ता)")
 	_ = f.MarkHidden("kartaa")
-	f.StringVar(&reviewersRaw, "reviewers", "codex,agy", "Ordered comma-separated reviewer list")
+	f.StringVar(&reviewersRaw, "reviewers", "codex,agy", "Ordered comma-separated reviewer list (claude, codex, agy, grok)")
 	f.String("pareekshak", "", "Alias for --reviewers (परीक्षक)")
 	_ = f.MarkHidden("pareekshak")
 	f.BoolVar(&anonymous, "anonymous", true, "Anonymize prompts (reviewer doesn't see author name)")
@@ -438,6 +450,7 @@ func renderRefineJSON(versions []refineVersionJSON, finalVersion int, finalConte
 		},
 	}
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {

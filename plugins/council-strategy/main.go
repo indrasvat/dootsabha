@@ -99,6 +99,8 @@ func createProvider(name string, cfg *core.Config, runner providers.Runner) prov
 		return providers.NewCodexProvider(cfg, runner)
 	case "agy":
 		return providers.NewAgyProvider(cfg, runner)
+	case "grok":
+		return providers.NewGrokProvider(cfg, runner)
 	default:
 		return nil
 	}

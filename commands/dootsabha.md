@@ -1,6 +1,6 @@
 # दूतसभा (dootsabha) — Multi-Agent Council
 
-दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy)) through council-mode deliberation, peer review, and synthesis. Use it when you need multi-perspective answers from multiple AI agents.
+दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy), xAI Grok CLI (grok)) through council-mode deliberation, peer review, and synthesis. `grok` is opt-in — select it with `--agent grok` / `--agents …,grok` / `--chair grok`. Use it when you need multi-perspective answers from multiple AI agents.
 
 ## Quick Reference
 
@@ -104,12 +104,16 @@ Output structure (envelope format):
 {
   "meta": { "schema_version": 1 },
   "data": [
-    { "Name": "claude", "Healthy": true, "Version": "2.1.63", "Model": "claude-opus-4-8", "Auth": "\u2713" },
-    { "Name": "codex", "Healthy": true, "Version": "0.106.0", "Model": "gpt-5.5", "Auth": "\u2713" },
-    { "Name": "agy", "Healthy": true, "Version": "1.0.8", "Model": "Gemini 3.5 Flash (High)", "Auth": "\u2713" }
+    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "Gemini 3.5 Flash (High)", "Reachable": "\u2713", "Installed": true },
+    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "claude-opus-4-8", "Reachable": "\u2713", "Installed": true },
+    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "gpt-5.5", "Reachable": "\u2713", "Installed": true },
+    { "Name": "grok", "Healthy": false, "Version": "", "Model": "", "Reachable": "\u2014", "Error": "...", "Installed": false }
   ]
 }
 ```
+
+`grok` is opt-in. When its CLI is absent it shows `Installed: false` and `status`
+still exits 0 — only required or installed-but-broken providers fail the check.
 
 Check for unhealthy agents: `dootsabha status --json | jq '.data[] | select(.Healthy == false)'`
 
@@ -135,11 +139,14 @@ dootsabha config migrate --json     # structured result for agent consumption
 | Code | Meaning | Agent Response |
 |------|---------|---------------|
 | 0 | Success | Use the output |
-| 1 | General error | Report error, try alternative approach |
-| 2 | Usage error | Fix the command syntax |
+| 1 | Unexpected internal error | Report a bug |
+| 2 | Bad command — flags, args, unknown agent/chair | Fix the command syntax |
+| 6 | Config missing or invalid | Fix the config file |
 | 3 | Provider error | Agent CLI not found or crashed; check `dootsabha status` |
 | 4 | Timeout | Increase `--timeout` or simplify prompt |
 | 5 | Partial result | Some agents failed but output is still usable |
+
+
 
 ## Common Patterns
 

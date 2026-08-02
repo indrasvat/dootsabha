@@ -59,8 +59,8 @@ func newReviewCmd() *cobra.Command {
 
 समीक्षा (sameeksha) — एक एजेंट सामग्री बनाता है, दूसरा उसकी समीक्षा करता है।
 
-Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
-		Args:         cobra.ExactArgs(1),
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config error`,
+		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).
@@ -75,7 +75,7 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 
 			cfg, err := core.LoadConfig(configFile)
 			if err != nil {
-				return &ExitError{Code: 5, Message: fmt.Sprintf("load config: %s", err)}
+				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
 			timeout := globalTimeout
@@ -93,11 +93,11 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 
 			authorProv, err := getProvider(author, cfg, runner)
 			if err != nil {
-				return &ExitError{Code: 1, Message: err.Error()}
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 			reviewerProv, err := getProvider(reviewer, cfg, runner)
 			if err != nil {
-				return &ExitError{Code: 1, Message: err.Error()}
+				return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 			}
 
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
@@ -117,14 +117,14 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 			totalStart := time.Now()
 			authorResult, err := authorProv.Invoke(ctx, prompt, invokeOpts)
 			if err != nil {
-				exitCode := 3
+				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = 4
+					exitCode = core.ExitTimeout
 					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
-					_ = output.WriteErrorJSON(os.Stdout, author, msg)
+					emitErrorJSON(author, msg)
 				}
 				return &ExitError{Code: exitCode, Message: msg}
 			}
@@ -145,9 +145,11 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 					renderReviewSection(rc, author, "(author)", authorResult)
 				}
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: 4, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
+					return &ExitError{Code: core.ExitTimeout, Message: fmt.Sprintf("timeout after %s: %s", timeout, err)}
 				}
-				return &ExitError{Code: 3, Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
+				// The author already produced content, which is in the payload — a
+				// failed reviewer leaves a usable partial result, not nothing.
+				return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
 			}
 
 			// Render output.
@@ -161,10 +163,10 @@ Exit codes: 0 success, 1 error, 3 provider error, 4 timeout, 5 config error`,
 	}
 
 	f := cmd.Flags()
-	f.StringVar(&author, "author", "codex", "Agent that produces initial output")
+	f.StringVar(&author, "author", "codex", "Agent that produces initial output (claude, codex, agy, grok)")
 	f.String("kartaa", "", "Alias for --author (कर्ता)")
 	_ = f.MarkHidden("kartaa")
-	f.StringVar(&reviewer, "reviewer", "claude", "Agent that reviews the output")
+	f.StringVar(&reviewer, "reviewer", "claude", "Agent that reviews the output (claude, codex, agy, grok)")
 	f.String("pareekshak", "", "Alias for --reviewer (परीक्षक)")
 	_ = f.MarkHidden("pareekshak")
 	f.StringVar(&model, "model", "", "Override model for both agents")
@@ -234,6 +236,7 @@ func renderReviewJSON(authorResult, reviewerResult *providers.ProviderResult, au
 		},
 	}
 
+	markJSONWritten()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(data); err != nil {

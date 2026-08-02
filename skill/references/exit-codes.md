@@ -2,30 +2,50 @@
 
 दूतसभा uses structured exit codes so agents can branch logic without parsing output.
 
+- [Exit code table](#exit-code-table)
+- [Per-command exit codes](#per-command-exit-codes)
+- [Conditional patterns](#conditional-patterns)
+
 ## Exit Code Table
 
-| Code | Constant | Meaning | Precedence |
-|------|----------|---------|------------|
-| 0 | ExitSuccess | Everything OK | 1 (lowest) |
-| 1 | ExitError | General error | 2 |
-| 2 | ExitUsage | Bad flags, missing arguments | 6 (highest) |
-| 3 | ExitProvider | Provider error (CLI not found, auth invalid) | 4 |
-| 4 | ExitTimeout | At least one agent timed out | 5 |
-| 5 | ExitPartial | Partial result (some agents failed) | 3 |
+| Code | Constant | Meaning | Caller action |
+|------|----------|---------|---------------|
+| 0 | ExitSuccess | Complete and usable | proceed |
+| 1 | ExitError | Unexpected internal error | report a bug |
+| 2 | ExitUsage | Bad flags/args, unknown agent or chair | fix the command |
+| 3 | ExitProvider | Every requested agent failed — CLI missing, auth invalid, crashed, quota exhausted | retry, or pick another agent |
+| 4 | ExitTimeout | At least one agent timed out | raise `--timeout`, shrink the prompt |
+| 5 | ExitPartial | Some agents failed, output still usable | use it, note the gaps |
+| 6 | ExitConfig | Config missing, unreadable, or invalid | fix the config |
 
-When multiple errors occur in a multi-agent pipeline, the highest-precedence code wins:
-`2 > 4 > 3 > 5 > 1 > 0`
+When several apply, the highest wins: `2 > 6 > 4 > 3 > 5 > 1 > 0`.
+
+Read the precedence most-blocking first: the command was never valid, then the
+config would not load, then a deadline was hit, then every agent failed, then some
+did. **`3` vs `5` is the distinction that matters** — 3 means nothing usable came
+back; 5 means you have an answer with gaps.
+
+> Every usage error — unknown flag, missing argument, unknown provider, unknown
+> chair, unknown command — exits **2**. `1` means an unexpected internal failure,
+> so seeing it is worth reporting rather than retrying.
 
 ## Per-Command Exit Codes
 
-| Command | 0 | 1 | 2 | 3 | 4 | 5 |
+| Command | 0 | 2 | 3 | 4 | 5 | 6 |
 |---------|---|---|---|---|---|---|
-| `council` | All agents + synthesis OK | All agents failed | Bad flags | Provider error | Timeout | Partial (some failed) |
-| `consult` | Agent responded | Error | Bad flags | Provider error | Timeout | Config error |
-| `review` | Author + reviewer OK | Error | Bad flags | Provider error | Timeout | Config error |
-| `refine` | All rounds completed | Error | Bad flags | Provider error | Timeout | Partial (some reviewers failed) |
-| `status` | All healthy | Error | — | Some unhealthy | — | — |
-| `config show` | Success | — | — | — | — | Config error |
+| `council` | Agents + synthesis OK | Bad flags; unknown agent/chair; >5 agents; >5 rounds | **Every** agent failed | Timeout | Some agents failed; peer-review or synthesis failed after a good dispatch | Config error |
+| `consult` | Agent responded | Bad flags; missing/unknown `--agent` | Provider error, quota exhausted | Timeout | — | Config error |
+| `review` | Author + reviewer OK | Bad flags; unknown agent | **Author** failed — nothing to review | Timeout | **Reviewer** failed — author content still usable | Config error |
+| `refine` | All rounds completed | Bad flags; unknown agent | Provider error | Timeout | Some reviewers failed | Config error |
+| `status` | All usable | Bad flags | **Nothing** usable | — | Degraded — some broken, others work¹ | Config error |
+| `config show` | Success | Bad flags | — | — | — | Config error |
+
+¹ `status` follows the same 3-vs-5 rule as the pipelines: **5 means degraded but
+workable** (some agents broken, at least one still usable), **3 means nothing is
+usable at all**. An **opt-in** provider (`grok`) that was never installed is
+reported as `not installed (optional)` and does not degrade the result — but it
+also cannot make a setup usable, so a config whose only agent is an uninstalled
+opt-in one still exits 3.
 
 ## Conditional Patterns
 
@@ -46,11 +66,11 @@ fi
 ```bash
 dootsabha council --json "Design review for auth module" > result.json 2>/dev/null
 case $? in
-  0) echo "Full council result"; jq -r '.synthesis.content' result.json ;;
-  5) echo "Partial result — some agents failed"; jq -r '.synthesis.content' result.json ;;
+  0) echo "Full council result"; jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json ;;
+  5) echo "Partial result — some agents failed"; jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json ;;
   4) echo "Timed out — try with fewer agents or longer timeout" ;;
   3) echo "Provider error — check agent health" ;;
-  1) echo "All agents failed" ;;
+  3) echo "All agents failed — nothing usable" ;;
 esac
 ```
 
@@ -60,18 +80,15 @@ esac
 output=$(dootsabha consult --json --agent claude "Explain this error" 2>&1)
 exit_code=$?
 
-if [ $exit_code -eq 2 ]; then
-  echo "Usage error: $output" >&2
-  exit 1
-fi
-
 if [ $exit_code -ne 0 ]; then
-  echo "Agent error (exit $exit_code)" >&2
+  # 5 is a usable partial result; a config error is its own code (6).
+  reason=$(echo "$output" | jq -r '.data.error // "agent failure"' 2>/dev/null)
+  echo "dootsabha failed (exit $exit_code): $reason" >&2
   exit 1
 fi
 
 # Safe to parse JSON
-echo "$output" | jq -r '.content'
+echo "$output" | jq -r '.data.Content'
 ```
 
 ### Timeout handling with fallback
@@ -94,10 +111,10 @@ exit_code=$?
 
 if [ $exit_code -eq 0 ] || [ $exit_code -eq 5 ]; then
   # Extract which agents succeeded
-  jq -r '[.dispatch[] | select(.error == "") | .provider] | join(", ")' result.json
+  jq -r '[.dispatch[] | select(.error == null) | .provider] | join(", ")' result.json
 
   # Synthesis is still attempted even with partial results
-  jq -r '.synthesis.content' result.json
+  jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json
 fi
 ```
 
@@ -105,12 +122,12 @@ fi
 
 ```bash
 # Count healthy agents
-HEALTHY=$(dootsabha status --json | jq '[.[] | select(.healthy)] | length')
+HEALTHY=$(dootsabha status --json | jq '[.data[] | select(.Healthy)] | length')
 
 case $HEALTHY in
   0) echo "No agents available"; exit 1 ;;
   1) echo "One agent — using consult"
-     AGENT=$(dootsabha status --json | jq -r '.[] | select(.healthy) | .name')
+     AGENT=$(dootsabha status --json | jq -r '.data[] | select(.Healthy) | .Name')
      dootsabha consult --json --agent "$AGENT" "Question" ;;
   *) echo "$HEALTHY agents — using council"
      dootsabha council --json "Question" ;;

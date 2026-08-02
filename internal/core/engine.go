@@ -12,6 +12,10 @@ import (
 // MaxAgents is the hard cap on concurrent agents in a council.
 const MaxAgents = 5
 
+// MaxRounds caps council deliberation rounds. Each round is a full
+// dispatch+review+synthesis cycle, so an unbounded value spends real money.
+const MaxRounds = 5
+
 // ProgressEvent describes a stage transition for a single provider.
 type ProgressEvent int
 

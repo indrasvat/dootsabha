@@ -91,7 +91,7 @@ exit_code=$?
 
 if [ $exit_code -eq 5 ]; then
   # See which agents failed
-  jq -r '.dispatch[] | select(.error != "") | "\(.provider): \(.error)"' result.json
+  jq -r '.dispatch[] | select(.error != null) | "\(.provider): \(.error)"' result.json
 
   # Synthesis still works with remaining agents
   jq -r '.synthesis.content' result.json

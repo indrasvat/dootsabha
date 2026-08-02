@@ -76,6 +76,7 @@ func DefaultContextFile(sessionID string, isTTY bool, termWidth int) ContextFile
 			"claude": {Healthy: true, Model: "claude-opus-4-8"},
 			"codex":  {Healthy: true, Model: "gpt-5.5"},
 			"agy":    {Healthy: true, Model: "Gemini 3.5 Flash (High)"},
+			"grok":   {Healthy: true, Model: "grok-4.5"},
 		},
 		Capabilities: ContextCapabilities{
 			Council: true,

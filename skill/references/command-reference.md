@@ -2,6 +2,46 @@
 
 Complete flag and output schema reference for all दूतसभा commands.
 
+- [Provider matrix](#provider-matrix) — which agent reports tokens/cost, which are defaults
+- [Global flags](#global-flags)
+- [`council`](#council-sabha--सभा) — dispatch → peer review → synthesis
+- [`consult`](#consult-paraamarsh--परामर्श) — query one agent
+- [`review`](#review-sameeksha--समीक्षा) — author + reviewer
+- [`refine`](#refine-sanshodhan--संशोधन) — sequential review + incorporation
+- [`status`](#status-sthiti--स्थिति) — agent health
+- [`config show`](#config-show-vinyaas--विन्यास) · [`config migrate`](#config-migrate)
+- [`plugin list` / `inspect`](#plugin-list--inspect-vistaarak--विस्तारक)
+
+Each command section lists: flags, pipeline, JSON output schema, exit codes.
+
+## Provider Matrix
+
+| Provider | Binary | Default model | Tokens | Cost | Session ID | In default council? |
+|---|---|---|---|---|---|---|
+| `claude` | `claude` | `claude-opus-4-8` | ✅ | ✅ | ✅ | ✅ (standalone only) |
+| `codex` | `codex` | `gpt-5.5` | ✅ | — | — | ✅ |
+| `agy` | `agy` | `Gemini 3.5 Flash (High)` | — | — | — | ✅ |
+| `grok` | `grok` | `grok-4.5` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
+
+**`agy`** runs in plain-text print mode (`agy -p`) and emits no usage data, so its
+`cost_usd`, `tokens_in`, `tokens_out` and `session_id` fields are `0`/empty.
+
+**`grok`** (xAI Grok CLI) is never selected automatically — pass `--agent grok`,
+`--agents claude,codex,grok`, `--chair grok`, or `--reviewers codex,grok`.
+Notes when using it:
+
+- Reasoning effort defaults to `high`; override via `providers.grok.flags`
+  (`--reasoning-effort high|medium|low`). `high` runs ~1.6× slower than `low` for
+  better prioritisation rather than more findings.
+- A real review takes ~105 s (p50), comfortably inside the 5 m default timeout.
+- dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
+  `$HOME`, so it cannot write files and does not inherit the caller's Claude Code
+  skills, hooks, MCP servers, or `CLAUDE.md`.
+- Correctness-critical flags (`--output-format`, `--sandbox`, `--permission-mode`,
+  `-m`, `--no-plan`) are pinned by the provider and stripped from user config.
+
+---
+
 ## Global Flags
 
 | Flag | Short | Default | Description |
@@ -80,15 +120,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All agents responded, synthesis complete |
-| 1 | All agents failed |
-| 3 | Provider error |
-| 4 | At least one agent timed out |
-| 5 | Partial result (some agents failed, synthesis may be incomplete) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`3` only when **every** agent failed. A peer-review or synthesis failure after a successful dispatch is `5` — the agent output is in the payload and usable.
 
 ## consult (paraamarsh / परामर्श)
 
@@ -100,7 +134,7 @@ dootsabha consult [flags] --agent <name> "<prompt>"
 
 | Flag | Short | Default | Description |
 |------|-------|---------|-------------|
-| `--agent` | `-a` | (required) | Agent name: claude, codex, or agy |
+| `--agent` | `-a` | (required) | Agent name: claude, codex, agy, or grok |
 | `--model` | | from config | Override model for this invocation |
 | `--max-turns` | | `0` (no limit) | Maximum agent turns |
 
@@ -132,15 +166,9 @@ Extract content: `jq -r '.data.Content'`
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Error |
-| 3 | Provider error (CLI not found, auth invalid) |
-| 4 | Timeout |
-| 5 | Config error |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+Single agent, so there is no partial state: a provider failure is `3`.
 
 ## review (sameeksha / समीक्षा)
 
@@ -199,15 +227,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Author and reviewer both succeeded |
-| 1 | Error |
-| 3 | Provider error |
-| 4 | Timeout |
-| 5 | Config error |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`3` if the **author** fails (nothing to review). A failed **reviewer** is `5` — the author's content is still in the payload.
 
 ## refine (sanshodhan / संशोधन)
 
@@ -272,15 +294,9 @@ Written directly (no envelope wrapper). All fields snake_case.
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All rounds completed |
-| 1 | Error |
-| 3 | Provider error |
-| 4 | Timeout |
-| 5 | Partial result (some reviewers failed) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`5` if any reviewer fails or times out; the versions produced so far are in the payload.
 
 ## status (sthiti / स्थिति)
 
@@ -304,23 +320,33 @@ Wrapped in envelope. Fields are PascalCase (no json tags on healthRow struct).
     "Healthy": true,
     "Version": "string",
     "Model": "string",
-    "Auth": "string",
-    "Error": "string"
+    "Reachable": "string",
+    "Error": "string",
+    "Installed": true
   }]
 }
 ```
 
 Extract healthy agents: `jq '[.data[] | select(.Healthy)] | length'`
 
+`Installed` reports whether the provider's binary resolved on `$PATH`. It separates
+the two reasons a provider can be unhealthy:
+
+| `Healthy` | `Installed` | Meaning | STATUS column |
+|---|---|---|---|
+| `true` | `true` | usable (but see the quota caveat in SKILL.md) | `OK` |
+| `false` | `false` | CLI not installed | `not installed (optional)` for opt-in agents, else `FAIL` |
+| `false` | `true` | installed but broken — bad auth, crash, wrong version | `FAIL <reason>` |
+
+An **opt-in** provider (`grok`) that is not installed does not fail the command —
+`status` still exits 0. A required provider that is absent, or any provider that is
+installed but broken, exits 3.
+
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | All providers healthy |
-| 1 | Error |
-| 3 | One or more providers unhealthy |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`0` all usable · `5` degraded (some broken, at least one usable) · `3` nothing usable. An opt-in provider that is not installed is reported but does not degrade.
 
 ## config show (vinyaas / विन्यास)
 
@@ -338,12 +364,9 @@ dootsabha config show [flags]
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 5 | Config error (file not found, parse error) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`6` for a missing, unreadable or invalid config.
 
 ## config migrate
 
@@ -363,12 +386,9 @@ dootsabha config migrate [flags]
 
 ### Exit Codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | Migration applied (or dry-run completed, or nothing to migrate) |
-| 5 | Config error (file not found, parse error, write failed) |
+Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
----
+`6` for a missing, unreadable or invalid config.
 
 ## plugin list / inspect (vistaarak / विस्तारक)
 
