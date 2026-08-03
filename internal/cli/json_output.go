@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"context"
-	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -54,21 +52,4 @@ func usageArgs(v cobra.PositionalArgs) cobra.PositionalArgs {
 		}
 		return nil
 	}
-}
-
-// stageExitCode maps a pipeline-stage failure to an exit code, honouring the
-// documented precedence rather than reporting whichever symptom surfaced last.
-//
-// A deadline outranks a provider failure (4 > 3 > 5): when the context expires,
-// downstream stages fail as a *consequence* — a council whose agent hangs would
-// otherwise report "synthesis failed" (3) and hide the real cause. Callers pass
-// the code that applies when no deadline was hit.
-//
-// Codes are combined via core.HighestExitCode so the precedence table is
-// actually computed, not merely documented.
-func stageExitCode(ctx context.Context, err error, fallback int) int {
-	if errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return core.HighestExitCode(core.ExitTimeout, fallback)
-	}
-	return fallback
 }

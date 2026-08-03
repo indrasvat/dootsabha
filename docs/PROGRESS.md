@@ -210,6 +210,29 @@ All 4 items addressed in PRD v1.6.
 | 702 | Provider default model refresh | DONE | — |
 | 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
 | 704 | Add xAI Grok CLI as opt-in fourth provider | DONE | — |
+| 705 | Per-provider timeouts + enforced session timeout (#20) | DONE | — |
+
+### What Works End-to-End (705)
+
+- `--timeout` is the budget for **one agent call**; every call in a pipeline gets
+  its own window. A slow author no longer starves the reviewer (issue #20).
+- `--session-timeout` is enforced for the first time and bounds the **whole
+  pipeline** — unhidden, with a `--satra-seema` alias. `0` disables the ceiling.
+- Both exit `4`; the message names which fired (`invocation timeout after …` /
+  `session timeout after …`) so the caller raises the right knob.
+- `core.Budget` owns the two deadlines; `core.StepContext` derives one call's
+  window. The council engine reads `InvokeOptions.Timeout`, which until now was
+  declared but never used.
+- A single agent hitting its own deadline no longer ends the run: `refine` moves
+  on to the next reviewer, `council` keeps its healthy agents' output.
+- A timed-out chair still reaches the exit code, including through a strategy
+  plugin (`chair_error` on the proto), and the ceiling warning is pipeline-aware.
+- `internal/cli/outcome.go` is the single exit-code decision for every pipeline,
+  replacing three per-command aggregators (90 insertions, 367 deletions). Four
+  freeze guards, each negative-tested, make forgetting a stage or result type a
+  build failure.
+- Tests: 23/23 L3, 234/234 L5, new unit coverage in core/cli/plugin, `-race` clean.
+  Real-CLI proof of old-vs-new in `.shux/out/20/09-real-cli-before-after.png`.
 
 ### What Works End-to-End (704)
 

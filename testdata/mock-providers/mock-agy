@@ -13,4 +13,8 @@ while [[ $# -gt 0 ]]; do
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
+
+# Test hook: simulate a slow provider so timeout scoping can be exercised
+# end-to-end (GitHub issue #20). Unset in normal runs, so this is a no-op.
+sleep "${MOCK_AGY_DELAY:-0}"
 echo "Mock response to: $PROMPT"

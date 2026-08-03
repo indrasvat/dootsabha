@@ -64,7 +64,8 @@ dootsabha <command> --json "<prompt>"
 ```
 
 Stdout is always **exactly one JSON document**, including on failure. Other global
-flags: `--quiet`, `--timeout 5m`, `-v`/`-vv` (stderr only).
+flags: `--quiet`, `-v`/`-vv` (stderr only), and the two budgets — `--timeout 5m`
+bounds **one agent call**, `--session-timeout 30m` bounds the **whole pipeline**.
 
 ## Commands
 
@@ -119,7 +120,7 @@ One code, one action:
 | 0 | Complete, usable | proceed |
 | 2 | Bad flags/args, unknown agent or chair | fix the command |
 | 3 | Every requested agent failed — nothing usable (incl. `status` with no healthy agent) | retry, or pick another agent |
-| 4 | Timeout | raise `--timeout`, shrink the prompt |
+| 4 | Timeout | raise the budget the message names — `invocation timeout` → `--timeout`, `session timeout` → `--session-timeout` — or shrink the prompt |
 | 5 | Some agents failed, output usable (incl. `status` degraded) | use it, note the gaps |
 | 6 | Config missing or invalid | fix the config |
 | 1 | Unexpected internal error | report a bug |

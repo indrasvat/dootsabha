@@ -81,6 +81,11 @@ message DispatchResult {
 
   // Error message if this agent failed (empty on success).
   string error = 8;
+  // Whether that error was a deadline. Carried as data because the error
+  // itself crosses as a plain string: rebuilding it on the far side cannot
+  // recover the sentinel, and inferring "timed out" from the message text
+  // would be a guess. The caller's exit code depends on knowing.
+  bool timed_out = 9;
 }
 
 // ReviewResult holds one agent's peer review output.
@@ -108,6 +113,11 @@ message ReviewResult {
 
   // Error message if this review failed (empty on success).
   string error = 8;
+  // Whether that error was a deadline. Carried as data because the error
+  // itself crosses as a plain string: rebuilding it on the far side cannot
+  // recover the sentinel, and inferring "timed out" from the message text
+  // would be a guess. The caller's exit code depends on knowing.
+  bool timed_out = 9;
 }
 
 // SynthesisResult holds the chair's synthesized output.
@@ -132,6 +142,17 @@ message SynthesisResult {
 
   // Output tokens generated.
   int32 tokens_out = 7;
+
+  // Why the intended chair was replaced, when chair_fallback is set. Kept even
+  // though the fallback succeeded: a chair that timed out is still an agent
+  // that timed out, and the caller's exit code depends on knowing that.
+  string chair_error = 8;
+
+  // Whether that error was a deadline. Carried as data because the error
+  // itself crosses as a plain string: rebuilding it on the far side cannot
+  // recover the sentinel, and inferring "timed out" by matching the message
+  // text would be a guess. The caller's exit code depends on knowing.
+  bool timed_out = 9;
 }
 
 // SessionMeta holds aggregate metadata for the entire strategy execution.

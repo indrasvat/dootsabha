@@ -31,8 +31,8 @@ var ConfigComments = map[string]string{
 	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
 	"council.parallel":        "Run dispatch phase in parallel (false = sequential)",
 	"council.rounds":          "Number of deliberation rounds (max 5)",
-	"timeout":                 "Global invocation timeout (e.g. 30s, 5m, 1h; 0 = disabled)",
-	"session_timeout":         "Max total duration for multi-agent pipelines (e.g. 30m, 1h; 0 = disabled)",
+	"timeout":                 "Budget for one agent call; each call in a pipeline gets its own window (e.g. 30s, 5m, 1h; 0 = use the 5m default)",
+	"session_timeout":         "Ceiling for a whole pipeline across every agent call (e.g. 30m, 1h; 0 = unbounded)",
 }
 
 // Config holds the resolved दूतसभा configuration.

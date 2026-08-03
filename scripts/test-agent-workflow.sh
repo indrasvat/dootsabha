@@ -488,7 +488,14 @@ expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINAR
 # discard content they already paid for.
 FAILN="$(mktemp -t ds-failn)"
 CTR="$(mktemp -t ds-ctr)"
-trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$CFG_CHAIR" "$SCRATCH_HANG" "$FAILN" "$CTR"' EXIT
+# A provider that hangs on its FIRST call and behaves on every later one, for
+# proving that a timeout in round 1 is not erased by a healthy round 2.
+HANGONCE="$(mktemp -t ds-hangonce)"
+HANGCTR="$(mktemp -t ds-hangctr)"
+trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$CFG_CHAIR" "$SCRATCH_HANG" "$FAILN" "$CTR" "$HANGONCE" "$HANGCTR"' EXIT
+# shellcheck disable=SC2016  # $1/$MOCK_* are the generated script's, not ours
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_HANG_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -eq 0 ]; then sleep 300; fi\necho "Mock response"\n' > "$HANGONCE"
+chmod +x "$HANGONCE"
 # shellcheck disable=SC2016  # $1/$C belong to the generated script
 printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -ge "${MOCK_OK:-1}" ]; then echo gone >&2; exit 1; fi\necho "{\\"result\\":\\"r\\",\\"session_id\\":\\"s\\",\\"cost_usd\\":0,\\"model\\":\\"m\\",\\"duration_ms\\":1}"\n' > "$FAILN"
 chmod +x "$FAILN"
@@ -609,6 +616,132 @@ expect_exit 4 "council: ALL agents hang" \
   env DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$HANG" DOOTSABHA_PROVIDERS_CODEX_BINARY="$HANG" "$BINARY" council "hi" --agents claude,codex --timeout 3s
 expect_exit 4 "refine: reviewer hangs" \
   env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" refine "hi" --author claude --reviewers grok --timeout 3s
+
+# Timeout SCOPE (GitHub issue #20). `--timeout` bounds one invocation;
+# `--session-timeout` bounds the whole pipeline. Both still map to exit 4 — the
+# caller's action is the same, "raise a timeout" — but the message must name
+# WHICH one, or the user raises the wrong knob. Before #20 a spent pipeline
+# budget was reported against whichever agent happened to be running.
+expect_exit 4 "review: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --session-timeout 1s
+expect_exit 4 "council: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" council "hi" \
+  --agents claude,codex --timeout 60s --session-timeout 1s
+expect_exit 4 "refine: session ceiling reached" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" refine "hi" \
+  --author claude --reviewers codex --timeout 60s --session-timeout 1s
+
+# The ceiling must NOT fire on a pipeline that fits inside it — a timeout that
+# triggers early is as bad as one that never triggers.
+expect_exit 0 "session ceiling not reached by a fast pipeline" \
+  "$BINARY" review "hi" --author codex --reviewer claude --timeout 60s --session-timeout 30s
+
+# The two scopes must be distinguishable in the message, not just the exit code.
+SCOPE_OUT=$(MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --session-timeout 1s 2>&1 || true)
+if grep -q "session timeout" <<<"$SCOPE_OUT"; then
+  pass "session timeout is named 'session timeout'"
+else
+  fail "session timeout was not named as such: $SCOPE_OUT"
+fi
+
+SCOPE_OUT=$(env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" consult --agent grok "hi" --timeout 1s 2>&1 || true)
+if grep -q "timeout after 1s" <<<"$SCOPE_OUT"; then
+  pass "consult still reports its single-invocation timeout"
+else
+  fail "consult timeout message changed unexpectedly: $SCOPE_OUT"
+fi
+
+SCOPE_OUT=$(env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" review "hi" \
+  --author grok --reviewer claude --timeout 1s --session-timeout 60s 2>&1 || true)
+if grep -q "invocation timeout" <<<"$SCOPE_OUT"; then
+  pass "per-invocation timeout is named 'invocation timeout'"
+else
+  fail "invocation timeout was not named as such: $SCOPE_OUT"
+fi
+
+# A slow agent must no longer bill its neighbours. Each of these pipelines runs
+# longer in total than one invocation budget, with no single step exceeding it.
+expect_exit 0 "review: slow author does not starve the reviewer" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 1200ms --session-timeout 60s
+expect_exit 0 "refine: every step gets its own budget" \
+  env MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" refine "hi" \
+  --author claude --reviewers codex --timeout 1200ms --session-timeout 60s
+expect_exit 0 "council: every stage gets its own budget" \
+  env MOCK_CLAUDE_DELAY=0.7 MOCK_CODEX_DELAY=0.7 "$BINARY" council "hi" \
+  --agents claude,codex --chair claude --timeout 1200ms --session-timeout 60s
+
+# The bilingual alias must resolve to the same ceiling as the ASCII flag.
+expect_exit 4 "session ceiling via --satra-seema" \
+  env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
+  --author codex --reviewer claude --timeout 60s --satra-seema 1s
+
+# One agent blowing ITS OWN window must not end the pipeline — the remaining
+# agents still have full windows of their own. It must still exit 4, because a
+# timeout outranks the partial result it leaves (precedence 4 > 5).
+expect_exit 4 "refine: one reviewer hangs, the rest still run" \
+  env MOCK_CODEX_DELAY=5 "$BINARY" refine "hi" --author claude --reviewers codex,agy \
+  --timeout 500ms --session-timeout 60s
+
+# A chair that timed out is still "an agent timed out", even when the fallback
+# rescued the answer. Dropping it reported a clean 0 for a run that hit a deadline.
+expect_exit 4 "council: chair times out, fallback synthesises" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
+  --agents claude,codex,grok --chair grok --timeout 3s --session-timeout 60s
+
+# ...and when there is NOTHING to fall back to. A one-agent council whose chair
+# times out has no second agent, so synthesis fails outright — but it still
+# failed on a deadline, and reporting 5 there tells the caller to use a partial
+# result that does not exist.
+expect_exit 4 "council: chair times out with no fallback available" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
+  --agents grok --chair grok --timeout 2s --session-timeout 60s
+
+# The session ceiling is checked BETWEEN calls, and a provider that ignores
+# SIGTERM gets a 5s grace period before SIGKILL. A run can therefore finish a
+# little past its ceiling — but the overshoot must stay bounded by that one
+# grace period, NOT grow with the number of steps. Per-invocation budgets mean
+# many more timeout events than the old single shared deadline, so an overshoot
+# that compounded would make --session-timeout meaningless on long pipelines.
+STUBBORN="$(mktemp -t ds-stubborn)"
+# shellcheck disable=SC2016  # $1 belongs to the generated script
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "0.0.0"; exit 0; }\ntrap "" TERM\nsleep 600 &\nwait\n' > "$STUBBORN"
+chmod +x "$STUBBORN"
+START=$(python3 -c "import time; print(time.time())")
+env DOOTSABHA_PROVIDERS_CODEX_BINARY="$STUBBORN" DOOTSABHA_PROVIDERS_AGY_BINARY="$STUBBORN" \
+    DOOTSABHA_PROVIDERS_GROK_BINARY="$STUBBORN" \
+  "$BINARY" refine "hi" --author claude --reviewers codex,agy,grok --timeout 1s \
+  --session-timeout 8s >/dev/null 2>&1 || true
+ELAPSED=$(python3 -c "import time; print(time.time() - $START)")
+# 8s ceiling + one 5s grace + 3s slack for a loaded machine.
+if python3 -c "import sys; sys.exit(0 if $ELAPSED < 16 else 1)"; then
+  pass "session ceiling overshoot stays within one SIGTERM grace period"
+else
+  fail "run took ${ELAPSED}s against an 8s ceiling — the grace overshoot is compounding per step"
+fi
+# Nothing may survive the run, SIGTERM-ignoring or not.
+if [ "$(pgrep -f "$STUBBORN" | wc -l | tr -d ' ')" -eq 0 ]; then
+  pass "a SIGTERM-ignoring provider is still reaped after a timeout"
+else
+  fail "orphaned provider processes left behind after a timeout"
+  pkill -f "$STUBBORN" || true
+fi
+rm -f "$STUBBORN"
+
+# ...and a timeout in an EARLY round survives a healthy later round. Keeping only
+# the final round's synthesis erased it the moment round 2's chair was fine.
+echo 0 > "$HANGCTR"
+RC=0
+env MOCK_HANG_CTR="$HANGCTR" DOOTSABHA_PROVIDERS_GROK_BINARY="$HANGONCE" "$BINARY" council "hi" \
+  --agents claude,codex,grok --chair grok --rounds 2 --timeout 2s --session-timeout 60s \
+  >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 4 ]; then
+  pass "exit 4 — council: round-1 timeout survives a healthy round 2"
+else
+  fail "exit $RC (want 4) — council: an early round's timeout was erased by a later round"
+fi
 
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 

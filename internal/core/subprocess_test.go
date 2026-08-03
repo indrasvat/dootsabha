@@ -2,7 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -238,5 +241,102 @@ func TestDetectAndCleanClaude_SubprocessInheritsCleanEnv(t *testing.T) {
 	got := strings.TrimSpace(string(result.Stdout))
 	if got != "CC=ABSENT BR=1" {
 		t.Errorf("stdout = %q, want %q", got, "CC=ABSENT BR=1")
+	}
+}
+
+// TestRunSkipsSpawnOnSpentBudget — a call whose context has already expired is
+// doomed before it starts. Forking a process just to SIGTERM it milliseconds
+// later is pure waste, and per-invocation timeouts (issue #20) mean expired
+// contexts reach the runner far more often than one shared deadline did.
+func TestRunSkipsSpawnOnSpentBudget(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "spawned")
+
+	for _, tc := range []struct {
+		name string
+		ctx  func() context.Context
+		want error
+	}{
+		{
+			name: "cancelled",
+			ctx: func() context.Context {
+				c, cancel := context.WithCancel(context.Background())
+				cancel()
+				return c
+			},
+			want: context.Canceled,
+		},
+		{
+			name: "deadline exceeded",
+			ctx: func() context.Context {
+				c, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+				t.Cleanup(cancel)
+				<-c.Done()
+				return c
+			},
+			want: context.DeadlineExceeded,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = os.Remove(marker)
+			r := &SubprocessRunner{}
+			start := time.Now()
+			res, err := r.Run(tc.ctx(), "/bin/sh", []string{"-c", "touch " + marker})
+			elapsed := time.Since(start)
+
+			if !errors.Is(err, tc.want) {
+				t.Errorf("err = %v, want %v — the caller's error contract must not change", err, tc.want)
+			}
+			if res == nil || res.ExitCode != -1 {
+				t.Errorf("result = %+v, want a non-nil result with ExitCode -1, same as the kill path", res)
+			}
+			if _, statErr := os.Stat(marker); statErr == nil {
+				t.Error("the command ran — a spent budget should not reach fork/exec")
+			}
+			if elapsed > 50*time.Millisecond {
+				t.Errorf("took %s to decline a doomed call", elapsed)
+			}
+		})
+	}
+}
+
+// TestRunReturnsWhenAGrandchildEscapesTheProcessGroup.
+//
+// The reaper kills the child's whole process GROUP, but a grandchild that calls
+// setsid() leaves that group — and it inherited the stdout pipe. cmd.Wait()
+// waits for os/exec's output copiers to reach EOF, so with a writer still alive
+// it never returns, and the unbounded drain after SIGKILL blocked forever.
+//
+// A run with --timeout 2s hung indefinitely. A timeout that never fires is
+// worse than no timeout at all: nothing downstream can enforce a budget the
+// runner will not honour. Run must always come back.
+func TestRunReturnsWhenAGrandchildEscapesTheProcessGroup(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 needed to spawn a setsid grandchild")
+	}
+	// The backgrounded python setsid()s into its own session, so it survives
+	// kill(-pgid), and it holds the inherited stdout pipe the whole time.
+	script := `python3 -c 'import os,time; os.setsid(); time.sleep(30)' & sleep 30`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	r := &SubprocessRunner{}
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		_, err := r.Run(ctx, "/bin/sh", []string{"-c", script}, WithGracePeriod(200*time.Millisecond))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("err = %v, want DeadlineExceeded", err)
+		}
+		t.Logf("Run returned after %s", time.Since(start))
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run never returned — a detached grandchild holding the output pipe " +
+			"makes every timeout unbounded")
 	}
 }

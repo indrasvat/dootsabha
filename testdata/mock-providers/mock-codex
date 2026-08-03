@@ -9,10 +9,18 @@ while [[ $# -gt 0 ]]; do
     --sandbox) shift 2 ;;
     --ephemeral) shift ;;
     --skip-git-repo-check) shift ;;
+    # The real provider always passes --model before the prompt. Without this
+    # case the mock took "--model" AS the prompt, so every codex-backed
+    # assertion was checking a flag name rather than the text under test.
+    --model|-m) shift 2 ;;
     -c) shift 2 ;;  # config overrides like model_reasoning_effort=medium
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
+
+# Test hook: simulate a slow provider so timeout scoping can be exercised
+# end-to-end (GitHub issue #20). Unset in normal runs, so this is a no-op.
+sleep "${MOCK_CODEX_DELAY:-0}"
 
 # JSON-escape a string so prompts containing quotes/newlines/backslashes cannot
 # produce invalid JSON. council/refine embed prior agent responses in the prompt,

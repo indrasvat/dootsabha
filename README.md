@@ -261,9 +261,26 @@ council:
   parallel: true      # Run dispatch phase in parallel
   rounds: 1           # Number of deliberation rounds (max 5)
 
-timeout: 5m           # Per-agent invocation timeout
-session_timeout: 30m  # Max total pipeline duration
+timeout: 5m           # Budget for ONE agent call — each call gets its own window
+session_timeout: 30m  # Ceiling for a whole pipeline (0 = unbounded)
 ```
+
+### Two timeouts, two jobs
+
+`timeout` is per invocation; `session_timeout` bounds the whole pipeline.
+`review --timeout 8m --session-timeout 20m` gives the author up to 8m *and* the
+reviewer up to 8m, while the command as a whole cannot exceed 20m. Whichever
+budget runs out first is named in the error, so you know which one to raise:
+
+```
+Error: invocation timeout after 8m0s: codex invoke: …   # raise --timeout
+Error: session timeout after 20m0s: claude invoke: …    # raise --session-timeout
+```
+
+The session ceiling is checked between calls, and an agent CLI that ignores
+SIGTERM gets a 5s grace period before it is killed — so a run can finish a few
+seconds past the ceiling. That overshoot is bounded by the one grace period; it
+does not grow with the length of the pipeline.
 
 ### Config merge order
 

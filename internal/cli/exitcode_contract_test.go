@@ -10,54 +10,59 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/indrasvat/dootsabha/internal/core"
 )
 
-// stageExitCode is the single place pipeline failures become exit codes. Before
-// it existed, consult/review/refine each mapped context.DeadlineExceeded to 4
-// while council did not — so a hung agent surfaced as "synthesis failed" (3),
-// reporting the symptom instead of the cause.
-func TestStageExitCodeDeadlineOutranksFallback(t *testing.T) {
-	ctx := context.Background()
+// The exit-code contract these tests pinned belonged to stageExitCode, the
+// helper that turned ONE pipeline-stage failure into a code. Outcome.Exit is now
+// the single place that decision is made — for every command, over every call —
+// so the same properties are asserted against it.
 
-	for _, fallback := range []int{core.ExitProvider, core.ExitPartial, core.ExitError} {
-		got := stageExitCode(ctx, context.DeadlineExceeded, fallback)
-		if got != core.ExitTimeout {
-			t.Errorf("stageExitCode(deadline, fallback=%d) = %d, want %d — a deadline outranks its downstream symptom",
-				fallback, got, core.ExitTimeout)
+// A deadline outranks whatever downstream symptom it caused. Before this was
+// pinned, a hung agent surfaced as "synthesis failed" (3) — the consequence
+// reported instead of the cause.
+func TestExitDeadlineOutranksEveryOtherOutcome(t *testing.T) {
+	deadline := fmt.Errorf("invoke claude: %w", context.DeadlineExceeded)
+
+	for _, other := range []error{
+		nil,
+		errors.New("provider exploded"),
+		errors.New("no healthy agents available for synthesis"),
+		context.Canceled,
+	} {
+		o := outcomeWith(t, call{provider: "claude", err: deadline}, call{provider: "codex", err: other})
+		if got := exitCodeOf(t, o.Exit("x")); got != core.ExitTimeout {
+			t.Errorf("with a deadline alongside %v: exit = %d, want %d", other, got, core.ExitTimeout)
 		}
 	}
 }
 
-// A wrapped deadline must still be recognised — errors.Is, not equality.
-func TestStageExitCodeWrappedDeadline(t *testing.T) {
-	wrapped := fmt.Errorf("synthesis: %w", context.DeadlineExceeded)
-	if got := stageExitCode(context.Background(), wrapped, core.ExitProvider); got != core.ExitTimeout {
+// Recognised by errors.Is, not equality — every real deadline arrives wrapped
+// in the provider and subprocess layers that produced it.
+func TestExitRecognisesADeeplyWrappedDeadline(t *testing.T) {
+	wrapped := fmt.Errorf("synthesis: %w",
+		fmt.Errorf("invoke claude: %w",
+			fmt.Errorf("subprocess %q: %w", "claude", context.DeadlineExceeded)))
+
+	o := outcomeWith(t, call{provider: "claude", err: wrapped})
+	if got := exitCodeOf(t, o.Exit("x")); got != core.ExitTimeout {
 		t.Errorf("wrapped deadline = %d, want %d", got, core.ExitTimeout)
 	}
 }
 
-// The deadline can live on the context rather than the returned error: a
-// cancelled context makes downstream stages fail with their own unrelated errors.
-func TestStageExitCodeDeadlineOnContext(t *testing.T) {
-	ctx, cancel := context.WithDeadline(context.Background(), timePast())
-	defer cancel()
+// Without any deadline the classification falls to whether output survived.
+func TestExitWithoutADeadlineClassifiesByUsableOutput(t *testing.T) {
+	boom := errors.New("provider exploded")
 
-	got := stageExitCode(ctx, errors.New("no healthy agents available for synthesis"), core.ExitProvider)
-	if got != core.ExitTimeout {
-		t.Errorf("expired context = %d, want %d — the stage error is a consequence, not the cause", got, core.ExitTimeout)
+	partial := outcomeWith(t, call{provider: "claude"}, call{provider: "codex", err: boom})
+	if got := exitCodeOf(t, partial.Exit("x")); got != core.ExitPartial {
+		t.Errorf("some failed = %d, want %d", got, core.ExitPartial)
 	}
-}
 
-// Without any deadline the caller's own classification stands.
-func TestStageExitCodeNoDeadlinePassesFallback(t *testing.T) {
-	for _, fallback := range []int{core.ExitProvider, core.ExitPartial} {
-		got := stageExitCode(context.Background(), errors.New("provider exploded"), fallback)
-		if got != fallback {
-			t.Errorf("stageExitCode(plain err, %d) = %d, want %d", fallback, got, fallback)
-		}
+	total := outcomeWith(t, call{provider: "claude", err: boom}, call{provider: "codex", err: boom})
+	if got := exitCodeOf(t, total.Exit("x")); got != core.ExitProvider {
+		t.Errorf("all failed = %d, want %d", got, core.ExitProvider)
 	}
 }
 
@@ -117,8 +122,6 @@ func TestProviderInstalledNilConfig(t *testing.T) {
 	}()
 	_ = providerInstalled(nil, "sh")
 }
-
-func timePast() time.Time { return time.Now().Add(-time.Hour) }
 
 // Every command rejects an unknown agent name with ExitUsage — refine used to
 // treat one as a failed reviewer instead, downgrading a typo to a "partial

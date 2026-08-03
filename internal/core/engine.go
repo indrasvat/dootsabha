@@ -138,7 +138,13 @@ func (e *Engine) invokeOne(ctx context.Context, agent Agent, prompt string, opts
 	e.notify(name, ProgressStarted)
 	slog.Debug("invoking agent", "provider", name, "model", opts.Model, "timeout", opts.Timeout)
 
-	result, err := agent.Invoke(ctx, prompt, opts)
+	// opts.Timeout is a budget for THIS call, not a share of one pipeline-wide
+	// deadline (issue #20). Without a fresh window here, whatever an earlier
+	// stage spent would be charged to this agent.
+	stepCtx, cancel := StepContext(ctx, opts.Timeout)
+	defer cancel()
+
+	result, err := agent.Invoke(stepCtx, prompt, opts)
 	if err != nil {
 		slog.Warn("agent invocation failed", "provider", name, "error", err)
 		e.notify(name, ProgressFailed)

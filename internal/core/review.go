@@ -99,7 +99,12 @@ func (e *Engine) reviewOne(ctx context.Context, reviewer DispatchResult, all []D
 		strings.Join(sections, "\n\n"),
 	)
 
-	result, err := agent.Invoke(ctx, prompt, opts)
+	// A fresh window per reviewer (issue #20) — peer review runs after dispatch,
+	// so under a shared deadline it started with whatever dispatch left behind.
+	stepCtx, cancel := StepContext(ctx, opts.Timeout)
+	defer cancel()
+
+	result, err := agent.Invoke(stepCtx, prompt, opts)
 	if err != nil {
 		slog.Warn("review failed", "reviewer", reviewer.Provider, "reviewed", reviewed, "error", err)
 		e.notify(reviewer.Provider, ProgressFailed)

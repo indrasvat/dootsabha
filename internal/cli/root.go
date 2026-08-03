@@ -59,6 +59,10 @@ council-mode deliberation, peer review, and synthesis.
 		if kaalseema, _ := pf.GetDuration("kaalseema"); kaalseema != 0 && !pf.Changed("timeout") {
 			globalTimeout = kaalseema
 		}
+		// Resolve --satra-seema → --session-timeout bilingual alias.
+		if satraSeema, _ := pf.GetDuration("satra-seema"); satraSeema != 0 && !pf.Changed("session-timeout") {
+			sessionTimeout = satraSeema
+		}
 		// Initialize structured logger.
 		logger := observability.SetupDefaultLogger(verbosity, jsonOutput)
 		traceID := observability.NewTraceID()
@@ -215,14 +219,12 @@ func init() {
 	f.BoolVar(&jsonOutput, "json", false, "Output as JSON (agent-friendly)")
 	f.CountVarP(&verbosity, "verbose", "v", "Verbosity level (-v info, -vv debug, -vvv debug+source)")
 	f.BoolVarP(&quiet, "quiet", "q", false, "Suppress all non-essential output")
-	f.DurationVar(&globalTimeout, "timeout", 0, "Global invocation timeout (e.g. 5m, 30s)")
+	f.DurationVar(&globalTimeout, "timeout", 0, "Timeout for each agent invocation (e.g. 5m, 30s)")
 	f.Duration("kaalseema", 0, "Alias for --timeout (कालसीमा)")
 	_ = f.MarkHidden("kaalseema")
-	f.DurationVar(&sessionTimeout, "session-timeout", 0, "Max session duration (e.g. 30m)")
-	// TODO(704): session_timeout is parsed and stored but never enforced.
-	// Hidden rather than advertised — a flag that silently does nothing is worse
-	// than one that is absent, since PRD §6.1 names it a council stop condition.
-	_ = rootCmd.PersistentFlags().MarkHidden("session-timeout")
+	f.DurationVar(&sessionTimeout, "session-timeout", 0, "Max total duration for the whole pipeline (e.g. 30m; 0 = unbounded)")
+	f.Duration("satra-seema", 0, "Alias for --session-timeout (सत्र-सीमा)")
+	_ = f.MarkHidden("satra-seema")
 	f.StringVar(&configFile, "config", "", "Path to config file (YAML)")
 
 	rootCmd.AddCommand(newConsultCmd())

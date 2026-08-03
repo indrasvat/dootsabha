@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -100,16 +98,13 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				return &ExitError{Code: core.ExitConfig, Message: fmt.Sprintf("load config: %s", err)}
 			}
 
-			timeout := globalTimeout
-			if timeout == 0 {
-				timeout = cfg.Timeout
-			}
-			if timeout == 0 {
-				timeout = 5 * 60 * 1_000_000_000 // 5 minutes in nanoseconds
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			// Generation, each review and each incorporation is its own
+			// invocation, so each gets its own window inside one pipeline
+			// ceiling (issue #20). v1, then a review + an incorporation per
+			// reviewer — the longest pipeline dootsabha runs.
+			budget := newBudget(cmd, cfg, 1+2*len(reviewerNames))
+			defer budget.Close()
+			outcome := newOutcome(budget)
 
 			runner := &core.SubprocessRunner{}
 
@@ -121,7 +116,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 			invokeOpts := providers.InvokeOptions{
 				Model:   model,
-				Timeout: timeout,
+				Timeout: budget.PerInvoke(),
 			}
 
 			// Render header (TTY only, not JSON).
@@ -136,29 +131,22 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			var versions []refineVersionJSON
 			var totalCost float64
 			var totalIn, totalOut int
-			partial := false
 
 			// Step 1: Author generates v1.
 			slog.Info("refine: author generating v1", "author", author, "reviewers", reviewerNames, "anonymous", anonymous)
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineStep(rc, author, "v1", true)
 			}
-			v1Result, err := authorProv.Invoke(ctx, prompt, invokeOpts)
+			v1Result, err := outcome.Invoke(authorProv, author, prompt, invokeOpts)
 			if err != nil {
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
-				}
-				exitCode := core.ExitProvider
-				msg := fmt.Sprintf("author (%s) failed on v1: %s", author, err)
-				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = core.ExitTimeout
-					msg = fmt.Sprintf("timeout after %s: %s", timeout, err)
 				}
 				if rc.IsJSON() {
 					totalDuration := time.Since(totalStart)
 					_ = renderRefineJSON(nil, 0, "", anonymous, totalDuration, 0, 0, 0, map[string]string{author: "error"})
 				}
-				return &ExitError{Code: exitCode, Message: msg}
+				return outcome.Exit(fmt.Sprintf("author (%s) failed on v1: %s", author, err))
 			}
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineDone(rc, author, "v1", v1Result.Duration)
@@ -178,9 +166,11 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			for _, revName := range reviewerNames {
 				revProv, revErr := getProvider(revName, cfg, runner)
 				if revErr != nil {
-					// Unknown reviewer — skip.
+					// Unknown reviewer — skip. Recorded, not merely noted: a
+					// failure the exit decision cannot see is how this class of
+					// bug happens.
 					providerStatus[revName] = "error"
-					partial = true
+					outcome.Fail(revName, revErr)
 					if rc.IsTTY && !rc.IsJSON() {
 						stderrRefineSkip(rc, revName, revErr)
 					}
@@ -193,15 +183,16 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
 				}
-				reviewResult, revErr := revProv.Invoke(ctx, reviewPrompt, invokeOpts)
+				reviewResult, revErr := outcome.Invoke(revProv, revName, reviewPrompt, invokeOpts)
 				if revErr != nil {
 					providerStatus[revName] = "error"
-					partial = true
 					if rc.IsTTY && !rc.IsJSON() {
 						stderrRefineSkip(rc, revName, revErr)
 					}
-					if errors.Is(revErr, context.DeadlineExceeded) {
-						// On timeout, output what we have.
+					// A spent session ends the pipeline; a single reviewer
+					// blowing its own window does not, so the remaining
+					// reviewers still get their turn.
+					if budget.SessionExpired() {
 						break
 					}
 					continue
@@ -223,10 +214,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 					nextVersion := currentVersion + 1
 					stderrRefineStep(rc, author, fmt.Sprintf("incorporating → v%d", nextVersion), true)
 				}
-				incResult, incErr := authorProv.Invoke(ctx, incorporatePrompt, invokeOpts)
+				incResult, incErr := outcome.Invoke(authorProv, author, incorporatePrompt, invokeOpts)
 				if incErr != nil {
 					// Author failed to incorporate — keep current version.
-					partial = true
 					if rc.IsTTY && !rc.IsJSON() {
 						dot := output.ProviderDot(rc, providerColor(author))
 						fmt.Fprintf(os.Stderr, "\r\033[K  %s %-8s incorporating failed, keeping v%d\n", dot, author, currentVersion) //nolint:errcheck
@@ -236,7 +226,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 						currentVersion, author, nil, revName, reviewResult.Content,
 						&providers.ProviderResult{Duration: reviewResult.Duration},
 					))
-					if errors.Is(incErr, context.DeadlineExceeded) {
+					if budget.SessionExpired() {
 						break
 					}
 					continue
@@ -282,10 +272,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				renderRefineTTY(rc, currentContent, currentVersion, len(reviewerNames), author, totalDuration, totalCost, totalIn, totalOut)
 			}
 
-			if partial {
-				return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: one or more reviewers failed"}
-			}
-			return nil
+			return outcome.Exit("one or more reviewers failed")
 		},
 	}
 

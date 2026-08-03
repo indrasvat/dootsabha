@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/output"
-	"github.com/indrasvat/dootsabha/internal/providers"
 )
 
 func newCouncilCmd() *cobra.Command {
@@ -88,16 +86,15 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 				}
 			}
 
-			timeout := globalTimeout
-			if timeout == 0 {
-				timeout = cfg.Timeout
-			}
-			if timeout == 0 {
-				timeout = 5 * 60 * 1_000_000_000 // 5 minutes
-			}
-
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
+			// Dispatch, peer review and synthesis are separate invocations, and
+			// multi-round councils repeat all three. Each call gets its own
+			// window inside one pipeline ceiling (issue #20); the engine derives
+			// the per-invocation context from InvokeOptions.Timeout.
+			budget := newBudget(cmd, cfg, councilSteps(cfg, splitAgentList(agents)))
+			defer budget.Close()
+			outcome := newOutcome(budget)
+			ctx := budget.Session()
+			invokeOpts := core.InvokeOptions{Timeout: budget.PerInvoke()}
 
 			// Parse agent names.
 			agentNames := splitAgentList(agents)
@@ -136,6 +133,9 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			// Run council pipeline.
 			var allDispatches []core.DispatchResult
 			var allReviews []core.ReviewResult
+			// synthesis is the LAST round's, for rendering. Every round's is
+			// folded into `outcome` as it happens, so an early round's chair
+			// failure cannot be erased by a healthy later one.
 			var synthesis *core.SynthesisResult
 			currentPrompt := prompt
 
@@ -152,7 +152,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					eng.SetProgress(stderrProgress("dispatch", rc.HasColor))
 				}
 
-				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, core.InvokeOptions{Timeout: timeout})
+				dispatches, dispErr := eng.Dispatch(ctx, currentPrompt, invokeOpts)
 				if dispErr != nil {
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, nil, nil)
@@ -163,6 +163,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 				// round, so a 3-round council under-reported its own cost by ~2/3
 				// and discarded earlier rounds' agent output entirely.
 				allDispatches = append(allDispatches, dispatches...)
+				outcome.AddDispatches(dispatches)
 
 				// Count successes.
 				successes := 0
@@ -176,18 +177,11 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
-					// Judge from the ACCUMULATED payload, not just this round. With
-					// multi-round accumulation an earlier round's output may still be
-					// in the JSON, and reporting "nothing usable" would tell callers
-					// to discard content they already paid for.
-					fallback := core.ExitProvider
-					for _, d := range allDispatches {
-						if d.Error == nil {
-							fallback = core.ExitPartial
-							break
-						}
-					}
-					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), fallback), Message: "all agents failed during dispatch"}
+					// Exit judges from the ACCUMULATED ledger, not just this round:
+					// with multi-round accumulation an earlier round's output may
+					// still be in the JSON, and reporting "nothing usable" would
+					// tell callers to discard content they already paid for.
+					return outcome.Exit("all agents failed during dispatch")
 				}
 
 				// Stage 2: Peer Review (skip if <2 successes)
@@ -200,7 +194,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					if stderrIsTTY && !quiet && !rc.IsJSON() {
 						eng.SetProgress(stderrProgress("review", rc.HasColor))
 					}
-					reviews, err = eng.PeerReview(ctx, dispatches, core.InvokeOptions{Timeout: timeout})
+					reviews, err = eng.PeerReview(ctx, dispatches, invokeOpts)
 					if err != nil {
 						if rc.IsJSON() {
 							_ = renderCouncilJSON(allDispatches, allReviews, nil)
@@ -208,24 +202,33 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 						// Dispatch already produced usable agent output, so this is
 						// a partial result — not "nothing usable". Reporting 3 here
 						// told callers to discard content they had already paid for.
-						return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("peer review: %s", err)}
+						// PeerReview reports per-reviewer failures on the results
+						// and currently never returns an error of its own, but the
+						// signature permits one — record it rather than trust that.
+						outcome.Fail("peer review", err)
+						return outcome.Exit(fmt.Sprintf("peer review: %s", err))
 					}
 				}
 				allReviews = append(allReviews, reviews...)
+				outcome.AddReviews(reviews)
 
 				// Stage 3: Synthesis
 				if stderrIsTTY && !quiet && !rc.IsJSON() {
 					fmt.Fprintln(os.Stdout)                                                                                      //nolint:errcheck
 					fmt.Fprintln(os.Stdout, output.SectionDivider(rc, "Synthesis", fmt.Sprintf("chair: %s", cfg.Council.Chair))) //nolint:errcheck
 				}
-				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, core.InvokeOptions{Timeout: timeout})
+				synthesis, err = eng.Synthesize(ctx, dispatches, reviews, invokeOpts)
+				outcome.AddSynthesis(synthesis)
 				if err != nil {
 					if rc.IsJSON() {
 						_ = renderCouncilJSON(allDispatches, allReviews, nil)
 					}
 					// Same reasoning as peer review: the dispatch output is in the
-					// payload and is usable, so this is partial, not total failure.
-					return &ExitError{Code: stageExitCode(ctx, err, core.ExitPartial), Message: fmt.Sprintf("synthesis: %s", err)}
+					// payload and is usable, so Exit sees a partial rather than a
+					// total failure. Synthesize can fail without any agent having
+					// been reachable, so record it explicitly.
+					outcome.Fail(cfg.Council.Chair, err)
+					return outcome.Exit(fmt.Sprintf("synthesis: %s", err))
 				}
 
 				// Surface a chair fallback. It is recorded in JSON as
@@ -250,23 +253,12 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 					return &ExitError{Code: core.ExitError, Message: fmt.Sprintf("write json: %s", err)}
 				}
 				// Return correct exit code even in JSON mode.
-				for _, d := range allDispatches {
-					if d.Error != nil {
-						return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
-					}
-				}
-				return nil
+				return outcome.Exit("some agents failed")
 			}
 
 			renderCouncilTTY(rc, allDispatches, allReviews, synthesis)
 
-			// Exit code 5 for partial results.
-			for _, d := range allDispatches {
-				if d.Error != nil {
-					return &ExitError{Code: stageExitCode(ctx, ctx.Err(), core.ExitPartial), Message: "partial result: some agents failed"}
-				}
-			}
-			return nil
+			return outcome.Exit("some agents failed")
 		},
 	}
 
@@ -291,31 +283,19 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 	return cmd
 }
 
-// providerAgent adapts providers.Provider to core.Agent, breaking the import cycle
-// between core and providers.
-type providerAgent struct {
-	prov providers.Provider
-}
-
-func (a *providerAgent) Name() string { return a.prov.Name() }
-
-func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.InvokeOptions) (*core.InvokeResult, error) {
-	result, err := a.prov.Invoke(ctx, prompt, providers.InvokeOptions{
-		Model:    opts.Model,
-		MaxTurns: opts.MaxTurns,
-		Timeout:  opts.Timeout,
-	})
-	if err != nil {
-		return nil, err
+// councilSteps is the longest chain of provider calls a council can run back to
+// back — what the session ceiling actually has to cover.
+//
+// It counts WALL CLOCK, not invocations. Dispatch and peer review run their
+// agents concurrently by default, so ten agents cost one call's worth of time,
+// not ten. Counting invocations made every default council warn that it might
+// be cut short when it comfortably fits.
+func councilSteps(cfg *core.Config, agents []string) int {
+	perRound := 3 // dispatch · peer review · synthesis
+	if !cfg.Council.Parallel {
+		perRound = 2*len(agents) + 1
 	}
-	return &core.InvokeResult{
-		Content:   result.Content,
-		Model:     result.Model,
-		Duration:  result.Duration,
-		CostUSD:   result.CostUSD,
-		TokensIn:  result.TokensIn,
-		TokensOut: result.TokensOut,
-	}, nil
+	return cfg.Council.Rounds * perRound
 }
 
 // stderrProgress returns a ProgressFunc that renders agent status to stderr with provider dots.

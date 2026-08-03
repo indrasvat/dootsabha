@@ -54,14 +54,39 @@ func (s *councilStrategy) Execute(ctx context.Context, req *gen.ExecuteRequest) 
 		if provider == nil {
 			continue
 		}
-		agents = append(agents, &agentAdapter{provider: provider})
+		// AgentConfig.timeout_ms is documented as the PER-AGENT timeout and was
+		// being dropped entirely, so every call in a plugin-run council was
+		// unbounded — GitHub issue #20 in the out-of-process pipeline.
+		timeout := time.Duration(ac.TimeoutMs) * time.Millisecond
+		if timeout <= 0 {
+			timeout = cfg.Timeout // proto: "0 = use config default"
+		}
+		if timeout <= 0 {
+			// A config that also says 0 must not mean "unbounded" — the CLI
+			// resolves the same pair to the built-in default, and a plugin-run
+			// council should not be the one with no per-call bound at all.
+			timeout = core.DefaultInvokeTimeout
+		}
+		agents = append(agents, &agentAdapter{provider: provider, timeout: timeout})
 	}
 	if len(agents) == 0 {
 		return nil, fmt.Errorf("no valid agents configured")
 	}
 
+	// The whole pipeline runs under the session ceiling, exactly as the CLI
+	// does. Without this the incoming RPC context is passed straight through
+	// every stage, so a plugin-run council could run for the sum of all its
+	// per-agent windows with nothing bounding the total.
+	if cfg.SessionTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.SessionTimeout)
+		defer cancel()
+	}
+
 	// Create engine and run pipeline.
 	engine := core.NewEngine(agents, cfg)
+	// Each agent carries its own timeout (see agentAdapter), so the engine adds
+	// no window of its own here.
 	opts := core.InvokeOptions{}
 
 	start := time.Now()
@@ -106,18 +131,28 @@ func createProvider(name string, cfg *core.Config, runner providers.Runner) prov
 	}
 }
 
-// agentAdapter wraps providers.Provider to satisfy core.Agent.
+// agentAdapter wraps providers.Provider to satisfy core.Agent, applying that
+// agent's own per-invocation timeout.
 type agentAdapter struct {
 	provider providers.Provider
+	timeout  time.Duration
 }
 
 func (a *agentAdapter) Name() string { return a.provider.Name() }
 
 func (a *agentAdapter) Invoke(ctx context.Context, prompt string, opts core.InvokeOptions) (*core.InvokeResult, error) {
+	// A fresh window for THIS call, clipped by whatever the caller's context
+	// already allows. Without it every call in the pipeline shared one deadline
+	// and a slow agent starved the ones after it (issue #20).
+	if a.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = core.StepContext(ctx, a.timeout)
+		defer cancel()
+	}
 	result, err := a.provider.Invoke(ctx, prompt, providers.InvokeOptions{
 		Model:    opts.Model,
 		MaxTurns: opts.MaxTurns,
-		Timeout:  opts.Timeout,
+		Timeout:  a.timeout,
 	})
 	if err != nil {
 		return nil, err
@@ -133,6 +168,14 @@ func (a *agentAdapter) Invoke(ctx context.Context, prompt string, opts core.Invo
 }
 
 // buildExecuteResponse converts engine results to a proto ExecuteResponse.
+// buildExecuteResponse assembles the strategy response.
+//
+// Serialisation goes through internal/plugin's converters rather than being
+// written out again here. This function used to hand-build every message, and
+// drifted: it never set SynthesisResult.ChairError, so a chair that timed out
+// and was replaced by a healthy fallback crossed the wire looking like a clean
+// run, and the host exited 0 on a run that hit a deadline. Two serialisers for
+// one format is one too many.
 func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.ReviewResult, synthesis *core.SynthesisResult, totalDuration time.Duration) *gen.ExecuteResponse {
 	resp := &gen.ExecuteResponse{}
 
@@ -141,17 +184,7 @@ func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.Revie
 	status := make(map[string]string)
 
 	for _, d := range dispatches {
-		dr := &gen.DispatchResult{
-			Provider:   d.Provider,
-			Model:      d.Model,
-			Content:    d.Content,
-			DurationMs: d.Duration.Milliseconds(),
-			CostUsd:    d.CostUSD,
-			TokensIn:   int32(d.TokensIn),
-			TokensOut:  int32(d.TokensOut),
-		}
 		if d.Error != nil {
-			dr.Error = d.Error.Error()
 			status[d.Provider] = "error"
 		} else {
 			status[d.Provider] = "healthy"
@@ -159,38 +192,18 @@ func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.Revie
 		totalCost += d.CostUSD
 		totalIn += int32(d.TokensIn)
 		totalOut += int32(d.TokensOut)
-		resp.DispatchResults = append(resp.DispatchResults, dr)
+		resp.DispatchResults = append(resp.DispatchResults, internalPlugin.DispatchResultToProto(&d))
 	}
 
 	for _, r := range reviews {
-		rr := &gen.ReviewResult{
-			Reviewer:   r.Reviewer,
-			Reviewed:   r.Reviewed,
-			Content:    r.Content,
-			DurationMs: r.Duration.Milliseconds(),
-			CostUsd:    r.CostUSD,
-			TokensIn:   int32(r.TokensIn),
-			TokensOut:  int32(r.TokensOut),
-		}
-		if r.Error != nil {
-			rr.Error = r.Error.Error()
-		}
 		totalCost += r.CostUSD
 		totalIn += int32(r.TokensIn)
 		totalOut += int32(r.TokensOut)
-		resp.ReviewResults = append(resp.ReviewResults, rr)
+		resp.ReviewResults = append(resp.ReviewResults, internalPlugin.ReviewResultToProto(&r))
 	}
 
 	if synthesis != nil {
-		resp.Synthesis = &gen.SynthesisResult{
-			Chair:         synthesis.Chair,
-			ChairFallback: synthesis.ChairFallback,
-			Content:       synthesis.Content,
-			DurationMs:    synthesis.Duration.Milliseconds(),
-			CostUsd:       synthesis.CostUSD,
-			TokensIn:      int32(synthesis.TokensIn),
-			TokensOut:     int32(synthesis.TokensOut),
-		}
+		resp.Synthesis = internalPlugin.SynthesisResultToProto(synthesis)
 		totalCost += synthesis.CostUSD
 		totalIn += int32(synthesis.TokensIn)
 		totalOut += int32(synthesis.TokensOut)
