@@ -488,7 +488,14 @@ expect_exit 5 "some agents failed"            env DOOTSABHA_PROVIDERS_GROK_BINAR
 # discard content they already paid for.
 FAILN="$(mktemp -t ds-failn)"
 CTR="$(mktemp -t ds-ctr)"
-trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$CFG_CHAIR" "$SCRATCH_HANG" "$FAILN" "$CTR"' EXIT
+# A provider that hangs on its FIRST call and behaves on every later one, for
+# proving that a timeout in round 1 is not erased by a healthy round 2.
+HANGONCE="$(mktemp -t ds-hangonce)"
+HANGCTR="$(mktemp -t ds-hangctr)"
+trap 'rm -f "$CFG_DUR" "$CFG_HUMAN" "$CFG_PROV" "$CFG_ROUNDS" "$CFG_CHAIR" "$SCRATCH_HANG" "$FAILN" "$CTR" "$HANGONCE" "$HANGCTR"' EXIT
+# shellcheck disable=SC2016  # $1/$MOCK_* are the generated script's, not ours
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_HANG_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -eq 0 ]; then sleep 300; fi\necho "Mock response"\n' > "$HANGONCE"
+chmod +x "$HANGONCE"
 # shellcheck disable=SC2016  # $1/$C belong to the generated script
 printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.0"; exit 0; }\nC="$MOCK_CTR"; n=$(cat "$C" 2>/dev/null || echo 0); n=${n:-0}; echo $((n+1)) > "$C"\nif [ "$n" -ge "${MOCK_OK:-1}" ]; then echo gone >&2; exit 1; fi\necho "{\\"result\\":\\"r\\",\\"session_id\\":\\"s\\",\\"cost_usd\\":0,\\"model\\":\\"m\\",\\"duration_ms\\":1}"\n' > "$FAILN"
 chmod +x "$FAILN"
@@ -683,6 +690,19 @@ expect_exit 4 "refine: one reviewer hangs, the rest still run" \
 expect_exit 4 "council: chair times out, fallback synthesises" \
   env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
   --agents claude,codex,grok --chair grok --timeout 3s --session-timeout 60s
+
+# ...and a timeout in an EARLY round survives a healthy later round. Keeping only
+# the final round's synthesis erased it the moment round 2's chair was fine.
+echo 0 > "$HANGCTR"
+RC=0
+env MOCK_HANG_CTR="$HANGCTR" DOOTSABHA_PROVIDERS_GROK_BINARY="$HANGONCE" "$BINARY" council "hi" \
+  --agents claude,codex,grok --chair grok --rounds 2 --timeout 2s --session-timeout 60s \
+  >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 4 ]; then
+  pass "exit 4 — council: round-1 timeout survives a healthy round 2"
+else
+  fail "exit $RC (want 4) — council: an early round's timeout was erased by a later round"
+fi
 
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
