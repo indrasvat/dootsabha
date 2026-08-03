@@ -89,6 +89,15 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 		o(cfg)
 	}
 
+	// A call whose budget is already spent is doomed before it starts, so do not
+	// pay for a fork/exec to kill it milliseconds later. Per-invocation timeouts
+	// (issue #20) make expired contexts reaching here far more common than the
+	// single shared deadline did.
+	if err := ctx.Err(); err != nil {
+		slog.Debug("subprocess skipped, budget already spent", "binary", binary, "error", err)
+		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, err)
+	}
+
 	cmd := exec.Command(binary, args...)
 	cmd.Env = cfg.env
 	if cfg.dir != "" {

@@ -2,7 +2,9 @@ package core
 
 import (
 	"context"
+	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -238,5 +240,61 @@ func TestDetectAndCleanClaude_SubprocessInheritsCleanEnv(t *testing.T) {
 	got := strings.TrimSpace(string(result.Stdout))
 	if got != "CC=ABSENT BR=1" {
 		t.Errorf("stdout = %q, want %q", got, "CC=ABSENT BR=1")
+	}
+}
+
+// TestRunSkipsSpawnOnSpentBudget — a call whose context has already expired is
+// doomed before it starts. Forking a process just to SIGTERM it milliseconds
+// later is pure waste, and per-invocation timeouts (issue #20) mean expired
+// contexts reach the runner far more often than one shared deadline did.
+func TestRunSkipsSpawnOnSpentBudget(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "spawned")
+
+	for _, tc := range []struct {
+		name string
+		ctx  func() context.Context
+		want error
+	}{
+		{
+			name: "cancelled",
+			ctx: func() context.Context {
+				c, cancel := context.WithCancel(context.Background())
+				cancel()
+				return c
+			},
+			want: context.Canceled,
+		},
+		{
+			name: "deadline exceeded",
+			ctx: func() context.Context {
+				c, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+				t.Cleanup(cancel)
+				<-c.Done()
+				return c
+			},
+			want: context.DeadlineExceeded,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_ = os.Remove(marker)
+			r := &SubprocessRunner{}
+			start := time.Now()
+			res, err := r.Run(tc.ctx(), "/bin/sh", []string{"-c", "touch " + marker})
+			elapsed := time.Since(start)
+
+			if !errors.Is(err, tc.want) {
+				t.Errorf("err = %v, want %v — the caller's error contract must not change", err, tc.want)
+			}
+			if res == nil || res.ExitCode != -1 {
+				t.Errorf("result = %+v, want a non-nil result with ExitCode -1, same as the kill path", res)
+			}
+			if _, statErr := os.Stat(marker); statErr == nil {
+				t.Error("the command ran — a spent budget should not reach fork/exec")
+			}
+			if elapsed > 50*time.Millisecond {
+				t.Errorf("took %s to decline a doomed call", elapsed)
+			}
+		})
 	}
 }
