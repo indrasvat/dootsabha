@@ -2,6 +2,7 @@ package plugin_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -435,10 +436,69 @@ func TestSynthesisChairErrorRoundTrips(t *testing.T) {
 	if !strings.Contains(out.ChairError.Error(), "context deadline exceeded") {
 		t.Errorf("ChairError = %q, want the deadline detail preserved", out.ChairError)
 	}
+	// The text surviving is not enough, and asserting only that is how this
+	// shipped broken: the error is rebuilt from a string on the far side, so
+	// errors.Is — which is what the exit decision actually calls — returned
+	// false and a timed-out run stopped being a timeout. Exit 4 became 5, or 3.
+	if !errors.Is(out.ChairError, context.DeadlineExceeded) {
+		t.Error("ChairError lost the DeadlineExceeded sentinel — errors.Is is what decides exit 4")
+	}
 	// A healthy chair must not arrive as a non-nil error, or every council
 	// through a strategy plugin would report itself partial.
 	clean := plugin.ProtoToSynthesisResult(plugin.SynthesisResultToProto(&core.SynthesisResult{Chair: "claude"}))
 	if clean.ChairError != nil {
 		t.Errorf("ChairError = %v for a healthy chair, want nil", clean.ChairError)
 	}
+}
+
+// TestEveryResultErrorKeepsItsDeadlineAcrossTheWire.
+//
+// The exit contract turns on errors.Is(err, context.DeadlineExceeded), and a
+// gRPC boundary carries text, not sentinels. Every result type that can hold an
+// error therefore has to carry the deadline fact as data — inferring it by
+// matching the message would make the exit code depend on wording.
+func TestEveryResultErrorKeepsItsDeadlineAcrossTheWire(t *testing.T) {
+	deadline := fmt.Errorf("invoke claude: %w", context.DeadlineExceeded)
+	plain := errors.New("provider exploded")
+
+	t.Run("dispatch", func(t *testing.T) {
+		out := plugin.ProtoToDispatchResult(plugin.DispatchResultToProto(
+			&core.DispatchResult{Provider: "claude", Error: deadline}))
+		if !errors.Is(out.Error, context.DeadlineExceeded) {
+			t.Error("dispatch error lost its deadline")
+		}
+	})
+	t.Run("review", func(t *testing.T) {
+		out := plugin.ProtoToReviewResult(plugin.ReviewResultToProto(
+			&core.ReviewResult{Reviewer: "claude", Error: deadline}))
+		if !errors.Is(out.Error, context.DeadlineExceeded) {
+			t.Error("review error lost its deadline")
+		}
+	})
+	t.Run("synthesis chair", func(t *testing.T) {
+		out := plugin.ProtoToSynthesisResult(plugin.SynthesisResultToProto(
+			&core.SynthesisResult{Chair: "claude", ChairFallback: "codex", ChairError: deadline}))
+		if !errors.Is(out.ChairError, context.DeadlineExceeded) {
+			t.Error("chair error lost its deadline")
+		}
+	})
+	// The mirror: an ordinary failure must not arrive looking like a timeout,
+	// or every provider crash would tell the caller to raise a budget.
+	t.Run("a plain failure stays plain", func(t *testing.T) {
+		out := plugin.ProtoToDispatchResult(plugin.DispatchResultToProto(
+			&core.DispatchResult{Provider: "claude", Error: plain}))
+		if errors.Is(out.Error, context.DeadlineExceeded) {
+			t.Error("a plain error came back as a deadline")
+		}
+		if out.Error == nil || !strings.Contains(out.Error.Error(), "provider exploded") {
+			t.Errorf("error = %v, want the original message", out.Error)
+		}
+	})
+	t.Run("success stays nil", func(t *testing.T) {
+		out := plugin.ProtoToDispatchResult(plugin.DispatchResultToProto(
+			&core.DispatchResult{Provider: "claude"}))
+		if out.Error != nil {
+			t.Errorf("error = %v on a successful dispatch, want nil", out.Error)
+		}
+	})
 }

@@ -4,6 +4,8 @@
 package plugin
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -84,12 +86,38 @@ func ProtoToInvokeOptions(p *gen.InvokeRequest) providers.InvokeOptions {
 
 // ── Engine/strategy types ──────────────────────────────────────────────────────
 
+// errorToProto splits an error into the two things the wire can carry: its text
+// and whether it was a deadline.
+//
+// The sentinel cannot survive as text. Rebuilding an error from a string on the
+// far side produces something errors.Is(err, context.DeadlineExceeded) rejects,
+// so a timed-out agent that crossed this boundary stopped being a timeout and
+// the caller's exit code silently fell from 4 to 5 (or 3). Matching the message
+// text to guess would be worse — it would make the exit contract depend on
+// wording. The fact travels as its own field instead.
+func errorToProto(err error) (msg string, timedOut bool) {
+	if err == nil {
+		return "", false
+	}
+	return err.Error(), errors.Is(err, context.DeadlineExceeded)
+}
+
+// protoToError rebuilds an error, re-attaching the deadline sentinel when the
+// far side said so, so errors.Is keeps working across the boundary.
+func protoToError(msg string, timedOut bool) error {
+	switch {
+	case msg == "":
+		return nil
+	case timedOut:
+		return fmt.Errorf("%s: %w", msg, context.DeadlineExceeded)
+	default:
+		return errors.New(msg)
+	}
+}
+
 // DispatchResultToProto converts a core.DispatchResult to a proto DispatchResult.
 func DispatchResultToProto(d *core.DispatchResult) *gen.DispatchResult {
-	errStr := ""
-	if d.Error != nil {
-		errStr = d.Error.Error()
-	}
+	errStr, timedOut := errorToProto(d.Error)
 	return &gen.DispatchResult{
 		Provider:   d.Provider,
 		Model:      d.Model,
@@ -99,15 +127,13 @@ func DispatchResultToProto(d *core.DispatchResult) *gen.DispatchResult {
 		TokensIn:   int32(d.TokensIn),
 		TokensOut:  int32(d.TokensOut),
 		Error:      errStr,
+		TimedOut:   timedOut,
 	}
 }
 
 // ProtoToDispatchResult converts a proto DispatchResult back to a core.DispatchResult.
 func ProtoToDispatchResult(p *gen.DispatchResult) *core.DispatchResult {
-	var err error
-	if p.GetError() != "" {
-		err = fmt.Errorf("%s", p.GetError())
-	}
+	err := protoToError(p.GetError(), p.GetTimedOut())
 	return &core.DispatchResult{
 		Provider:  p.GetProvider(),
 		Model:     p.GetModel(),
@@ -122,10 +148,7 @@ func ProtoToDispatchResult(p *gen.DispatchResult) *core.DispatchResult {
 
 // ReviewResultToProto converts a core.ReviewResult to a proto ReviewResult.
 func ReviewResultToProto(r *core.ReviewResult) *gen.ReviewResult {
-	errStr := ""
-	if r.Error != nil {
-		errStr = r.Error.Error()
-	}
+	errStr, timedOut := errorToProto(r.Error)
 	return &gen.ReviewResult{
 		Reviewer:   r.Reviewer,
 		Reviewed:   r.Reviewed,
@@ -135,15 +158,13 @@ func ReviewResultToProto(r *core.ReviewResult) *gen.ReviewResult {
 		TokensIn:   int32(r.TokensIn),
 		TokensOut:  int32(r.TokensOut),
 		Error:      errStr,
+		TimedOut:   timedOut,
 	}
 }
 
 // ProtoToReviewResult converts a proto ReviewResult back to a core.ReviewResult.
 func ProtoToReviewResult(p *gen.ReviewResult) *core.ReviewResult {
-	var err error
-	if p.GetError() != "" {
-		err = fmt.Errorf("%s", p.GetError())
-	}
+	err := protoToError(p.GetError(), p.GetTimedOut())
 	return &core.ReviewResult{
 		Reviewer:  p.GetReviewer(),
 		Reviewed:  p.GetReviewed(),
@@ -158,10 +179,7 @@ func ProtoToReviewResult(p *gen.ReviewResult) *core.ReviewResult {
 
 // SynthesisResultToProto converts a core.SynthesisResult to a proto SynthesisResult.
 func SynthesisResultToProto(s *core.SynthesisResult) *gen.SynthesisResult {
-	chairErr := ""
-	if s.ChairError != nil {
-		chairErr = s.ChairError.Error()
-	}
+	chairErr, timedOut := errorToProto(s.ChairError)
 	return &gen.SynthesisResult{
 		Chair:         s.Chair,
 		ChairFallback: s.ChairFallback,
@@ -171,15 +189,13 @@ func SynthesisResultToProto(s *core.SynthesisResult) *gen.SynthesisResult {
 		TokensIn:      int32(s.TokensIn),
 		TokensOut:     int32(s.TokensOut),
 		ChairError:    chairErr,
+		TimedOut:      timedOut,
 	}
 }
 
 // ProtoToSynthesisResult converts a proto SynthesisResult back to a core.SynthesisResult.
 func ProtoToSynthesisResult(p *gen.SynthesisResult) *core.SynthesisResult {
-	var chairErr error
-	if p.GetChairError() != "" {
-		chairErr = fmt.Errorf("%s", p.GetChairError())
-	}
+	chairErr := protoToError(p.GetChairError(), p.GetTimedOut())
 	return &core.SynthesisResult{
 		Chair:         p.GetChair(),
 		ChairFallback: p.GetChairFallback(),

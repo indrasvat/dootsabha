@@ -152,6 +152,14 @@ func (a *agentAdapter) Invoke(ctx context.Context, prompt string, opts core.Invo
 }
 
 // buildExecuteResponse converts engine results to a proto ExecuteResponse.
+// buildExecuteResponse assembles the strategy response.
+//
+// Serialisation goes through internal/plugin's converters rather than being
+// written out again here. This function used to hand-build every message, and
+// drifted: it never set SynthesisResult.ChairError, so a chair that timed out
+// and was replaced by a healthy fallback crossed the wire looking like a clean
+// run, and the host exited 0 on a run that hit a deadline. Two serialisers for
+// one format is one too many.
 func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.ReviewResult, synthesis *core.SynthesisResult, totalDuration time.Duration) *gen.ExecuteResponse {
 	resp := &gen.ExecuteResponse{}
 
@@ -160,17 +168,7 @@ func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.Revie
 	status := make(map[string]string)
 
 	for _, d := range dispatches {
-		dr := &gen.DispatchResult{
-			Provider:   d.Provider,
-			Model:      d.Model,
-			Content:    d.Content,
-			DurationMs: d.Duration.Milliseconds(),
-			CostUsd:    d.CostUSD,
-			TokensIn:   int32(d.TokensIn),
-			TokensOut:  int32(d.TokensOut),
-		}
 		if d.Error != nil {
-			dr.Error = d.Error.Error()
 			status[d.Provider] = "error"
 		} else {
 			status[d.Provider] = "healthy"
@@ -178,38 +176,18 @@ func buildExecuteResponse(dispatches []core.DispatchResult, reviews []core.Revie
 		totalCost += d.CostUSD
 		totalIn += int32(d.TokensIn)
 		totalOut += int32(d.TokensOut)
-		resp.DispatchResults = append(resp.DispatchResults, dr)
+		resp.DispatchResults = append(resp.DispatchResults, internalPlugin.DispatchResultToProto(&d))
 	}
 
 	for _, r := range reviews {
-		rr := &gen.ReviewResult{
-			Reviewer:   r.Reviewer,
-			Reviewed:   r.Reviewed,
-			Content:    r.Content,
-			DurationMs: r.Duration.Milliseconds(),
-			CostUsd:    r.CostUSD,
-			TokensIn:   int32(r.TokensIn),
-			TokensOut:  int32(r.TokensOut),
-		}
-		if r.Error != nil {
-			rr.Error = r.Error.Error()
-		}
 		totalCost += r.CostUSD
 		totalIn += int32(r.TokensIn)
 		totalOut += int32(r.TokensOut)
-		resp.ReviewResults = append(resp.ReviewResults, rr)
+		resp.ReviewResults = append(resp.ReviewResults, internalPlugin.ReviewResultToProto(&r))
 	}
 
 	if synthesis != nil {
-		resp.Synthesis = &gen.SynthesisResult{
-			Chair:         synthesis.Chair,
-			ChairFallback: synthesis.ChairFallback,
-			Content:       synthesis.Content,
-			DurationMs:    synthesis.Duration.Milliseconds(),
-			CostUsd:       synthesis.CostUSD,
-			TokensIn:      int32(synthesis.TokensIn),
-			TokensOut:     int32(synthesis.TokensOut),
-		}
+		resp.Synthesis = internalPlugin.SynthesisResultToProto(synthesis)
 		totalCost += synthesis.CostUSD
 		totalIn += int32(synthesis.TokensIn)
 		totalOut += int32(synthesis.TokensOut)

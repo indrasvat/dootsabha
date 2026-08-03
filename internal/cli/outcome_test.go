@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -57,77 +59,152 @@ func TestOutcomeConsumesEveryResultError(t *testing.T) {
 	}
 }
 
-// TestPipelineCommandsReachExitThroughOutcome — every pipeline command must get
-// its exit code from the one aggregator. Three commands hand-rolling this is
-// how they ended up with three different answers.
+// The guards below parse each pipeline command's RunE with go/ast rather than
+// grepping for substrings.
 //
-// The check is that a command may not MINT the codes Outcome owns. Merely
-// asserting the file mentions outcome.Exit is too weak: council still mentions
-// it on its early-return paths, so a hand-rolled `return nil` on the success
-// path slipped straight through when this guard was written that way.
+// The first versions matched text, and all three reviewers broke them on paper
+// in ways that are trivial in practice: rename a variable from `authorProv` to
+// `p` and the direct-invoke ban stops seeing it; use context.WithDeadline, or a
+// parent other than Background, and the shared-deadline ban stops seeing it;
+// write `&ExitError{Code: 5}` and the code ban stops seeing it. A guard that
+// can be evaded by renaming a variable is decoration.
+
+// runEBody returns the body of a command file's RunE, which is where the exit
+// decision is made. Rendering helpers elsewhere in the file are not subject to
+// these rules — they legitimately return nil.
+func runEBody(t *testing.T, file string) (*ast.FuncLit, *token.FileSet) {
+	t.Helper()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, file, nil, parser.SkipObjectResolution)
+	if err != nil {
+		t.Fatalf("parse %s: %v", file, err)
+	}
+	var runE *ast.FuncLit
+	ast.Inspect(f, func(n ast.Node) bool {
+		kv, ok := n.(*ast.KeyValueExpr)
+		if !ok {
+			return true
+		}
+		if key, ok := kv.Key.(*ast.Ident); ok && key.Name == "RunE" {
+			if lit, ok := kv.Value.(*ast.FuncLit); ok {
+				runE = lit
+			}
+		}
+		return true
+	})
+	if runE == nil {
+		t.Fatalf("%s has no RunE — the detector matched a file it should not have", file)
+	}
+	return runE, fset
+}
+
+// TestPipelineCommandsReachExitThroughOutcome — a pipeline command may not
+// decide its own exit code. Three commands doing so is how they ended up with
+// three different answers.
 //
-// Pre-flight codes (2 usage, 6 config, 1 internal) stay a command's own
-// business — they are decided before any provider runs.
+// Two rules, because either alone leaks. Banning only the owned constants lets
+// `return nil` through on a branch that has recorded failures — which is the
+// exact regression the first version of this guard missed. Banning only
+// `return nil` lets a hand-minted ExitPartial through.
 func TestPipelineCommandsReachExitThroughOutcome(t *testing.T) {
-	owned := []string{"core.ExitProvider", "core.ExitTimeout", "core.ExitPartial"}
+	owned := map[string]bool{"ExitProvider": true, "ExitTimeout": true, "ExitPartial": true}
 
 	for _, file := range pipelineCommandFiles(t) {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		if !strings.Contains(string(src), "outcome.Exit(") {
-			t.Errorf("%s never calls outcome.Exit — it is deciding its own exit code", file)
-		}
-		for i, line := range strings.Split(string(src), "\n") {
-			for _, code := range owned {
-				if strings.Contains(line, code) {
-					t.Errorf("%s:%d mints %s itself — that decision belongs to Outcome.Exit, "+
-						"which weighs it against every other call in the run:\n\t%s",
-						file, i+1, code, strings.TrimSpace(line))
+		runE, fset := runEBody(t, file)
+		sawExit := false
+
+		ast.Inspect(runE, func(n ast.Node) bool {
+			switch v := n.(type) {
+			case *ast.ReturnStmt:
+				if len(v.Results) == 1 {
+					if id, ok := v.Results[0].(*ast.Ident); ok && id.Name == "nil" {
+						t.Errorf("%s: `return nil` inside RunE — every exit must come from "+
+							"outcome.Exit, which knows whether anything failed",
+							fset.Position(v.Pos()))
+					}
+				}
+			case *ast.SelectorExpr:
+				if x, ok := v.X.(*ast.Ident); ok && x.Name == "core" && owned[v.Sel.Name] {
+					t.Errorf("%s: mints core.%s itself — that decision belongs to Outcome.Exit, "+
+						"which weighs it against every other call in the run",
+						fset.Position(v.Pos()), v.Sel.Name)
+				}
+			case *ast.CallExpr:
+				if sel, ok := v.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "Exit" {
+					if x, ok := sel.X.(*ast.Ident); ok && x.Name == "outcome" {
+						sawExit = true
+					}
 				}
 			}
+			return true
+		})
+
+		if !sawExit {
+			t.Errorf("%s never calls outcome.Exit — it is deciding its own exit code", file)
 		}
 	}
 }
 
-// TestPipelineCommandsInvokeOnlyThroughOutcome bans calling a provider outside
-// the recording choke point, in ANY pipeline command rather than a fixed list —
-// so a fourth command added tomorrow is covered without editing this test.
+// TestPipelineCommandsInvokeOnlyThroughOutcome — a provider call the ledger does
+// not see cannot affect the exit code. Matched on the call shape, so renaming
+// the receiver does not evade it.
 func TestPipelineCommandsInvokeOnlyThroughOutcome(t *testing.T) {
 	for _, file := range pipelineCommandFiles(t) {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		for i, line := range strings.Split(string(src), "\n") {
-			if !strings.Contains(line, "Prov.Invoke(") && !strings.Contains(line, "prov.Invoke(") {
-				continue
+		runE, fset := runEBody(t, file)
+		ast.Inspect(runE, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
 			}
-			t.Errorf("%s:%d calls a provider directly — route it through outcome.Invoke so "+
-				"it gets its own window AND is seen by the exit decision:\n\t%s",
-				file, i+1, strings.TrimSpace(line))
-		}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || sel.Sel.Name != "Invoke" {
+				return true
+			}
+			if x, ok := sel.X.(*ast.Ident); ok && x.Name == "outcome" {
+				return true
+			}
+			t.Errorf("%s: calls Invoke outside the ledger — route it through outcome.Invoke "+
+				"so it gets its own window AND is seen by the exit decision",
+				fset.Position(call.Pos()))
+			return true
+		})
 	}
 }
 
 // TestPipelineCommandsDoNotShareOneDeadline bans the original issue #20 shape:
-// one context.WithTimeout created up front and reused for every provider call.
+// one deadline created up front and reused for every provider call. Any
+// context deadline built inside RunE is banned, whatever its parent — the
+// budget is the only thing allowed to hand out windows.
 func TestPipelineCommandsDoNotShareOneDeadline(t *testing.T) {
 	for _, file := range pipelineCommandFiles(t) {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		if strings.Contains(string(src), "context.WithTimeout(context.Background()") {
-			t.Errorf("%s bakes one deadline for the whole pipeline (issue #20) — "+
-				"derive a per-invocation context from core.Budget instead", file)
-		}
+		runE, fset := runEBody(t, file)
+		ast.Inspect(runE, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok {
+				return true
+			}
+			x, ok := sel.X.(*ast.Ident)
+			if !ok || x.Name != "context" {
+				return true
+			}
+			if sel.Sel.Name == "WithTimeout" || sel.Sel.Name == "WithDeadline" {
+				t.Errorf("%s: builds a context.%s inside RunE — that is one deadline for the "+
+					"whole pipeline (issue #20); take a fresh window per call from core.Budget",
+					fset.Position(call.Pos()), sel.Sel.Name)
+			}
+			return true
+		})
 	}
 }
 
-// pipelineCommandFiles finds every multi-step command by what it does — builds
-// a budget — rather than by a hard-coded list that a new command would miss.
+// pipelineCommandFiles finds every multi-step command by what it IS — a cobra
+// RunE that takes a budget — rather than by a hard-coded list a new command
+// would miss. Both signals are required: budget.go takes a budget without being
+// a command, and a command without a budget makes no provider calls to weigh.
 func pipelineCommandFiles(t *testing.T) []string {
 	t.Helper()
 	matches, err := filepath.Glob("*.go")
@@ -135,16 +212,41 @@ func pipelineCommandFiles(t *testing.T) []string {
 		t.Fatalf("glob: %v", err)
 	}
 	var files []string
-	for _, f := range matches {
-		if strings.HasSuffix(f, "_test.go") || f == "outcome.go" || f == "budget.go" {
+	for _, file := range matches {
+		if strings.HasSuffix(file, "_test.go") {
 			continue
 		}
-		src, err := os.ReadFile(f)
+		fset := token.NewFileSet()
+		f, err := parser.ParseFile(fset, file, nil, parser.SkipObjectResolution)
 		if err != nil {
-			t.Fatalf("read %s: %v", f, err)
+			t.Fatalf("parse %s: %v", file, err)
 		}
-		if strings.Contains(string(src), "newBudget(cmd,") {
-			files = append(files, f)
+		var hasRunE, takesBudget bool
+		ast.Inspect(f, func(n ast.Node) bool {
+			switch v := n.(type) {
+			case *ast.KeyValueExpr:
+				if key, ok := v.Key.(*ast.Ident); ok && key.Name == "RunE" {
+					if _, ok := v.Value.(*ast.FuncLit); ok {
+						hasRunE = true
+					}
+				}
+			case *ast.CallExpr:
+				// Both spellings: the CLI helper, and core.NewBudget directly.
+				switch fn := v.Fun.(type) {
+				case *ast.Ident:
+					if fn.Name == "newBudget" {
+						takesBudget = true
+					}
+				case *ast.SelectorExpr:
+					if x, ok := fn.X.(*ast.Ident); ok && x.Name == "core" && fn.Sel.Name == "NewBudget" {
+						takesBudget = true
+					}
+				}
+			}
+			return true
+		})
+		if hasRunE && takesBudget {
+			files = append(files, file)
 		}
 	}
 	if len(files) < 3 {
