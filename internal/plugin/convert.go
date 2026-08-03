@@ -158,6 +158,10 @@ func ProtoToReviewResult(p *gen.ReviewResult) *core.ReviewResult {
 
 // SynthesisResultToProto converts a core.SynthesisResult to a proto SynthesisResult.
 func SynthesisResultToProto(s *core.SynthesisResult) *gen.SynthesisResult {
+	chairErr := ""
+	if s.ChairError != nil {
+		chairErr = s.ChairError.Error()
+	}
 	return &gen.SynthesisResult{
 		Chair:         s.Chair,
 		ChairFallback: s.ChairFallback,
@@ -166,11 +170,16 @@ func SynthesisResultToProto(s *core.SynthesisResult) *gen.SynthesisResult {
 		CostUsd:       s.CostUSD,
 		TokensIn:      int32(s.TokensIn),
 		TokensOut:     int32(s.TokensOut),
+		ChairError:    chairErr,
 	}
 }
 
 // ProtoToSynthesisResult converts a proto SynthesisResult back to a core.SynthesisResult.
 func ProtoToSynthesisResult(p *gen.SynthesisResult) *core.SynthesisResult {
+	var chairErr error
+	if p.GetChairError() != "" {
+		chairErr = fmt.Errorf("%s", p.GetChairError())
+	}
 	return &core.SynthesisResult{
 		Chair:         p.GetChair(),
 		ChairFallback: p.GetChairFallback(),
@@ -179,5 +188,6 @@ func ProtoToSynthesisResult(p *gen.SynthesisResult) *core.SynthesisResult {
 		CostUSD:       p.GetCostUsd(),
 		TokensIn:      int(p.GetTokensIn()),
 		TokensOut:     int(p.GetTokensOut()),
+		ChairError:    chairErr,
 	}
 }

@@ -337,3 +337,94 @@ func TestStepContextClipsToParentDeadline(t *testing.T) {
 	defer cancelChild()
 	assertWindow(t, child, 100*time.Millisecond, 60*time.Millisecond, "StepContext under a shorter parent")
 }
+
+// TestBudgetScopeOf decides which budget bounded a step from the deadlines
+// themselves, so a session expiring later — e.g. while a killed subprocess is
+// still in its SIGTERM grace period — cannot rewrite the diagnosis after the
+// fact. TimeoutScope alone had exactly that race.
+func TestBudgetScopeOf(t *testing.T) {
+	// Per-invocation window is the shorter one: the step's own timer bounds it.
+	invocation := core.NewBudget(100*time.Millisecond, 10*time.Second)
+	defer invocation.Close()
+	step, cancel := invocation.Step()
+	defer cancel()
+	if got := invocation.ScopeOf(step); got != core.TimeoutScopeInvocation {
+		t.Errorf("ScopeOf(short step) = %q, want %q", got, core.TimeoutScopeInvocation)
+	}
+	// And it stays "invocation" even once the session is spent.
+	<-step.Done()
+	if got := invocation.ScopeOf(step); got != core.TimeoutScopeInvocation {
+		t.Errorf("ScopeOf after the step expired = %q, want %q", got, core.TimeoutScopeInvocation)
+	}
+
+	// Session ceiling is the shorter one: it is what actually bounds the call.
+	session := core.NewBudget(10*time.Second, 100*time.Millisecond)
+	defer session.Close()
+	clipped, cancelClipped := session.Step()
+	defer cancelClipped()
+	if got := session.ScopeOf(clipped); got != core.TimeoutScopeSession {
+		t.Errorf("ScopeOf(clipped step) = %q, want %q", got, core.TimeoutScopeSession)
+	}
+
+	// No session ceiling at all — nothing but the invocation can have fired.
+	unbounded := core.NewBudget(100*time.Millisecond, 0)
+	defer unbounded.Close()
+	free, cancelFree := unbounded.Step()
+	defer cancelFree()
+	if got := unbounded.ScopeOf(free); got != core.TimeoutScopeInvocation {
+		t.Errorf("ScopeOf with no session ceiling = %q, want %q", got, core.TimeoutScopeInvocation)
+	}
+
+	// Per-invocation disabled under a bounded session: the session bounds it.
+	sessionOnly := core.NewBudget(0, time.Second)
+	defer sessionOnly.Close()
+	inherited, cancelInherited := sessionOnly.Step()
+	defer cancelInherited()
+	if got := sessionOnly.ScopeOf(inherited); got != core.TimeoutScopeSession {
+		t.Errorf("ScopeOf with per-invocation disabled = %q, want %q", got, core.TimeoutScopeSession)
+	}
+}
+
+// TestSynthesisRecordsChairTimeout — a chair that blew its window is still "an
+// agent timed out" even when the fallback rescued the answer. Dropping the
+// error let a council report exit 0 for a run that hit a deadline.
+func TestSynthesisRecordsChairTimeout(t *testing.T) {
+	chair := &probeAgent{name: "claude", sleep: 5 * time.Second}
+	fallback := &probeAgent{name: "codex"}
+	eng := core.NewEngine([]core.Agent{chair, fallback}, councilCfg("claude", false))
+
+	dispatches := []core.DispatchResult{
+		{Provider: "claude", Content: "a"},
+		{Provider: "codex", Content: "b"},
+	}
+	synth, err := eng.Synthesize(context.Background(), dispatches, nil,
+		core.InvokeOptions{Timeout: 120 * time.Millisecond})
+	if err != nil {
+		t.Fatalf("synthesize: %v", err)
+	}
+	if synth.ChairFallback != "codex" {
+		t.Fatalf("ChairFallback = %q, want codex", synth.ChairFallback)
+	}
+	if !errors.Is(synth.ChairError, context.DeadlineExceeded) {
+		t.Errorf("ChairError = %v, want DeadlineExceeded — a timed-out chair must reach the exit code", synth.ChairError)
+	}
+}
+
+// TestSynthesisChairErrorIsNilOnSuccess — the negative case, so a healthy
+// council is never downgraded to "partial".
+func TestSynthesisChairErrorIsNilOnSuccess(t *testing.T) {
+	chair := &probeAgent{name: "claude"}
+	eng := core.NewEngine([]core.Agent{chair}, councilCfg("claude", false))
+
+	synth, err := eng.Synthesize(context.Background(), []core.DispatchResult{{Provider: "claude"}}, nil,
+		core.InvokeOptions{Timeout: 5 * time.Second})
+	if err != nil {
+		t.Fatalf("synthesize: %v", err)
+	}
+	if synth.ChairError != nil {
+		t.Errorf("ChairError = %v on a successful chair, want nil", synth.ChairError)
+	}
+	if synth.ChairFallback != "" {
+		t.Errorf("ChairFallback = %q on a successful chair, want empty", synth.ChairFallback)
+	}
+}

@@ -671,6 +671,19 @@ expect_exit 4 "session ceiling via --satra-seema" \
   env MOCK_CODEX_DELAY=0.7 MOCK_CLAUDE_DELAY=0.7 "$BINARY" review "hi" \
   --author codex --reviewer claude --timeout 60s --satra-seema 1s
 
+# One agent blowing ITS OWN window must not end the pipeline — the remaining
+# agents still have full windows of their own. It must still exit 4, because a
+# timeout outranks the partial result it leaves (precedence 4 > 5).
+expect_exit 4 "refine: one reviewer hangs, the rest still run" \
+  env MOCK_CODEX_DELAY=5 "$BINARY" refine "hi" --author claude --reviewers codex,agy \
+  --timeout 500ms --session-timeout 60s
+
+# A chair that timed out is still "an agent timed out", even when the fallback
+# rescued the answer. Dropping it reported a clean 0 for a run that hit a deadline.
+expect_exit 4 "council: chair times out, fallback synthesises" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
+  --agents claude,codex,grok --chair grok --timeout 3s --session-timeout 60s
+
 # ── Workflow 6: Error produces structured output ─────────────────────────────
 
 echo ""

@@ -12,17 +12,22 @@ import (
 type SynthesisResult struct {
 	Chair         string
 	ChairFallback string // non-empty if fallback chair was used
-	Content       string
-	Duration      time.Duration
-	CostUSD       float64
-	TokensIn      int
-	TokensOut     int
+	// ChairError is why the chair was replaced, kept even though the fallback
+	// succeeded: a chair that timed out is still "an agent timed out", and
+	// dropping it here let a council exit 0 on a run that hit a deadline.
+	ChairError error
+	Content    string
+	Duration   time.Duration
+	CostUSD    float64
+	TokensIn   int
+	TokensOut  int
 }
 
 // Synthesize invokes the chair agent with all dispatch outputs and reviews.
 // On chair failure, re-invokes the first healthy non-chair agent.
 func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, reviews []ReviewResult, opts InvokeOptions) (*SynthesisResult, error) {
 	prompt := buildSynthesisPrompt(dispatches, reviews)
+	var chairErr error
 
 	// Find the chair agent.
 	chairName := e.cfg.Council.Chair
@@ -34,9 +39,15 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 		slog.Debug("invoking chair", "chair", chairName)
 		// Synthesis is the LAST stage, so it was the one starved by a shared
 		// deadline (issue #20). It gets its own window like every other call.
-		chairCtx, cancelChair := StepContext(ctx, opts.Timeout)
-		result, err := chair.Invoke(chairCtx, prompt, opts)
-		cancelChair()
+		//
+		// The closure scopes `defer cancel` to the call itself: the fallback
+		// below must not inherit the chair's spent window, and a provider that
+		// panics must not leak the timer.
+		result, err := func() (*InvokeResult, error) {
+			chairCtx, cancel := StepContext(ctx, opts.Timeout)
+			defer cancel()
+			return chair.Invoke(chairCtx, prompt, opts)
+		}()
 		if err == nil {
 			slog.Info("synthesis complete", "chair", chairName, "duration", result.Duration, "content_len", len(result.Content))
 			e.notify(chairName, ProgressDone)
@@ -51,6 +62,7 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 		}
 		slog.Warn("chair failed, trying fallback", "chair", chairName, "error", err)
 		e.notify(chairName, ProgressFailed)
+		chairErr = err
 		// Chair failed — try fallback.
 	}
 
@@ -77,6 +89,7 @@ func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, re
 	return &SynthesisResult{
 		Chair:         chairName,
 		ChairFallback: fallbackName,
+		ChairError:    chairErr,
 		Content:       result.Content,
 		Duration:      result.Duration,
 		CostUSD:       result.CostUSD,

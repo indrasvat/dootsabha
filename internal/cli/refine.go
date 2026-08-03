@@ -102,9 +102,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 
 			// Generation, each review and each incorporation is its own
 			// invocation, so each gets its own window inside one pipeline
-			// ceiling (issue #20). refine is the longest pipeline here: a run
-			// with two reviewers makes five calls.
-			budget := newBudget(cmd, cfg)
+			// ceiling (issue #20). v1, then a review + an incorporation per
+			// reviewer — the longest pipeline dootsabha runs.
+			budget := newBudget(cmd, cfg, 1+2*len(reviewerNames))
 			defer budget.Close()
 
 			runner := &core.SubprocessRunner{}
@@ -138,15 +138,14 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			// agent can time out while the session is still healthy — so the
 			// session context alone no longer answers "did anything time out?".
 			var deadlineErr error
+			var deadlineScope string
 
 			// Step 1: Author generates v1.
 			slog.Info("refine: author generating v1", "author", author, "reviewers", reviewerNames, "anonymous", anonymous)
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineStep(rc, author, "v1", true)
 			}
-			v1Ctx, cancelV1 := budget.Step()
-			v1Result, err := authorProv.Invoke(v1Ctx, prompt, invokeOpts)
-			cancelV1()
+			v1Result, v1Scope, err := invokeStep(budget, authorProv, prompt, invokeOpts)
 			if err != nil {
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
@@ -155,7 +154,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				msg := fmt.Sprintf("author (%s) failed on v1: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
 					exitCode = core.ExitTimeout
-					msg = timeoutMessage(budget, err)
+					msg = timeoutMessage(budget, v1Scope, err)
 				}
 				if rc.IsJSON() {
 					totalDuration := time.Since(totalStart)
@@ -196,9 +195,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
 				}
-				reviewCtx, cancelReview := budget.Step()
-				reviewResult, revErr := revProv.Invoke(reviewCtx, reviewPrompt, invokeOpts)
-				cancelReview()
+				reviewResult, reviewScope, revErr := invokeStep(budget, revProv, reviewPrompt, invokeOpts)
 				if revErr != nil {
 					providerStatus[revName] = "error"
 					partial = true
@@ -206,14 +203,13 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 						stderrRefineSkip(rc, revName, revErr)
 					}
 					if errors.Is(revErr, context.DeadlineExceeded) {
-						deadlineErr = revErr
+						deadlineErr, deadlineScope = revErr, reviewScope
 						// A spent session ends the pipeline; a single reviewer
 						// blowing its own window does not, so the remaining
 						// reviewers still get their turn.
 						if budget.SessionExpired() {
 							break
 						}
-						continue
 					}
 					continue
 				}
@@ -234,9 +230,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 					nextVersion := currentVersion + 1
 					stderrRefineStep(rc, author, fmt.Sprintf("incorporating → v%d", nextVersion), true)
 				}
-				incCtx, cancelInc := budget.Step()
-				incResult, incErr := authorProv.Invoke(incCtx, incorporatePrompt, invokeOpts)
-				cancelInc()
+				incResult, incScope, incErr := invokeStep(budget, authorProv, incorporatePrompt, invokeOpts)
 				if incErr != nil {
 					// Author failed to incorporate — keep current version.
 					partial = true
@@ -250,7 +244,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 						&providers.ProviderResult{Duration: reviewResult.Duration},
 					))
 					if errors.Is(incErr, context.DeadlineExceeded) {
-						deadlineErr = incErr
+						deadlineErr, deadlineScope = incErr, incScope
 						if budget.SessionExpired() {
 							break
 						}
@@ -300,11 +294,12 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 
 			if partial {
 				msg := "partial result: one or more reviewers failed"
-				if d := firstDeadline(deadlineErr, budget.Session().Err()); d != nil {
-					msg = "partial result: " + timeoutMessage(budget, d)
+				deadline := firstDeadline(deadlineErr, budget.Session().Err())
+				if deadline != nil {
+					msg = "partial result: " + timeoutMessage(budget, deadlineScope, deadline)
 				}
 				return &ExitError{
-					Code:    stageExitCode(budget.Session(), firstDeadline(deadlineErr, budget.Session().Err()), core.ExitPartial),
+					Code:    stageExitCode(budget.Session(), deadline, core.ExitPartial),
 					Message: msg,
 				}
 			}

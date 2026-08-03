@@ -1,8 +1,10 @@
 package plugin_test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -341,7 +343,7 @@ func TestProtoFieldCoverage_SynthesisResult(t *testing.T) {
 	mapped := map[string]bool{
 		"Chair": true, "ChairFallback": true, "Content": true,
 		"Duration": true, "CostUSD": true, "TokensIn": true,
-		"TokensOut": true,
+		"TokensOut": true, "ChairError": true,
 	}
 
 	for field := range typ.Fields() {
@@ -411,5 +413,32 @@ func TestArchitectureDocCapabilitiesFields(t *testing.T) {
 	}
 	if caps.GetMaxContextTokens() != 128000 {
 		t.Error("MaxContextTokens field missing or broken")
+	}
+}
+
+// TestSynthesisChairErrorRoundTrips — a strategy plugin's synthesis crosses the
+// gRPC boundary as bytes, so a chair timeout that is not carried in the proto
+// is a chair timeout the host never learns about. That would let a
+// plugin-driven council exit 0 on a run that hit a deadline.
+func TestSynthesisChairErrorRoundTrips(t *testing.T) {
+	in := &core.SynthesisResult{
+		Chair:         "claude",
+		ChairFallback: "codex",
+		ChairError:    fmt.Errorf("invoke claude: %w", context.DeadlineExceeded),
+		Content:       "synthesised",
+	}
+	out := plugin.ProtoToSynthesisResult(plugin.SynthesisResultToProto(in))
+
+	if out.ChairError == nil {
+		t.Fatal("ChairError was dropped crossing the plugin boundary")
+	}
+	if !strings.Contains(out.ChairError.Error(), "context deadline exceeded") {
+		t.Errorf("ChairError = %q, want the deadline detail preserved", out.ChairError)
+	}
+	// A healthy chair must not arrive as a non-nil error, or every council
+	// through a strategy plugin would report itself partial.
+	clean := plugin.ProtoToSynthesisResult(plugin.SynthesisResultToProto(&core.SynthesisResult{Chair: "claude"}))
+	if clean.ChairError != nil {
+		t.Errorf("ChairError = %v for a healthy chair, want nil", clean.ChairError)
 	}
 }

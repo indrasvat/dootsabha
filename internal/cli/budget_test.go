@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -112,7 +113,7 @@ func TestResolveTimeoutsNeverReturnsExpiredBudget(t *testing.T) {
 func TestTimeoutMessageNamesTheDeadlineThatFired(t *testing.T) {
 	invocation := core.NewBudget(50*time.Millisecond, 10*time.Second)
 	defer invocation.Close()
-	msg := timeoutMessage(invocation, context.DeadlineExceeded)
+	msg := timeoutMessage(invocation, "", context.DeadlineExceeded)
 	if !strings.Contains(msg, "invocation timeout") {
 		t.Errorf("message %q should say which deadline fired (invocation)", msg)
 	}
@@ -126,7 +127,7 @@ func TestTimeoutMessageNamesTheDeadlineThatFired(t *testing.T) {
 	session := core.NewBudget(10*time.Second, 60*time.Millisecond)
 	defer session.Close()
 	<-session.Session().Done()
-	msg = timeoutMessage(session, context.DeadlineExceeded)
+	msg = timeoutMessage(session, "", context.DeadlineExceeded)
 	if !strings.Contains(msg, "session timeout") {
 		t.Errorf("message %q should say which deadline fired (session)", msg)
 	}
@@ -141,7 +142,7 @@ func TestTimeoutMessageCarriesTheUnderlyingError(t *testing.T) {
 	b := core.NewBudget(time.Second, time.Minute)
 	defer b.Close()
 	err := fmt.Errorf("claude invoke: %w", context.DeadlineExceeded)
-	msg := timeoutMessage(b, err)
+	msg := timeoutMessage(b, "", err)
 	if !strings.Contains(msg, "claude invoke") {
 		t.Errorf("message %q dropped the underlying provider error", msg)
 	}
@@ -151,7 +152,7 @@ func TestTimeoutMessageCarriesTheUnderlyingError(t *testing.T) {
 func TestTimeoutMessageWithUnboundedLimits(t *testing.T) {
 	b := core.NewBudget(0, 0)
 	defer b.Close()
-	msg := timeoutMessage(b, context.DeadlineExceeded)
+	msg := timeoutMessage(b, "", context.DeadlineExceeded)
 	if strings.Contains(msg, "after 0s") {
 		t.Errorf("message %q reports a 0s limit for a disabled timeout", msg)
 	}
@@ -159,20 +160,102 @@ func TestTimeoutMessageWithUnboundedLimits(t *testing.T) {
 
 // TestBudgetInversionWarning — a per-invocation budget larger than the session
 // ceiling silently truncates every call. Say so before 30 minutes are burned.
-func TestBudgetInversionWarning(t *testing.T) {
-	if w := budgetInversionWarning(40*time.Minute, 30*time.Minute); w == "" {
+func TestBudgetWarning(t *testing.T) {
+	// One call cannot fit the ceiling.
+	if w := budgetWarning(40*time.Minute, 30*time.Minute, 2); w == "" {
 		t.Error("no warning when --timeout exceeds --session-timeout")
 	} else if !strings.Contains(w, "session-timeout") {
 		t.Errorf("warning %q should name the flag to raise", w)
 	}
-	if w := budgetInversionWarning(8*time.Minute, 30*time.Minute); w != "" {
-		t.Errorf("unexpected warning for a sane budget: %q", w)
+	// The calls cannot fit TOGETHER — `refine --reviewers a,b,c` is 7 calls, so
+	// the shipped defaults (5m each, 30m ceiling) overrun by 5 minutes. This is
+	// the shape that would otherwise truncate a pipeline halfway with no notice.
+	if w := budgetWarning(5*time.Minute, 30*time.Minute, 7); w == "" {
+		t.Error("no warning when N calls of --timeout exceed --session-timeout")
+	} else if !strings.Contains(w, "session-timeout") {
+		t.Errorf("warning %q should name the flag to raise", w)
 	}
-	if w := budgetInversionWarning(40*time.Minute, 0); w != "" {
-		t.Errorf("unexpected warning when the session ceiling is disabled: %q", w)
+	// A council of 3 agents over 2 rounds is 14 calls.
+	if w := budgetWarning(5*time.Minute, 30*time.Minute, 14); w == "" {
+		t.Error("no warning for a multi-round council under the default ceiling")
 	}
-	if w := budgetInversionWarning(30*time.Minute, 30*time.Minute); w != "" {
-		t.Errorf("unexpected warning when the budgets are equal: %q", w)
+	// Coherent budgets stay silent.
+	for _, tc := range []struct {
+		name             string
+		perInvoke, sessn time.Duration
+		steps            int
+	}{
+		{"fits comfortably", 8 * time.Minute, 30 * time.Minute, 2},
+		{"ceiling disabled", 40 * time.Minute, 0, 5},
+		{"exactly equal", 30 * time.Minute, 30 * time.Minute, 1},
+		{"N calls exactly fit", 6 * time.Minute, 30 * time.Minute, 5},
+		{"refine with two reviewers fits the defaults", 5 * time.Minute, 30 * time.Minute, 5},
+		{"single call, no multiplication", 20 * time.Minute, 30 * time.Minute, 1},
+	} {
+		if w := budgetWarning(tc.perInvoke, tc.sessn, tc.steps); w != "" {
+			t.Errorf("%s: unexpected warning %q", tc.name, w)
+		}
+	}
+}
+
+// TestTimeoutMessageHonoursExplicitScope — the scope is decided when the step
+// is created, so a session that expires later (e.g. while a killed subprocess
+// is in its SIGTERM grace period) cannot retroactively rewrite the diagnosis.
+func TestTimeoutMessageHonoursExplicitScope(t *testing.T) {
+	b := core.NewBudget(10*time.Second, 60*time.Millisecond)
+	defer b.Close()
+	<-b.Session().Done() // session is spent; TimeoutScope() would say "session"
+
+	msg := timeoutMessage(b, core.TimeoutScopeInvocation, context.DeadlineExceeded)
+	if !strings.Contains(msg, "invocation timeout") {
+		t.Errorf("message %q ignored the scope recorded when the step ran", msg)
+	}
+	if !strings.Contains(msg, "10s") {
+		t.Errorf("message %q should carry the per-invocation limit for an invocation scope", msg)
+	}
+}
+
+// TestStageFailureMessage — a stage that died on a deadline must name the
+// budget; a stage that died for any other reason must not invent one.
+func TestStageFailureMessage(t *testing.T) {
+	b := core.NewBudget(30*time.Second, 10*time.Minute)
+	defer b.Close()
+
+	msg := stageFailureMessage(b, "synthesis", fmt.Errorf("chair: %w", context.DeadlineExceeded))
+	if !strings.HasPrefix(msg, "synthesis: ") {
+		t.Errorf("message %q lost the stage label", msg)
+	}
+	if !strings.Contains(msg, "timeout after 30s") {
+		t.Errorf("message %q should name the budget that fired", msg)
+	}
+
+	msg = stageFailureMessage(b, "peer review", errors.New("provider exploded"))
+	if strings.Contains(msg, "timeout") {
+		t.Errorf("message %q blamed a timeout for a non-deadline failure", msg)
+	}
+	if !strings.Contains(msg, "provider exploded") {
+		t.Errorf("message %q dropped the underlying error", msg)
+	}
+}
+
+// TestFirstDeadline — the helper that decides whether exit 4 applies.
+func TestFirstDeadline(t *testing.T) {
+	other := errors.New("provider exploded")
+	wrapped := fmt.Errorf("invoke claude: %w", context.DeadlineExceeded)
+
+	if got := firstDeadline(nil, other, nil); got != nil {
+		t.Errorf("firstDeadline with no deadline = %v, want nil", got)
+	}
+	if got := firstDeadline(nil, other, wrapped); got == nil {
+		t.Error("firstDeadline missed a wrapped DeadlineExceeded")
+	}
+	if got := firstDeadline(); got != nil {
+		t.Errorf("firstDeadline() = %v, want nil", got)
+	}
+	// context.Canceled is NOT a deadline — a user Ctrl-C must not read as
+	// "raise your timeout".
+	if got := firstDeadline(context.Canceled); got != nil {
+		t.Errorf("firstDeadline(Canceled) = %v, want nil", got)
 	}
 }
 
@@ -221,6 +304,36 @@ func TestPipelineCommandsDoNotShareOneDeadline(t *testing.T) {
 		if strings.Contains(string(src), "context.WithTimeout(context.Background()") {
 			t.Errorf("%s bakes one deadline for the whole pipeline (issue #20) — "+
 				"derive a per-invocation context from core.Budget instead", file)
+		}
+	}
+}
+
+// TestSequentialCommandsInvokeOnlyThroughInvokeStep is the stronger half of the
+// freeze guard.
+//
+// Banning the old `context.WithTimeout(context.Background()` spelling does not
+// stop the bug coming back a different way — passing `budget.Session()` straight
+// to every Invoke reproduces it exactly. review and refine drive their providers
+// directly, so the invariant is that EVERY provider call goes through
+// invokeStep, which is the only thing that hands out a fresh window.
+//
+// council is exempt: it invokes through the engine, which derives its own step
+// context from InvokeOptions.Timeout (covered by the engine tests).
+func TestSequentialCommandsInvokeOnlyThroughInvokeStep(t *testing.T) {
+	for _, file := range []string{"review.go", "refine.go"} {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatalf("read %s: %v", file, err)
+		}
+		for i, line := range strings.Split(string(src), "\n") {
+			if !strings.Contains(line, "Prov.Invoke(") {
+				continue
+			}
+			t.Errorf("%s:%d calls a provider directly — route it through invokeStep "+
+				"so it gets its own window (issue #20):\n\t%s", file, i+1, strings.TrimSpace(line))
+		}
+		if !strings.Contains(string(src), "invokeStep(budget,") {
+			t.Errorf("%s never calls invokeStep — how is it bounding its provider calls?", file)
 		}
 	}
 }

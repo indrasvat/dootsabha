@@ -132,6 +132,11 @@ message SynthesisResult {
 
   // Output tokens generated.
   int32 tokens_out = 7;
+
+  // Why the intended chair was replaced, when chair_fallback is set. Kept even
+  // though the fallback succeeded: a chair that timed out is still an agent
+  // that timed out, and the caller's exit code depends on knowing that.
+  string chair_error = 8;
 }
 
 // SessionMeta holds aggregate metadata for the entire strategy execution.

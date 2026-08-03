@@ -7,7 +7,8 @@ package core
 //	1  report a bug: unexpected internal failure
 //	2  fix the command: bad flag, missing arg, unknown agent/chair
 //	3  retry or pick another agent: every requested agent failed
-//	4  raise --timeout or shrink the prompt
+//	4  raise the budget the message names — --timeout bounds ONE agent call,
+//	   --session-timeout bounds the whole pipeline — or shrink the prompt
 //	5  use the output, note the gaps: some agents failed
 //	6  fix the config: missing, unreadable, or invalid
 const (

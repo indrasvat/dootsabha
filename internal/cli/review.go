@@ -59,7 +59,7 @@ func newReviewCmd() *cobra.Command {
 
 समीक्षा (sameeksha) — एक एजेंट सामग्री बनाता है, दूसरा उसकी समीक्षा करता है।
 
-Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config error`,
+Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial result, 6 config error`,
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -79,8 +79,8 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 			}
 
 			// Author and reviewer each get their own invocation window, inside
-			// one pipeline ceiling (issue #20).
-			budget := newBudget(cmd, cfg)
+			// one pipeline ceiling (issue #20). Two calls.
+			budget := newBudget(cmd, cfg, 2)
 			defer budget.Close()
 
 			runner := &core.SubprocessRunner{}
@@ -109,15 +109,13 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 
 			// Step 1: Invoke author.
 			totalStart := time.Now()
-			authorCtx, cancelAuthor := budget.Step()
-			authorResult, err := authorProv.Invoke(authorCtx, prompt, invokeOpts)
-			cancelAuthor()
+			authorResult, authorScope, err := invokeStep(budget, authorProv, prompt, invokeOpts)
 			if err != nil {
 				exitCode := core.ExitProvider
 				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
 				if errors.Is(err, context.DeadlineExceeded) {
 					exitCode = core.ExitTimeout
-					msg = timeoutMessage(budget, err)
+					msg = timeoutMessage(budget, authorScope, err)
 				}
 				if rc.IsJSON() {
 					emitErrorJSON(author, msg)
@@ -130,9 +128,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 				"Review the following output from %s. Identify strengths, weaknesses, errors. Be specific.\n\n%s",
 				author, authorResult.Content,
 			)
-			reviewerCtx, cancelReviewer := budget.Step()
-			reviewerResult, err := reviewerProv.Invoke(reviewerCtx, reviewPrompt, invokeOpts)
-			cancelReviewer()
+			reviewerResult, reviewerScope, err := invokeStep(budget, reviewerProv, reviewPrompt, invokeOpts)
 			totalDuration := time.Since(totalStart)
 
 			if err != nil {
@@ -143,7 +139,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 					renderReviewSection(rc, author, "(author)", authorResult)
 				}
 				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: core.ExitTimeout, Message: timeoutMessage(budget, err)}
+					return &ExitError{Code: core.ExitTimeout, Message: timeoutMessage(budget, reviewerScope, err)}
 				}
 				// The author already produced content, which is in the payload — a
 				// failed reviewer leaves a usable partial result, not nothing.

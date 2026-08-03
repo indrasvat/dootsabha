@@ -84,8 +84,31 @@ func (b *Budget) SessionExpired() bool {
 // TimeoutScope names the deadline responsible for a failure. A step context
 // inherits DeadlineExceeded from an expired session, so the two are told apart
 // by asking the session directly rather than by inspecting the step's error.
+//
+// Prefer ScopeOf when the step's own context is available: this answers "is the
+// session spent now?", which can differ from "which timer killed that call" if
+// the session expires while a killed subprocess is still in its grace period.
 func (b *Budget) TimeoutScope() string {
 	if b.SessionExpired() {
+		return TimeoutScopeSession
+	}
+	return TimeoutScopeInvocation
+}
+
+// ScopeOf names the deadline that bounded a step, decided from the deadlines
+// themselves rather than from which timer happened to fire first.
+//
+// A step's deadline is the earlier of (now + per-invocation) and the session's.
+// If the step's deadline is not earlier than the session's, the session is what
+// bounded it. Comparing the two is exact and free of the timing race that
+// asking "has the session expired yet?" after the fact would have.
+func (b *Budget) ScopeOf(step context.Context) string {
+	sessionDeadline, hasSession := b.ctx.Deadline()
+	if !hasSession {
+		return TimeoutScopeInvocation
+	}
+	stepDeadline, hasStep := step.Deadline()
+	if !hasStep || !stepDeadline.Before(sessionDeadline) {
 		return TimeoutScopeSession
 	}
 	return TimeoutScopeInvocation

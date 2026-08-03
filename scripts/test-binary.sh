@@ -223,6 +223,37 @@ else
   fail "refine: pipeline stopped early — a later step inherited a spent budget"
 fi
 
+# Test 16b: refine — a reviewer that blows its OWN window must not end the run.
+#
+# The old code broke out of the loop on any DeadlineExceeded, which was right
+# when one deadline bounded everything. With per-invocation budgets it is wrong:
+# reviewer B still has a full window of its own. codex hangs past --timeout, agy
+# must still review, and the run must exit 4 (a timeout outranks the partial).
+REFINE_PARTIAL=$(MOCK_CODEX_DELAY=5 MOCK_CLAUDE_DELAY=0 MOCK_AGY_DELAY=0 \
+  "$BINARY" refine --json --author claude --reviewers codex,agy --timeout 500ms \
+  --session-timeout 60s --config /dev/null "say something" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+p = d["meta"]["providers"]
+assert p.get("codex") == "error", "the hung reviewer should be marked error, got %r" % p
+assert p.get("agy") == "ok", "the second reviewer never ran — the loop broke out early: %r" % p
+assert d["final"]["version"] >= 2, "no incorporation ran after the surviving review"
+' <<<"$REFINE_PARTIAL" 2>/dev/null; then
+  pass "refine: a reviewer blowing its own window does not end the pipeline"
+else
+  fail "refine: one reviewer timing out killed the rest of the pipeline"
+fi
+
+RC=0
+MOCK_CODEX_DELAY=5 "$BINARY" refine --author claude --reviewers codex,agy --timeout 500ms \
+  --session-timeout 60s --config /dev/null "say something" >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -eq 4 ]]; then
+  pass "refine: a timed-out reviewer still exits 4 (timeout outranks partial)"
+else
+  fail "refine: reviewer timeout exited $RC, want 4"
+fi
+
 # Test 17: council — dispatch, peer review and synthesis are separate budgets.
 run_pipeline "council: dispatch/review/synthesis each get their own budget" 0 "" -- \
   council --json --agents claude,codex --chair claude --rounds 1 \

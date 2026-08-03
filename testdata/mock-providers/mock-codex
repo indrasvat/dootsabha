@@ -9,6 +9,10 @@ while [[ $# -gt 0 ]]; do
     --sandbox) shift 2 ;;
     --ephemeral) shift ;;
     --skip-git-repo-check) shift ;;
+    # The real provider always passes --model before the prompt. Without this
+    # case the mock took "--model" AS the prompt, so every codex-backed
+    # assertion was checking a flag name rather than the text under test.
+    --model|-m) shift 2 ;;
     -c) shift 2 ;;  # config overrides like model_reasoning_effort=medium
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
