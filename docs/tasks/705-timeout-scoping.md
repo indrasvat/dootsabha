@@ -64,21 +64,50 @@ Exit `4` still outranks the partial result (precedence `4 > 5`).
 | Level | Result |
 |-------|--------|
 | L1 `make ci-fast` | 0 lint issues |
-| L2 `go test ./...` | pass; `-race -count=2` clean |
-| L2 unit | 17 `Budget`/`StepContext` cases, 9 engine cases, 13 CLI cases |
-| L3 `make test-binary` | 21/21 (9 new timeout-scoping cases) |
-| L5 `make test-agent` | 222/222 (17 new) |
-| L4 `shux` | screenshots under `.shux/out/20/` |
+| L2 `go test ./...` | pass; `-race` clean |
+| L2 unit | `Budget`/`StepContext`/`ScopeOf`, engine per-stage windows, CLI resolution + messages, proto round-trip |
+| L3 `make test-binary` | 23/23 (11 new timeout-scoping cases) |
+| L5 `make test-agent` | 228/228 (23 new) |
+| L4 `shux` | 9 frames under `.shux/out/20/`, incl. a real-CLI old-vs-new run |
 
-RED evidence: before the fix, 8 of the 9 new L3 cases failed — `review`, `refine`
-and `council` all exited 4 on pipelines whose every individual step fitted its
-budget.
+RED evidence: before the fix, 8 of the 9 original L3 cases failed — `review`,
+`refine` and `council` all exited 4 on pipelines whose every individual step
+fitted its budget. The multi-reviewer case was verified the same way against a
+binary built from `main`: it abandoned the second reviewer entirely and returned
+v1, where this branch runs it and returns v2.
+
+Real CLIs, same command, two binaries (`.shux/out/20/09-real-cli-before-after.png`):
+
+```
+council --agents codex,agy --chair codex --timeout 25s --session-timeout 20m
+  main         25.5s  exit 4  synthesis: synthesize fallback agy: context deadline exceeded
+  this branch  33.0s  exit 0  synthesis complete
+```
+
+## Council review findings (codex · agy · grok, addressed)
+
+- A chair that timed out was dropped once the fallback succeeded, so a council
+  that hit a deadline could exit `0`. `SynthesisResult.ChairError` now carries
+  it, including across the strategy-plugin gRPC boundary (`chair_error`).
+- council's early returns printed bare stage errors; they now name the budget.
+- Non-timeout peer-review failures reported `0`; they are `5`.
+- The ceiling warning is pipeline-aware — `refine --reviewers a,b,c` is 7 calls,
+  which overruns the shipped 5m/30m defaults — and is no longer suppressed in
+  `--json` (stderr, so stdout stays one document).
+- Timeout scope is decided when the step is created (`Budget.ScopeOf`) rather
+  than by asking afterwards, closing a race where a subprocess in its 5s SIGTERM
+  grace let a late session expiry rewrite the diagnosis.
+- refine's continue-past-a-timed-out-reviewer path was untested; covered at L3+L5.
 
 ## Regression guards
 
 - `TestPipelineCommandsDoNotShareOneDeadline` — bans
   `context.WithTimeout(context.Background()` in review/refine/council, the exact
   shape of the bug.
+- `TestSequentialCommandsInvokeOnlyThroughInvokeStep` — review/refine may not
+  call a provider directly; every call must go through `invokeStep`. Catches the
+  variant the string ban misses (reusing `budget.Session()` for every call), and
+  was itself negative-tested by reintroducing the bug.
 - `TestBudgetStepIsFreshEachTime` — five sequential steps each get a full window.
 - `TestEngineReleasesStepContexts` — no timer leak per agent per stage.
 - L3 pipelines whose total runtime exceeds one invocation budget while no single

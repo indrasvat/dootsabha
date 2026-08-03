@@ -225,7 +225,10 @@ All 4 items addressed in PRD v1.6.
   declared but never used.
 - A single agent hitting its own deadline no longer ends the run: `refine` moves
   on to the next reviewer, `council` keeps its healthy agents' output.
-- Tests: 21/21 L3 (9 new), 222/222 L5 (17 new), 39 new unit cases, `-race` clean.
+- A timed-out chair still reaches the exit code, including through a strategy
+  plugin (`chair_error` on the proto), and the ceiling warning is pipeline-aware.
+- Tests: 23/23 L3, 228/228 L5, new unit coverage in core/cli/plugin, `-race` clean.
+  Real-CLI proof of old-vs-new in `.shux/out/20/09-real-cli-before-after.png`.
 
 ### What Works End-to-End (704)
 
