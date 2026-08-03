@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -82,6 +80,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			// one pipeline ceiling (issue #20). Two calls.
 			budget := newBudget(cmd, cfg, 2)
 			defer budget.Close()
+			outcome := newOutcome(budget)
 
 			runner := &core.SubprocessRunner{}
 
@@ -109,18 +108,13 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 
 			// Step 1: Invoke author.
 			totalStart := time.Now()
-			authorResult, authorScope, err := invokeStep(budget, authorProv, prompt, invokeOpts)
+			authorResult, err := outcome.Invoke(authorProv, author, prompt, invokeOpts)
 			if err != nil {
-				exitCode := core.ExitProvider
-				msg := fmt.Sprintf("author (%s) failed: %s", author, err)
-				if errors.Is(err, context.DeadlineExceeded) {
-					exitCode = core.ExitTimeout
-					msg = timeoutMessage(budget, authorScope, err)
-				}
+				exit := outcome.Exit(fmt.Sprintf("author (%s) failed: %s", author, err))
 				if rc.IsJSON() {
-					emitErrorJSON(author, msg)
+					emitErrorJSON(author, exit.Error())
 				}
-				return &ExitError{Code: exitCode, Message: msg}
+				return exit
 			}
 
 			// Step 2: Construct review prompt and invoke reviewer.
@@ -128,7 +122,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				"Review the following output from %s. Identify strengths, weaknesses, errors. Be specific.\n\n%s",
 				author, authorResult.Content,
 			)
-			reviewerResult, reviewerScope, err := invokeStep(budget, reviewerProv, reviewPrompt, invokeOpts)
+			reviewerResult, err := outcome.Invoke(reviewerProv, reviewer, reviewPrompt, invokeOpts)
 			totalDuration := time.Since(totalStart)
 
 			if err != nil {
@@ -138,21 +132,22 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				} else {
 					renderReviewSection(rc, author, "(author)", authorResult)
 				}
-				if errors.Is(err, context.DeadlineExceeded) {
-					return &ExitError{Code: core.ExitTimeout, Message: timeoutMessage(budget, reviewerScope, err)}
-				}
-				// The author already produced content, which is in the payload — a
-				// failed reviewer leaves a usable partial result, not nothing.
-				return &ExitError{Code: stageExitCode(budget.Session(), err, core.ExitPartial), Message: fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err)}
+				// The author already produced content, which is in the payload, so
+				// this is a partial result rather than nothing — a distinction
+				// Exit draws from the ledger, not from a judgement here.
+				return outcome.Exit(fmt.Sprintf("reviewer (%s) failed: %s", reviewer, err))
 			}
 
 			// Render output.
 			if rc.IsJSON() {
-				return renderReviewJSON(authorResult, reviewerResult, author, reviewer, totalDuration)
+				if err := renderReviewJSON(authorResult, reviewerResult, author, reviewer, totalDuration); err != nil {
+					return err
+				}
+				return outcome.Exit("")
 			}
 
 			renderReviewTTY(rc, author, reviewer, authorResult, reviewerResult, totalDuration)
-			return nil
+			return outcome.Exit("")
 		},
 	}
 

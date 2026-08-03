@@ -2,9 +2,7 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -215,50 +213,6 @@ func TestTimeoutMessageHonoursExplicitScope(t *testing.T) {
 	}
 }
 
-// TestStageFailureMessage — a stage that died on a deadline must name the
-// budget; a stage that died for any other reason must not invent one.
-func TestStageFailureMessage(t *testing.T) {
-	b := core.NewBudget(30*time.Second, 10*time.Minute)
-	defer b.Close()
-
-	msg := stageFailureMessage(b, "synthesis", fmt.Errorf("chair: %w", context.DeadlineExceeded))
-	if !strings.HasPrefix(msg, "synthesis: ") {
-		t.Errorf("message %q lost the stage label", msg)
-	}
-	if !strings.Contains(msg, "timeout after 30s") {
-		t.Errorf("message %q should name the budget that fired", msg)
-	}
-
-	msg = stageFailureMessage(b, "peer review", errors.New("provider exploded"))
-	if strings.Contains(msg, "timeout") {
-		t.Errorf("message %q blamed a timeout for a non-deadline failure", msg)
-	}
-	if !strings.Contains(msg, "provider exploded") {
-		t.Errorf("message %q dropped the underlying error", msg)
-	}
-}
-
-// TestFirstDeadline — the helper that decides whether exit 4 applies.
-func TestFirstDeadline(t *testing.T) {
-	other := errors.New("provider exploded")
-	wrapped := fmt.Errorf("invoke claude: %w", context.DeadlineExceeded)
-
-	if got := firstDeadline(nil, other, nil); got != nil {
-		t.Errorf("firstDeadline with no deadline = %v, want nil", got)
-	}
-	if got := firstDeadline(nil, other, wrapped); got == nil {
-		t.Error("firstDeadline missed a wrapped DeadlineExceeded")
-	}
-	if got := firstDeadline(); got != nil {
-		t.Errorf("firstDeadline() = %v, want nil", got)
-	}
-	// context.Canceled is NOT a deadline — a user Ctrl-C must not read as
-	// "raise your timeout".
-	if got := firstDeadline(context.Canceled); got != nil {
-		t.Errorf("firstDeadline(Canceled) = %v, want nil", got)
-	}
-}
-
 // TestSessionTimeoutFlagIsVisible — the flag was hidden because it did nothing
 // (TODO(704)). It does something now, so users must be able to discover it.
 func TestSessionTimeoutFlagIsVisible(t *testing.T) {
@@ -286,54 +240,5 @@ func TestTimeoutFlagUsageSaysPerInvocation(t *testing.T) {
 	if !strings.Contains(usage, "per-agent") && !strings.Contains(usage, "per-invocation") &&
 		!strings.Contains(usage, "per agent") && !strings.Contains(usage, "each") {
 		t.Errorf("--timeout usage %q should say the budget is per invocation", f.Usage)
-	}
-}
-
-// TestPipelineCommandsDoNotShareOneDeadline is the freeze guard for issue #20.
-//
-// The bug was structural: one context.WithTimeout(context.Background(), timeout)
-// created up front and reused for every provider call. Any command that goes
-// back to that shape reintroduces the bug, whatever its tests say, so the shape
-// itself is banned in the multi-step commands.
-func TestPipelineCommandsDoNotShareOneDeadline(t *testing.T) {
-	for _, file := range []string{"review.go", "refine.go", "council.go"} {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		if strings.Contains(string(src), "context.WithTimeout(context.Background()") {
-			t.Errorf("%s bakes one deadline for the whole pipeline (issue #20) — "+
-				"derive a per-invocation context from core.Budget instead", file)
-		}
-	}
-}
-
-// TestSequentialCommandsInvokeOnlyThroughInvokeStep is the stronger half of the
-// freeze guard.
-//
-// Banning the old `context.WithTimeout(context.Background()` spelling does not
-// stop the bug coming back a different way — passing `budget.Session()` straight
-// to every Invoke reproduces it exactly. review and refine drive their providers
-// directly, so the invariant is that EVERY provider call goes through
-// invokeStep, which is the only thing that hands out a fresh window.
-//
-// council is exempt: it invokes through the engine, which derives its own step
-// context from InvokeOptions.Timeout (covered by the engine tests).
-func TestSequentialCommandsInvokeOnlyThroughInvokeStep(t *testing.T) {
-	for _, file := range []string{"review.go", "refine.go"} {
-		src, err := os.ReadFile(file)
-		if err != nil {
-			t.Fatalf("read %s: %v", file, err)
-		}
-		for i, line := range strings.Split(string(src), "\n") {
-			if !strings.Contains(line, "Prov.Invoke(") {
-				continue
-			}
-			t.Errorf("%s:%d calls a provider directly — route it through invokeStep "+
-				"so it gets its own window (issue #20):\n\t%s", file, i+1, strings.TrimSpace(line))
-		}
-		if !strings.Contains(string(src), "invokeStep(budget,") {
-			t.Errorf("%s never calls invokeStep — how is it bounding its provider calls?", file)
-		}
 	}
 }

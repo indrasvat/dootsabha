@@ -54,7 +54,14 @@ func (s *councilStrategy) Execute(ctx context.Context, req *gen.ExecuteRequest) 
 		if provider == nil {
 			continue
 		}
-		agents = append(agents, &agentAdapter{provider: provider})
+		// AgentConfig.timeout_ms is documented as the PER-AGENT timeout and was
+		// being dropped entirely, so every call in a plugin-run council was
+		// unbounded — GitHub issue #20 in the out-of-process pipeline.
+		timeout := time.Duration(ac.TimeoutMs) * time.Millisecond
+		if timeout <= 0 {
+			timeout = cfg.Timeout // proto: "0 = use config default"
+		}
+		agents = append(agents, &agentAdapter{provider: provider, timeout: timeout})
 	}
 	if len(agents) == 0 {
 		return nil, fmt.Errorf("no valid agents configured")
@@ -62,6 +69,8 @@ func (s *councilStrategy) Execute(ctx context.Context, req *gen.ExecuteRequest) 
 
 	// Create engine and run pipeline.
 	engine := core.NewEngine(agents, cfg)
+	// Each agent carries its own timeout (see agentAdapter), so the engine adds
+	// no window of its own here.
 	opts := core.InvokeOptions{}
 
 	start := time.Now()
@@ -106,18 +115,28 @@ func createProvider(name string, cfg *core.Config, runner providers.Runner) prov
 	}
 }
 
-// agentAdapter wraps providers.Provider to satisfy core.Agent.
+// agentAdapter wraps providers.Provider to satisfy core.Agent, applying that
+// agent's own per-invocation timeout.
 type agentAdapter struct {
 	provider providers.Provider
+	timeout  time.Duration
 }
 
 func (a *agentAdapter) Name() string { return a.provider.Name() }
 
 func (a *agentAdapter) Invoke(ctx context.Context, prompt string, opts core.InvokeOptions) (*core.InvokeResult, error) {
+	// A fresh window for THIS call, clipped by whatever the caller's context
+	// already allows. Without it every call in the pipeline shared one deadline
+	// and a slow agent starved the ones after it (issue #20).
+	if a.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = core.StepContext(ctx, a.timeout)
+		defer cancel()
+	}
 	result, err := a.provider.Invoke(ctx, prompt, providers.InvokeOptions{
 		Model:    opts.Model,
 		MaxTurns: opts.MaxTurns,
-		Timeout:  opts.Timeout,
+		Timeout:  a.timeout,
 	})
 	if err != nil {
 		return nil, err
