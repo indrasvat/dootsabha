@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -296,5 +297,46 @@ func TestRunSkipsSpawnOnSpentBudget(t *testing.T) {
 				t.Errorf("took %s to decline a doomed call", elapsed)
 			}
 		})
+	}
+}
+
+// TestRunReturnsWhenAGrandchildEscapesTheProcessGroup.
+//
+// The reaper kills the child's whole process GROUP, but a grandchild that calls
+// setsid() leaves that group — and it inherited the stdout pipe. cmd.Wait()
+// waits for os/exec's output copiers to reach EOF, so with a writer still alive
+// it never returns, and the unbounded drain after SIGKILL blocked forever.
+//
+// A run with --timeout 2s hung indefinitely. A timeout that never fires is
+// worse than no timeout at all: nothing downstream can enforce a budget the
+// runner will not honour. Run must always come back.
+func TestRunReturnsWhenAGrandchildEscapesTheProcessGroup(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 needed to spawn a setsid grandchild")
+	}
+	// The backgrounded python setsid()s into its own session, so it survives
+	// kill(-pgid), and it holds the inherited stdout pipe the whole time.
+	script := `python3 -c 'import os,time; os.setsid(); time.sleep(30)' & sleep 30`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	r := &SubprocessRunner{}
+	done := make(chan error, 1)
+	start := time.Now()
+	go func() {
+		_, err := r.Run(ctx, "/bin/sh", []string{"-c", script}, WithGracePeriod(200*time.Millisecond))
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("err = %v, want DeadlineExceeded", err)
+		}
+		t.Logf("Run returned after %s", time.Since(start))
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run never returned — a detached grandchild holding the output pipe " +
+			"makes every timeout unbounded")
 	}
 }

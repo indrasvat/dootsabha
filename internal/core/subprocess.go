@@ -5,12 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+	"slices"
+	"sync"
 	"syscall"
 	"time"
 )
+
+// outputDrainTimeout bounds how long Run waits for a finished subprocess's
+// output to be read. Normally instant; it only bites when a descendant that
+// escaped the process group is still holding the write end.
+const outputDrainTimeout = 2 * time.Second
 
 // SubprocessRunner executes CLI binaries as subprocesses with process group isolation.
 type SubprocessRunner struct{}
@@ -107,14 +115,67 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	// This lets us kill the entire group with syscall.Kill(-pgid, sig).
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.Stdout = &stdoutBuf
-	cmd.Stderr = &stderrBuf
+	// Own the output pipes rather than handing os/exec an io.Writer.
+	//
+	// With a Writer, exec creates the pipe itself and cmd.Wait() blocks until
+	// its copier reaches EOF — which needs EVERY holder of the write end to
+	// close it. A grandchild that calls setsid() escapes the process group the
+	// reaper signals AND keeps that write end, so Wait never returns and the
+	// timeout never fires. Passing *os.File hands the descriptor to the child
+	// directly, so Wait waits for the process and nothing else.
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		return nil, fmt.Errorf("subprocess pipe %q: %w", binary, err)
+	}
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		_ = outR.Close()
+		_ = outW.Close()
+		return nil, fmt.Errorf("subprocess pipe %q: %w", binary, err)
+	}
+	cmd.Stdout = outW
+	cmd.Stderr = errW
+
+	var stdoutBuf, stderrBuf syncBuffer
+	defer func() {
+		_ = outR.Close()
+		_ = errR.Close()
+	}()
 
 	slog.Debug("subprocess starting", "binary", binary, "args", args)
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
+		_ = outR.Close()
+		_ = outW.Close()
+		_ = errR.Close()
+		_ = errW.Close()
 		return nil, fmt.Errorf("subprocess start %q: %w", binary, err)
+	}
+	// The parent's write ends must go, or the readers below never see EOF even
+	// when the child and all its descendants have exited.
+	_ = outW.Close()
+	_ = errW.Close()
+
+	copied := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); _, _ = io.Copy(&stdoutBuf, outR) }()
+		go func() { defer wg.Done(); _, _ = io.Copy(&stderrBuf, errR) }()
+		wg.Wait()
+		close(copied)
+	}()
+
+	// drain waits for the output copiers, but never indefinitely: an escaped
+	// grandchild can hold the write end open for as long as it likes, and the
+	// caller is owed an answer either way.
+	drain := func() {
+		select {
+		case <-copied:
+		case <-time.After(outputDrainTimeout):
+			slog.Warn("subprocess output still open after exit; returning what was read",
+				"binary", binary, "stdout_len", stdoutBuf.Len(), "stderr_len", stderrBuf.Len())
+		}
 	}
 
 	// pgid == child.Pid when Setpgid = true (child is process group leader).
@@ -127,6 +188,7 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 
 	select {
 	case err := <-waitCh:
+		drain()
 		elapsed := time.Since(start)
 		exitCode := exitCodeFromErr(err)
 		slog.Debug("subprocess finished", "binary", binary, "exit_code", exitCode,
@@ -148,8 +210,17 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 			// Process exited cleanly within grace period.
 		case <-time.After(cfg.gracePeriod):
 			_ = syscall.Kill(-pgid, syscall.SIGKILL)
-			<-waitCh // drain to release cmd resources
+			// Bounded. SIGKILL cannot reach a descendant that left the process
+			// group, and waiting for one forever would make the timeout this
+			// branch exists to enforce unenforceable.
+			select {
+			case <-waitCh:
+			case <-time.After(cfg.gracePeriod):
+				slog.Warn("subprocess survived SIGKILL, abandoning it",
+					"binary", binary, "pgid", pgid)
+			}
 		}
+		drain()
 		elapsed := time.Since(start)
 		return &SubprocessResult{
 			Stdout:   stdoutBuf.Bytes(),
@@ -158,6 +229,32 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 			Duration: elapsed,
 		}, fmt.Errorf("subprocess %q: %w", binary, ctx.Err())
 	}
+}
+
+// syncBuffer is a bytes.Buffer safe for one writer goroutine and a reader that
+// may look while the writer is still going — which is exactly what happens when
+// a subprocess is abandoned with its output pipe still open.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) Bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return slices.Clone(b.buf.Bytes())
+}
+
+func (b *syncBuffer) Len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Len()
 }
 
 // exitCodeFromErr extracts the numeric exit code from a cmd.Wait() error.
