@@ -63,5 +63,9 @@ timeout: 5m
 # Session timeout — the ceiling for a WHOLE pipeline (review, refine, council),
 # across every agent call it makes. It always wins over `timeout`: a call is cut
 # short if the session budget runs out first.
+#
+# Checked between calls. A CLI that ignores SIGTERM gets a 5s grace period before
+# it is killed, so a run can finish a few seconds past the ceiling — bounded by
+# that one grace period, not by the number of calls.
 # Formats: 30m, 1h, 2h. Set to 0 to disable the ceiling.
 session_timeout: 30m

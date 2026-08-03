@@ -277,6 +277,11 @@ Error: invocation timeout after 8m0s: codex invoke: …   # raise --timeout
 Error: session timeout after 20m0s: claude invoke: …    # raise --session-timeout
 ```
 
+The session ceiling is checked between calls, and an agent CLI that ignores
+SIGTERM gets a 5s grace period before it is killed — so a run can finish a few
+seconds past the ceiling. That overshoot is bounded by the one grace period; it
+does not grow with the length of the pipeline.
+
 ### Config merge order
 
 **built-in defaults → auto-loaded `~/.config/dootsabha/config.yaml` or explicit `--config` file → env vars → CLI flags**

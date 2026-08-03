@@ -691,6 +691,37 @@ expect_exit 4 "council: chair times out, fallback synthesises" \
   env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
   --agents claude,codex,grok --chair grok --timeout 3s --session-timeout 60s
 
+# The session ceiling is checked BETWEEN calls, and a provider that ignores
+# SIGTERM gets a 5s grace period before SIGKILL. A run can therefore finish a
+# little past its ceiling — but the overshoot must stay bounded by that one
+# grace period, NOT grow with the number of steps. Per-invocation budgets mean
+# many more timeout events than the old single shared deadline, so an overshoot
+# that compounded would make --session-timeout meaningless on long pipelines.
+STUBBORN="$(mktemp -t ds-stubborn)"
+# shellcheck disable=SC2016  # $1 belongs to the generated script
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "0.0.0"; exit 0; }\ntrap "" TERM\nsleep 600 &\nwait\n' > "$STUBBORN"
+chmod +x "$STUBBORN"
+START=$(python3 -c "import time; print(time.time())")
+env DOOTSABHA_PROVIDERS_CODEX_BINARY="$STUBBORN" DOOTSABHA_PROVIDERS_AGY_BINARY="$STUBBORN" \
+    DOOTSABHA_PROVIDERS_GROK_BINARY="$STUBBORN" \
+  "$BINARY" refine "hi" --author claude --reviewers codex,agy,grok --timeout 1s \
+  --session-timeout 8s >/dev/null 2>&1 || true
+ELAPSED=$(python3 -c "import time; print(time.time() - $START)")
+# 8s ceiling + one 5s grace + 3s slack for a loaded machine.
+if python3 -c "import sys; sys.exit(0 if $ELAPSED < 16 else 1)"; then
+  pass "session ceiling overshoot stays within one SIGTERM grace period"
+else
+  fail "run took ${ELAPSED}s against an 8s ceiling — the grace overshoot is compounding per step"
+fi
+# Nothing may survive the run, SIGTERM-ignoring or not.
+if [ "$(pgrep -f "$STUBBORN" | wc -l | tr -d ' ')" -eq 0 ]; then
+  pass "a SIGTERM-ignoring provider is still reaped after a timeout"
+else
+  fail "orphaned provider processes left behind after a timeout"
+  pkill -f "$STUBBORN" || true
+fi
+rm -f "$STUBBORN"
+
 # ...and a timeout in an EARLY round survives a healthy later round. Keeping only
 # the final round's synthesis erased it the moment round 2's chair was fine.
 echo 0 > "$HANGCTR"
