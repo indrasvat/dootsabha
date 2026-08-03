@@ -227,7 +227,11 @@ All 4 items addressed in PRD v1.6.
   on to the next reviewer, `council` keeps its healthy agents' output.
 - A timed-out chair still reaches the exit code, including through a strategy
   plugin (`chair_error` on the proto), and the ceiling warning is pipeline-aware.
-- Tests: 23/23 L3, 228/228 L5, new unit coverage in core/cli/plugin, `-race` clean.
+- `internal/cli/outcome.go` is the single exit-code decision for every pipeline,
+  replacing three per-command aggregators (90 insertions, 367 deletions). Four
+  freeze guards, each negative-tested, make forgetting a stage or result type a
+  build failure.
+- Tests: 23/23 L3, 234/234 L5, new unit coverage in core/cli/plugin, `-race` clean.
   Real-CLI proof of old-vs-new in `.shux/out/20/09-real-cli-before-after.png`.
 
 ### What Works End-to-End (704)

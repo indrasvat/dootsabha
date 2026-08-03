@@ -84,6 +84,47 @@ council --agents codex,agy --chair codex --timeout 25s --session-timeout 20m
   this branch  33.0s  exit 0  synthesis complete
 ```
 
+## One exit-code decision for every pipeline
+
+Six defects landed in this change; four were the same one — a failure recorded
+somewhere the aggregator did not look. The cause was structural: `review`,
+`refine` and `council` each derived their own exit code from their own
+bookkeeping, so every new stage or result type multiplied the places that had to
+be updated together and nothing failed loudly when one was missed.
+
+`internal/cli/outcome.go` is now the single input to every pipeline's exit code.
+Commands record what each call did — `Outcome.Invoke` for their own calls,
+`AddDispatches`/`AddReviews`/`AddSynthesis` for the engine's — and finish with
+`outcome.Exit()`. "Nothing usable" is derived (no call succeeded) rather than
+judged per command.
+
+The design was reviewed by codex, agy and grok **before** implementation. All
+three rejected its first shape — a `Recorder` callback on the engine — on two
+grounds: an optional `SetRecorder` a new command forgets is worse than the
+status quo because it looks like the design was used, and a Go callback cannot
+reach an out-of-process strategy plugin, leaving two aggregation systems. Their
+counter-point — that the result types already carry every error, so retention
+was solved and only the scanning was inconsistent — is what shipped. Outcomes
+travel as data, so a plugin's gRPC response converts to the same types and
+reaches the same decision.
+
+Net effect in `internal/cli`: 90 insertions, 367 deletions. Deleted:
+`stageExitCode`, `firstDeadline`, `councilErrors`, `councilDeadline`,
+`councilExit`, `invokeStep`, `stageFailureMessage`, and refine's
+`partial`/`deadlineErr`/`deadlineScope` bookkeeping.
+
+Three guards, each negative-tested by reintroducing the regression it forbids:
+
+| Guard | Fails the build when |
+|-------|----------------------|
+| `TestOutcomeConsumesEveryResultError` | a result type gains an error field no `Add*` reads |
+| `TestPipelineCommandsReachExitThroughOutcome` | a command mints `ExitProvider`/`ExitTimeout`/`ExitPartial` itself |
+| `TestPipelineCommandsInvokeOnlyThroughOutcome` | a command calls a provider outside the choke point |
+| `TestPipelineCommandsDoNotShareOneDeadline` | a command bakes one deadline for the whole pipeline |
+
+They find pipeline commands by what they do — building a budget — rather than by
+a hard-coded list, so a fourth command is covered without editing the test.
+
 ## Council review findings (codex · agy · grok, addressed)
 
 - A chair that timed out was dropped once the fallback succeeded, so a council
@@ -98,6 +139,25 @@ council --agents codex,agy --chair codex --timeout 25s --session-timeout 20m
   than by asking afterwards, closing a race where a subprocess in its 5s SIGTERM
   grace let a late session expiry rewrite the diagnosis.
 - refine's continue-past-a-timed-out-reviewer path was untested; covered at L3+L5.
+
+## Adversarial findings (parallel agents driving the real binary)
+
+- **BLOCKER.** A provider whose grandchild calls `setsid()` escapes the process
+  group the reaper signals and keeps the inherited stdout pipe, so `cmd.Wait()`
+  never returned and the post-SIGKILL drain was an unbounded receive. Measured:
+  `review --timeout 2s --session-timeout 30s` ran until killed at 25s — a
+  timeout that never fires, in the very change that promises one. `Run` now owns
+  its pipes so `Wait` depends on the process alone, and every wait is bounded.
+  Same command now exits 4 in 4.0s; `main` still hangs.
+- A one-agent council whose chair timed out exited 5 on this branch and 4 on
+  main: `Synthesize` replaced the chair's error before returning, and with
+  per-invocation budgets the session context is no longer a second witness.
+- `Run` forked the child before checking the context, so an already-spent budget
+  still cost a fork/exec.
+- The ceiling warning counted invocations, not wall clock, so every council on
+  the shipped defaults warned it might be cut short when it comfortably fits.
+- `plugins/council-strategy` dropped `AgentConfig.timeout_ms` entirely, leaving
+  every call in a plugin-run council unbounded — issue #20 out-of-process.
 
 ## Regression guards
 
