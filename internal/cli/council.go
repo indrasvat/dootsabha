@@ -92,9 +92,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 			// multi-round councils repeat all three. Each call gets its own
 			// window inside one pipeline ceiling (issue #20); the engine derives
 			// the per-invocation context from InvokeOptions.Timeout.
-			// Per round: one call per agent, one peer review per agent, one
-			// synthesis. Rounds repeat all three.
-			budget := newBudget(cmd, cfg, cfg.Council.Rounds*(2*len(splitAgentList(agents))+1))
+			budget := newBudget(cmd, cfg, councilSteps(cfg, splitAgentList(agents)))
 			defer budget.Close()
 			ctx := budget.Session()
 			invokeOpts := core.InvokeOptions{Timeout: budget.PerInvoke()}
@@ -292,6 +290,21 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 	_ = f.MarkHidden("samantar")
 
 	return cmd
+}
+
+// councilSteps is the longest chain of provider calls a council can run back to
+// back — what the session ceiling actually has to cover.
+//
+// It counts WALL CLOCK, not invocations. Dispatch and peer review run their
+// agents concurrently by default, so ten agents cost one call's worth of time,
+// not ten. Counting invocations made every default council warn that it might
+// be cut short when it comfortably fits.
+func councilSteps(cfg *core.Config, agents []string) int {
+	perRound := 3 // dispatch · peer review · synthesis
+	if !cfg.Council.Parallel {
+		perRound = 2*len(agents) + 1
+	}
+	return cfg.Council.Rounds * perRound
 }
 
 // councilErrors collects every per-agent failure a council round recorded,
