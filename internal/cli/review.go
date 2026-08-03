@@ -143,11 +143,11 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				if err := renderReviewJSON(authorResult, reviewerResult, author, reviewer, totalDuration); err != nil {
 					return err
 				}
-				return outcome.Exit("")
+				return outcome.Exit(fmt.Sprintf("author (%s) or reviewer (%s) failed", author, reviewer))
 			}
 
 			renderReviewTTY(rc, author, reviewer, authorResult, reviewerResult, totalDuration)
-			return outcome.Exit("")
+			return outcome.Exit(fmt.Sprintf("author (%s) or reviewer (%s) failed", author, reviewer))
 		},
 	}
 

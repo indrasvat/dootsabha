@@ -202,7 +202,10 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 						// Dispatch already produced usable agent output, so this is
 						// a partial result — not "nothing usable". Reporting 3 here
 						// told callers to discard content they had already paid for.
-						outcome.Fail("", err)
+						// PeerReview reports per-reviewer failures on the results
+						// and currently never returns an error of its own, but the
+						// signature permits one — record it rather than trust that.
+						outcome.Fail("peer review", err)
 						return outcome.Exit(fmt.Sprintf("peer review: %s", err))
 					}
 				}
