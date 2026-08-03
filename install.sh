@@ -252,12 +252,15 @@ find_install_dir() {
     printf "\n"
     printf "  %sChoice [%s1%s]: %s" "$BOLD" "$CYAN" "$RESET$BOLD" "$RESET"
 
+    # Attempting the open IS the test. /dev/tty passes both -e and -r even when
+    # it cannot be opened — a piped `curl … | sh` with no controlling terminal
+    # gets ENXIO ("Device not configured") — so the old existence check let a
+    # doomed read through, and `set -e` turned that into an aborted install.
+    choice=""
     if [ -t 0 ]; then
-        read -r choice
-    elif [ -e /dev/tty ]; then
-        read -r choice </dev/tty
+        read -r choice || choice=""
     else
-        choice=""
+        read -r choice 2>/dev/null </dev/tty || choice=""
     fi
 
     if [ -z "$choice" ] || [ "$choice" = "1" ]; then
@@ -443,12 +446,11 @@ main() {
     if [ "${NONINTERACTIVE:-}" != "1" ]; then
         printf "\n"
         printf "  %sProceed? [Y/n] %s" "$BOLD" "$RESET"
+        confirm="y"
         if [ -t 0 ]; then
-            read -r confirm
-        elif [ -e /dev/tty ]; then
-            read -r confirm </dev/tty
+            read -r confirm || confirm="y"
         else
-            confirm="y"
+            read -r confirm 2>/dev/null </dev/tty || confirm="y"
         fi
         case "$confirm" in
             [nN]*) info "Cancelled."; exit 0 ;;
