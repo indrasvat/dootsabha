@@ -6,6 +6,11 @@ import (
 	"time"
 )
 
+// DefaultInvokeTimeout bounds a single provider call when neither a flag nor
+// the config supplies one. Lives here because both the CLI and the strategy
+// plugin need it, and two copies of a default are two chances to disagree.
+const DefaultInvokeTimeout = 5 * time.Minute
+
 // TimeoutScope names which of a pipeline's two deadlines fired. A timeout is
 // only actionable if the caller knows which knob to turn.
 const (

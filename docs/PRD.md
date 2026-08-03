@@ -353,7 +353,7 @@ error produces none.
 - [ ] FR-ROOT-02: `dootsabha --version` prints version string
 - [ ] FR-ROOT-03: Unknown command checks for extension binary
 - [ ] FR-ROOT-04: `--json` applies globally to all subcommands
-- [ ] FR-ROOT-05: `--timeout` applies per-agent invocation; `--session-timeout` caps total session time
+- [x] FR-ROOT-05: `--timeout` applies per-agent invocation; `--session-timeout` caps total session time
 - [ ] FR-ROOT-06: Retries consume the same per-agent timeout budget (no reset)
 - [ ] FR-ROOT-07: Handles SIGPIPE gracefully when piped to `head` (exit 0, no "broken pipe" error)
 

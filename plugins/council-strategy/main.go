@@ -61,10 +61,26 @@ func (s *councilStrategy) Execute(ctx context.Context, req *gen.ExecuteRequest) 
 		if timeout <= 0 {
 			timeout = cfg.Timeout // proto: "0 = use config default"
 		}
+		if timeout <= 0 {
+			// A config that also says 0 must not mean "unbounded" — the CLI
+			// resolves the same pair to the built-in default, and a plugin-run
+			// council should not be the one with no per-call bound at all.
+			timeout = core.DefaultInvokeTimeout
+		}
 		agents = append(agents, &agentAdapter{provider: provider, timeout: timeout})
 	}
 	if len(agents) == 0 {
 		return nil, fmt.Errorf("no valid agents configured")
+	}
+
+	// The whole pipeline runs under the session ceiling, exactly as the CLI
+	// does. Without this the incoming RPC context is passed straight through
+	// every stage, so a plugin-run council could run for the sum of all its
+	// per-agent windows with nothing bounding the total.
+	if cfg.SessionTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, cfg.SessionTimeout)
+		defer cancel()
 	}
 
 	// Create engine and run pipeline.

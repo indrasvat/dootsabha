@@ -12,7 +12,7 @@ import (
 
 // defaultInvokeTimeout bounds a single provider invocation when neither the
 // --timeout flag nor the config supplies one.
-const defaultInvokeTimeout = 5 * time.Minute
+const defaultInvokeTimeout = core.DefaultInvokeTimeout
 
 // resolveTimeouts picks the per-invocation and session budgets, preferring the
 // flag, then the config, then the built-in default.

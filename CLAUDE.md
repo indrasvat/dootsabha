@@ -84,6 +84,22 @@ Read most-blocking first: never valid → couldn't load config → ran out of ti
 nothing usable → partially usable. `1` is reserved for genuine internal failures,
 never for a bad command line.
 
+**Pipelines do not decide their own exit code.** `review`, `refine` and `council`
+record what every provider call did into `cli.Outcome` — `Outcome.Invoke` for
+their own calls, `AddDispatches`/`AddReviews`/`AddSynthesis` for the engine's —
+and end with `outcome.Exit()`. Three of them each deriving their own answer is
+how four separate "a timed-out agent exits 0" bugs shipped (#20). Guards in
+`outcome_test.go` fail the build if a command mints `ExitProvider`/`ExitTimeout`/
+`ExitPartial` itself, returns `nil` from `RunE`, calls a provider outside
+`Outcome.Invoke`, builds its own `context.WithTimeout`, or adds a result type
+with an error no `Add*` reads.
+
+## Timeouts
+`--timeout` is the budget for **one agent call**; `--session-timeout` is the
+ceiling for the **whole pipeline**. Every call gets a fresh window from
+`core.Budget`, clipped by the session. Both exit `4`; the message names which
+fired. Never reuse one context across calls — that is the #20 regression.
+
 ## Plugin Architecture
 - **gRPC based:** Uses `hashicorp/go-plugin`.
 - **Handshake Cookies:**
