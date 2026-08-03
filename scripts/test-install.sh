@@ -127,7 +127,7 @@ run_install() {
   TEST_SHA="${TEST_SHA}" \
   TEST_PLATFORM="${TEST_PLATFORM}" \
   PATH="${fakebin}:$PATH" \
-  NONINTERACTIVE=1 \
+  NONINTERACTIVE="${RUN_NONINTERACTIVE-1}" \
   INSTALL_DIR="${test_dir}/install" \
   "$@" sh "${ROOT}/install.sh" >"${test_dir}/stdout" 2>"${test_dir}/stderr"
 
@@ -194,5 +194,57 @@ if [[ ${status} -eq 0 ]]; then
 fi
 assert_contains "${rate_dir}/stderr" 'GitHub API rate-limited'
 assert_contains "${rate_dir}/stdout" 'VERSION=vX.Y.Z'
+
+# --- Regression for #23: no controlling terminal must not abort the install ---
+#
+# `curl … | sh` from CI, a container or an agent shell has no controlling
+# terminal. /dev/tty still passes -e and -r there — access(2) succeeds — but
+# open(2) returns ENXIO, so the old existence check let a doomed `read` through
+# and `set -eu` turned that into an aborted install at the directory prompt.
+#
+# Every other test here passes NONINTERACTIVE=1, which skips the prompt
+# entirely. That is exactly why this shipped, so this one must NOT set it.
+#
+# setsid() guarantees no controlling terminal whether or not the person running
+# the suite has a terminal — without it this test would hang on a real tty,
+# waiting for someone to answer the prompt.
+if command -v python3 >/dev/null 2>&1; then
+  tty_home="${tmp}/tty-home"
+  tty_dir="${tmp}/tty-fallback"
+  mkdir -p "${tty_home}/.local/bin" "${tty_dir}/fakebin"
+  make_fake_tools ok "${tty_dir}/fakebin"
+
+  set +e
+  FAKE_CURL_LOG="${tty_dir}/curl.log" \
+  FAKE_NPX_LOG="${tty_dir}/npx.log" \
+  FAKE_CURL_MODE=ok \
+  TEST_BINARY="${BIN}" \
+  TEST_SHA="${TEST_SHA}" \
+  TEST_PLATFORM="${TEST_PLATFORM}" \
+  HOME="${tty_home}" \
+  PATH="${tty_dir}/fakebin:${tty_home}/.local/bin:/usr/bin:/bin" \
+  INSTALL_SKILL=0 \
+  python3 -c 'import os,sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' \
+    sh "${ROOT}/install.sh" >"${tty_dir}/stdout" 2>"${tty_dir}/stderr" </dev/null
+  status=$?
+  set -e
+
+  if [[ ${status} -ne 0 ]]; then
+    echo "interactive install with no controlling terminal exited ${status}" >&2
+    cat "${tty_dir}/stderr" >&2
+    exit 1
+  fi
+  if grep -q 'Device not configured\|/dev/tty' "${tty_dir}/stderr"; then
+    echo "installer tripped over /dev/tty instead of falling back" >&2
+    cat "${tty_dir}/stderr" >&2
+    exit 1
+  fi
+  assert_contains "${tty_dir}/stdout" 'dootsabha is ready'
+  # It must have taken the default, inside the sandboxed HOME — never the real one.
+  if [[ ! -x "${tty_home}/.local/bin/dootsabha" ]]; then
+    echo "expected the default dir to be chosen inside the test HOME" >&2
+    exit 1
+  fi
+fi
 
 echo "install.sh tests passed"
