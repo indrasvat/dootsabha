@@ -691,6 +691,14 @@ expect_exit 4 "council: chair times out, fallback synthesises" \
   env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
   --agents claude,codex,grok --chair grok --timeout 3s --session-timeout 60s
 
+# ...and when there is NOTHING to fall back to. A one-agent council whose chair
+# times out has no second agent, so synthesis fails outright — but it still
+# failed on a deadline, and reporting 5 there tells the caller to use a partial
+# result that does not exist.
+expect_exit 4 "council: chair times out with no fallback available" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY="$HANG" "$BINARY" council "hi" \
+  --agents grok --chair grok --timeout 2s --session-timeout 60s
+
 # The session ceiling is checked BETWEEN calls, and a provider that ignores
 # SIGTERM gets a 5s grace period before SIGKILL. A run can therefore finish a
 # little past its ceiling — but the overshoot must stay bounded by that one

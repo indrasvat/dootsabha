@@ -3,6 +3,7 @@ package core_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -426,5 +427,63 @@ func TestSynthesisChairErrorIsNilOnSuccess(t *testing.T) {
 	}
 	if synth.ChairFallback != "" {
 		t.Errorf("ChairFallback = %q on a successful chair, want empty", synth.ChairFallback)
+	}
+}
+
+// TestSynthesisKeepsChairErrorWhenNoFallbackExists — a one-agent council whose
+// chair times out has nothing to fall back to. Returning a fresh error for that
+// discarded the deadline, downgrading the caller's exit code from 4 to 5 and
+// telling them to use a partial result that does not exist.
+func TestSynthesisKeepsChairErrorWhenNoFallbackExists(t *testing.T) {
+	chair := &probeAgent{name: "claude", sleep: 5 * time.Second}
+	eng := core.NewEngine([]core.Agent{chair}, councilCfg("claude", false))
+
+	_, err := eng.Synthesize(context.Background(), []core.DispatchResult{{Provider: "claude", Content: "a"}}, nil,
+		core.InvokeOptions{Timeout: 120 * time.Millisecond})
+	if err == nil {
+		t.Fatal("synthesize should fail when the only agent is a timed-out chair")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("error = %v, want it to carry DeadlineExceeded so exit 4 outranks 5", err)
+	}
+}
+
+// TestSynthesisKeepsChairErrorWhenFallbackAlsoFails — chair times out, fallback
+// dies some other way. The run still hit a deadline.
+func TestSynthesisKeepsChairErrorWhenFallbackAlsoFails(t *testing.T) {
+	chair := &probeAgent{name: "claude", sleep: 5 * time.Second}
+	fallback := &probeAgent{name: "codex", fail: errors.New("codex exploded")}
+	eng := core.NewEngine([]core.Agent{chair, fallback}, councilCfg("claude", false))
+
+	_, err := eng.Synthesize(context.Background(),
+		[]core.DispatchResult{{Provider: "claude"}, {Provider: "codex"}}, nil,
+		core.InvokeOptions{Timeout: 120 * time.Millisecond})
+	if err == nil {
+		t.Fatal("synthesize should fail when both chair and fallback fail")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("error = %v, want the chair's deadline preserved alongside the fallback failure", err)
+	}
+	if !strings.Contains(err.Error(), "codex exploded") {
+		t.Errorf("error = %v, want the fallback's own failure still visible", err)
+	}
+}
+
+// TestSynthesisNoFallbackWithoutChairErrorStaysClean — the negative case: no
+// chair configured at all is not a timeout.
+func TestSynthesisNoFallbackWithoutChairErrorStaysClean(t *testing.T) {
+	other := &probeAgent{name: "codex"}
+	cfg := councilCfg("nobody", false) // chair is not among the agents
+	eng := core.NewEngine([]core.Agent{other}, cfg)
+
+	// Only failed dispatches, so findFallbackAgent finds nothing either.
+	_, err := eng.Synthesize(context.Background(),
+		[]core.DispatchResult{{Provider: "codex", Error: errors.New("down")}}, nil,
+		core.InvokeOptions{Timeout: time.Second})
+	if err == nil {
+		t.Fatal("synthesize should fail with no usable agent")
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		t.Errorf("error = %v, want no deadline — nothing timed out here", err)
 	}
 }
