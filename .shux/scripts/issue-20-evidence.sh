@@ -15,6 +15,22 @@ BIN="bin/dootsabha"   # relative: absolute paths would leak $HOME into every fra
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR_OVERRIDE:-/tmp/shux20}"
 mkdir -p "$XDG_RUNTIME_DIR" "$OUT"
 
+
+# wait_marker <session> <max-seconds> — block until the pane shows the end
+# marker. shux's `pane wait-for --timeout-ms` caps at 60s, which is shorter than
+# a real-CLI council takes, so poll it instead of asking for one long wait.
+wait_marker() {
+  local sess="$1" max="$2" waited=0
+  while [[ "$waited" -lt "$max" ]]; do
+    if shux pane capture -s "$sess" --lines 400 2>/dev/null | grep -q '__FRAME_DONE__'; then
+      return 0
+    fi
+    sleep 3
+    waited=$((waited + 3))
+  done
+  return 1
+}
+
 SESSIONS=()
 cleanup() {
   for s in "${SESSIONS[@]:-}"; do
@@ -50,7 +66,7 @@ frame() {
   shux pane set-size -s "$sess" --cols "$cols" --rows "$rows" >/dev/null
   # Marker-driven, not settle-driven: the screen is legitimately quiet while a
   # provider subprocess runs, so "stopped repainting" would fire mid-pipeline.
-  if ! shux pane wait-for -s "$sess" --text '__FRAME_DONE__' --timeout-ms 90000 >/dev/null; then
+  if ! wait_marker "$sess" 120; then
     echo "  ✗ $name: never reached the end marker" >&2
     shux pane capture -s "$sess" >&2
     return 1

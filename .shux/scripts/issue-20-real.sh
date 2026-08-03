@@ -30,6 +30,22 @@ mkdir -p "$XDG_RUNTIME_DIR" "$OUT"
 
 [[ -x "$OLD" ]] || { echo "missing old binary at $OLD — see BUILD in the header" >&2; exit 1; }
 
+
+# wait_marker <session> <max-seconds> — block until the pane shows the end
+# marker. shux's `pane wait-for --timeout-ms` caps at 60s, which is shorter than
+# a real-CLI council takes, so poll it instead of asking for one long wait.
+wait_marker() {
+  local sess="$1" max="$2" waited=0
+  while [[ "$waited" -lt "$max" ]]; do
+    if shux pane capture -s "$sess" --lines 400 2>/dev/null | grep -q '__FRAME_DONE__'; then
+      return 0
+    fi
+    sleep 3
+    waited=$((waited + 3))
+  done
+  return 1
+}
+
 SESS="i20-real"
 cleanup() {
   shux session kill "$SESS" >/dev/null 2>&1 || true
@@ -62,7 +78,7 @@ EOF
 echo "Running real-CLI before/after (this makes real API calls)…"
 shux session create "$SESS" -d --title "real" -- bash -c "$SCRIPT" >/dev/null
 shux pane set-size -s "$SESS" --cols 120 --rows 30 >/dev/null
-if ! shux pane wait-for -s "$SESS" --text '__FRAME_DONE__' --timeout-ms 900000 >/dev/null; then
+if ! wait_marker "$SESS" 600; then
   echo "  ✗ never reached the end marker" >&2
   shux pane capture -s "$SESS" >&2
   exit 1
