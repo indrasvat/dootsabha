@@ -2,6 +2,7 @@ package providers_test
 
 import (
 	"context"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -18,28 +19,56 @@ func grokModel(t *testing.T, cfg *core.Config) string {
 	return flagValue(runner.capturedArgs, "-m")
 }
 
-// The default grok model is declared in four places that nothing keeps in sync:
-// the provider constant, the viper default, the plugin's advertised capabilities
-// and the YAML skeleton. Bumping one and forgetting the others is silent —
-// `--agent grok` would run 4.6 while `status` and the plugin still claimed 4.5.
+// The default grok model used to be declared in four places that nothing kept in
+// sync: the provider constant, the viper default, the plugin's advertised
+// capabilities and the YAML skeleton. Bumping one and forgetting the others is
+// silent — `status` would claim one model while `--agent grok` ran another.
 //
-// This is a drift guard, not a bump test: it asserts the two Go-side sources
-// AGREE, whatever the value is.
+// The plugin and the extension-context defaults now READ providers.GrokDefaultModel
+// instead of repeating it, so those two can no longer drift by construction. Two
+// independent sources remain and are guarded here:
+//
+//   - the viper default, which lives in internal/core and cannot import providers
+//     (core sits below providers, so the dependency would cycle);
+//   - configs/default.yaml, which is a static file shipped to users.
+//
+// This is a drift guard, not a bump test: it asserts the sources AGREE, whatever
+// the value is.
 func TestGrokDefaultModelSourcesAgree(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
-	cfg, err := core.LoadConfig("")
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
+	// A nil config exercises the provider's own constant, bypassing viper entirely.
+	want := grokModel(t, nil)
+	if want != providers.GrokDefaultModel {
+		t.Fatalf("provider emits -m %q but GrokDefaultModel is %q", want, providers.GrokDefaultModel)
 	}
 
-	viperDefault := cfg.Providers["grok"].Model
-	// A nil config exercises the provider's own built-in constant, bypassing viper.
-	providerDefault := grokModel(t, nil)
+	t.Run("viper default", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		cfg, err := core.LoadConfig("")
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := cfg.Providers["grok"].Model; got != want {
+			t.Errorf("viper default is %q, the provider constant is %q — "+
+				"bump internal/core/config.go setDefaults too", got, want)
+		}
+	})
 
-	if viperDefault != providerDefault {
-		t.Errorf("default model drift: viper says %q, the provider constant says %q — "+
-			"both must be bumped together", viperDefault, providerDefault)
-	}
+	// The YAML skeleton is what `dootsabha config init` writes and what users copy.
+	// Nothing loads it at runtime, so it is the surface most likely to be forgotten
+	// — and forgetting it hands every new install a stale model.
+	t.Run("configs/default.yaml skeleton", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		// Loaded through the app's own loader, so this also proves the shipped
+		// skeleton still parses — not just that a string appears in the file.
+		skeleton, err := core.LoadConfig(filepath.Join("..", "..", "configs", "default.yaml"))
+		if err != nil {
+			t.Fatalf("load skeleton: %v", err)
+		}
+		if got := skeleton.Providers["grok"].Model; got != want {
+			t.Errorf("configs/default.yaml ships model %q, the provider default is %q — "+
+				"the skeleton is not loaded at runtime, so nothing else would catch this", got, want)
+		}
+	})
 }
 
 // A default bump is not a migration. grok-4.5 is still a live model (`grok models`

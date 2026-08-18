@@ -31,9 +31,9 @@ Two things made this riskier than a one-constant edit:
 |---|---|
 | `internal/providers/grok.go` | `grokDefaultModel` → `grok-4.6`; empty-`=`-effort fallback fix |
 | `internal/core/config.go` | viper default → `grok-4.6`; effort comment |
-| `plugins/grok/main.go` | `DefaultModel` → `grok-4.6`; `SupportedModels` → `["grok-4.6","grok-4.5"]` |
+| `plugins/grok/main.go` | reads `providers.GrokDefaultModel`; `SupportedModels` keeps 4.5 |
 | `configs/default.yaml` | model + `xhigh` in the effort comment |
-| `internal/plugin/context_file.go` | extension-context example model |
+| `internal/plugin/context_file.go` | extension-context model reads the constant (LIVE path — extensions read this JSON) |
 | `testdata/mock-providers/mock-grok` | **echoes the `-m` it receives** as `<model>-build` |
 | `scripts/test-binary.sh` | L3: end-to-end forwarding + pin-survival |
 | `scripts/test-agent-workflow.sh` | L5: grok success path (only failure paths existed) |
@@ -63,7 +63,8 @@ real `grok-4.6` work.
 ## Done Criteria
 
 - [ ] `grok models` default (`grok-4.6`) == दूतसभा's shipped default
-- [ ] All four default sources agree, guarded by a test that fails on drift
+- [ ] Two of the four sources deduplicated into `providers.GrokDefaultModel`; the
+      other two (viper default, YAML skeleton) fail a drift test when broken alone
 - [ ] `--config /dev/null` → `consult --agent grok` reports `grok-4.6-build`
 - [ ] A pinned `providers.grok.model: grok-4.5` still yields `grok-4.5-build`
 - [ ] `xhigh` reaches argv in all four spellings; empty `=` value falls back to `high`

@@ -28,10 +28,19 @@ const (
 	grokOutputFormat   = "streaming-messages-json"
 	grokSandbox        = "read-only"
 	grokPermissionMode = "bypassPermissions"
-	grokDefaultModel   = "grok-4.6"
 	grokDefaultEffort  = "high"
 	grokDefaultBinary  = "grok"
 )
+
+// GrokDefaultModel is the single source of truth for grok's default model.
+// The plugin's advertised capabilities and the extension-context defaults both
+// read it rather than repeating the literal — three copies of a model id is how
+// `status` ends up claiming one model while `--agent grok` runs another.
+//
+// The viper default in internal/core cannot import this (core is below
+// providers), and configs/default.yaml is a static file; both are covered by
+// TestGrokDefaultModelSourcesAgree instead.
+const GrokDefaultModel = "grok-4.6"
 
 // grokPinnedValueFlags take an argument; grokPinnedBoolFlags do not. Both are
 // removed from config-supplied flags so a stray entry cannot break parsing or
@@ -264,7 +273,7 @@ func parseGrokNDJSON(data []byte) *grokResult {
 func (p *GrokProvider) providerConfig() core.ProviderConfig {
 	def := core.ProviderConfig{
 		Binary: grokDefaultBinary,
-		Model:  grokDefaultModel,
+		Model:  GrokDefaultModel,
 	}
 	if p.cfg == nil {
 		return def

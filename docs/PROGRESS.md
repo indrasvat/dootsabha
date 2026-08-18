@@ -237,9 +237,13 @@ All 4 items addressed in PRD v1.6.
 ### What Works End-to-End (706)
 
 - Default grok model bumped `grok-4.5` → **`grok-4.6`** (grok CLI 1.0.5's own
-  default). All four declaration sites — provider constant, viper default, plugin
-  `Capabilities`, `configs/default.yaml` — bumped together and now guarded by a
-  drift test.
+  default). It used to be declared in four unsynced places; now
+  `providers.GrokDefaultModel` is the single source of truth that the plugin's
+  `Capabilities` and the extension-context defaults **read** (so those two cannot
+  drift at all), and the two that structurally cannot import it — the viper
+  default in `internal/core`, and the static `configs/default.yaml` skeleton —
+  are covered by `TestGrokDefaultModelSourcesAgree`. The skeleton was previously
+  guarded by nothing: breaking it alone failed zero tests.
 - **Not a migration.** `grok-4.5` is still live and still offered in
   `SupportedModels`; an explicit `providers.grok.model: grok-4.5` is never rewritten.
 - `xhigh` reasoning effort (new in grok-4.6) passes through in all four spellings;
