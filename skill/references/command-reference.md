@@ -21,7 +21,7 @@ Each command section lists: flags, pipeline, JSON output schema, exit codes.
 | `claude` | `claude` | `claude-opus-4-8` | ✅ | ✅ | ✅ | ✅ (standalone only) |
 | `codex` | `codex` | `gpt-5.5` | ✅ | — | — | ✅ |
 | `agy` | `agy` | `Gemini 3.5 Flash (High)` | — | — | — | ✅ |
-| `grok` | `grok` | `grok-4.5` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
+| `grok` | `grok` | `grok-4.6` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
 
 **`agy`** runs in plain-text print mode (`agy -p`) and emits no usage data, so its
 `cost_usd`, `tokens_in`, `tokens_out` and `session_id` fields are `0`/empty.
@@ -31,8 +31,11 @@ Each command section lists: flags, pipeline, JSON output schema, exit codes.
 Notes when using it:
 
 - Reasoning effort defaults to `high`; override via `providers.grok.flags`
-  (`--reasoning-effort high|medium|low`). `high` runs ~1.6× slower than `low` for
-  better prioritisation rather than more findings.
+  (`--reasoning-effort xhigh|high|medium|low` — `xhigh` is new in grok-4.6).
+  `high` runs ~1.6× slower than `low` for better prioritisation rather than more
+  findings.
+- `grok-4.5` is still selectable: pin `providers.grok.model: grok-4.5`. दूतसभा
+  never rewrites an explicitly configured model.
 - A real review takes ~105 s (p50), comfortably inside the 5 m default timeout.
 - dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
   `$HOME`, so it cannot write files and does not inherit the caller's Claude Code

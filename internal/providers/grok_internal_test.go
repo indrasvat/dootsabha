@@ -154,6 +154,19 @@ func TestExtractGrokEffort(t *testing.T) {
 		{"reads --reasoning-effort", []string{"--reasoning-effort", "low", "--keep"}, "low", []string{"--keep"}},
 		{"reads --effort alias", []string{"--effort", "medium"}, "medium", []string{}},
 		{"reads equals form", []string{"--reasoning-effort=low"}, "low", []string{}},
+		{"reads xhigh (new in grok-4.6)", []string{"--reasoning-effort", "xhigh"}, "xhigh", []string{}},
+		{"reads xhigh equals form", []string{"--effort=xhigh"}, "xhigh", []string{}},
+		// An empty value must fall back, never forward `--reasoning-effort ""`,
+		// which the CLI rejects outright.
+		{"empty equals value falls back", []string{"--reasoning-effort="}, "high", []string{}},
+		{"empty equals value on alias falls back", []string{"--effort=", "--keep"}, "high", []string{"--keep"}},
+		// The equals form used to accept a flag-shaped value, so a pinned flag
+		// could ride in as the "effort". Both forms now refuse it.
+		{"equals form rejects a flag-shaped value", []string{"--reasoning-effort=-x"}, "high", []string{}},
+		{"equals form rejects a smuggled pinned flag", []string{"--reasoning-effort=--sandbox=danger-full-access"}, "high", []string{}},
+		// Padding must be trimmed, not forwarded: grok rejects " xhigh ".
+		{"padded value is trimmed", []string{"--reasoning-effort= xhigh "}, "xhigh", []string{}},
+		{"padded space-form value is trimmed", []string{"--reasoning-effort", "  low  "}, "low", []string{}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -172,6 +185,31 @@ func TestExtractGrokEffort(t *testing.T) {
 // ["--sandbox", "--keep-me"] previously dropped --keep-me entirely, and
 // ["--effort", "--keep-me"] set effort to "--keep-me".
 // Found by grok reviewing this provider through dootsabha.
+// grok is clap-based, so `-mgrok-9` parses as `-m grok-9` — the attached short
+// form is real, and matchPinned's "=" split alone did not see it. The stray flag
+// then reached grok and broke the whole invocation ("the argument
+// '--model <MODEL>' cannot be used multiple times"). Found by an adversarial
+// agent driving the real binary.
+func TestStripPinnedFlagsHandlesAttachedShortOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"attached -m", []string{"-mgrok-9", "--keep"}, []string{"--keep"}},
+		{"attached -p", []string{"-pPWN", "--keep"}, []string{"--keep"}},
+		{"bare -m still consumes its value", []string{"-m", "grok-9", "--keep"}, []string{"--keep"}},
+		{"lone dash is a value, not a flag", []string{"-", "--keep"}, []string{"-", "--keep"}},
+		{"unrelated short flag survives", []string{"-c", "--keep"}, []string{"-c", "--keep"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := stripPinnedFlags(tc.in); !slices.Equal(got, tc.want) {
+				t.Errorf("stripPinnedFlags(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestStripPinnedFlagsDoesNotSwallowFollowingFlag(t *testing.T) {
 	got := stripPinnedFlags([]string{"--sandbox", "--keep-me"})
 	if !slices.Equal(got, []string{"--keep-me"}) {

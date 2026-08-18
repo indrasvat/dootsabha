@@ -5,6 +5,11 @@ from the real `grok` binary (0.2.117 → 0.2.118, macOS arm64, 2026-08-01), not 
 Screenshots proving these live in `.shux/out/grok-provider/` (gitignored — attached to
 the PR as review evidence, not committed).
 
+> ⚠️ **Partly superseded.** The findings below were true for grok 0.2.117/0.2.118.
+> By grok 1.0.5 the default model is `grok-4.6` and `xhigh` joined the
+> reasoning-effort set. See the **grok 1.0.5 addendum at the end of this file**
+> before relying on any model or effort claim here.
+
 ## Key Findings (grok 0.2.117 → 0.2.118, verified on the real binary)
 
 > The binary **self-updated 0.2.117 → 0.2.118 mid-research**, which is itself the argument
@@ -346,3 +351,66 @@ place the additive rule genuinely bends, so it is recorded here rather than slip
 Everything else stays opt-in: default council, refine reviewers, and review defaults are
 untouched. `status` listing a provider ≠ that provider joining any pipeline by default.
 
+
+---
+
+## Addendum — grok 1.0.5, `grok-4.6` (verified 2026-08-18)
+
+Everything above was captured against grok **0.2.117 → 0.2.118** and is left
+unedited as the historical record for that build. This section records what
+changed by grok **1.0.5** (`5115b46bc909`, stable, macOS arm64) and backs the
+default bump to `grok-4.6`.
+
+### What changed
+
+- **`grok-4.6` is the CLI's own default**, and `grok-4.5` is still selectable —
+  this is a *default bump*, not a sunset like gemini→agy:
+  ```
+  $ grok models
+  Default model: grok-4.6
+  Available models:
+    * grok-4.6 (default)
+    - grok-4.5
+  ```
+  The old finding "`grok-4.5` is the only available model" is therefore **stale**.
+
+- **`xhigh` was added to the reasoning-effort set.** Probed the same way as before,
+  by feeding an invalid value:
+  ```
+  --effort/--reasoning-effort: unknown effort level 'ultramax'; use one of: xhigh, high, medium, low
+  ```
+  Was `high, medium, low`. दूतसभा's default stays **`high`** — that is grok-4.6's
+  own default, and `xhigh` costs more time and tokens, so it is opt-in.
+
+- **The backend id follows the model:** `modelUsage` key is now `grok-4.6-build`.
+  The 704 invariant holds — the key is deliberately *not* the `-m` value. Live
+  capture on `-m grok-4.6`:
+  ```
+  modelUsage keys: ['grok-4.6-build']
+  usage: {"input_tokens":15236,"output_tokens":24,"cache_read_input_tokens":128,...}
+  total_cost_usd: 0.0052156
+  ```
+
+### What did NOT change
+
+- The invocation shape, the NDJSON contract, and "take the last `type=="result"`
+  line" are all unchanged. **No parser work was needed for this bump.**
+- Context window is still **500 000** for both 4.5 and 4.6 (docs.x.ai).
+- `--output-format json` is still unusable (the `.text` trap), `--verbatim` is
+  still deliberately not passed, exit codes are unchanged.
+
+### Pricing (docs.x.ai, for the record only)
+
+दूतसभा reads `total_cost_usd` from the CLI and computes no pricing of its own, so
+this is informational:
+
+| per 1M tokens | grok-4.5 | grok-4.6 |
+|---|---|---|
+| input (<200k / >200k) | 2.00 / 4.00 | 2.00 / 4.00 |
+| **cached input** | 0.30 / 0.60 | **0.50 / 1.00** |
+| output | 6.00 / 12.00 | 6.00 / 12.00 |
+
+Cached input is the one line that got more expensive. Knowledge cutoff 2026-02-01.
+
+Sources: `grok models` and `grok --reasoning-effort` on the local 1.0.5 binary;
+`https://docs.x.ai/docs/models`; `https://docs.x.ai/developers/grok-4-6`.

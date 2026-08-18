@@ -24,8 +24,8 @@ func TestGrokProviderDefaults(t *testing.T) {
 	if pc.Binary != "grok" {
 		t.Errorf("binary = %q, want grok", pc.Binary)
 	}
-	if pc.Model != "grok-4.5" {
-		t.Errorf("model = %q, want grok-4.5", pc.Model)
+	if pc.Model != "grok-4.6" {
+		t.Errorf("model = %q, want grok-4.6", pc.Model)
 	}
 	if len(pc.Flags) == 0 {
 		t.Error("flags should carry the default reasoning effort")

@@ -86,7 +86,7 @@ fi
 
 # Test 9: mock-grok works (streaming-messages-json NDJSON)
 if [[ -x "$MOCK_DIR/mock-grok" ]]; then
-  RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.5 \
+  RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.6 \
     --reasoning-effort high --sandbox read-only --permission-mode bypassPermissions \
     --always-approve --no-plan --no-subagents --no-auto-update -p "PONG" 2>&1)
   # The answer must come from the result event, not the assistant preamble block.
@@ -95,8 +95,82 @@ if [[ -x "$MOCK_DIR/mock-grok" ]]; then
   else
     fail "mock-grok output unexpected: $RESULT"
   fi
+  # The mock ECHOES the -m it was handed as "<model>-build", mirroring the real
+  # CLI's backend-id convention. A SYNTHETIC model is used deliberately: asserting
+  # grok-4.6-build here would move both sides together every bump and prove
+  # nothing. probe-9.9 can only appear if the flag really was read.
+  ECHO_RESULT=$("$MOCK_DIR/mock-grok" -m probe-9.9 -p "PONG" 2>&1)
+  if echo "$ECHO_RESULT" | grep -q '"probe-9.9-build"'; then
+    pass "mock-grok echoes the model it was given as the backend id"
+  else
+    fail "mock-grok did not echo -m into modelUsage: $ECHO_RESULT"
+  fi
+  # ...and with no -m at all it must NOT invent a plausible model, or a
+  # regression that dropped the flag would read as a pass.
+  if "$MOCK_DIR/mock-grok" -p "PONG" 2>&1 | grep -q '"unset-build"'; then
+    pass "mock-grok reports a sentinel when -m is absent"
+  else
+    fail "mock-grok masks a missing -m"
+  fi
 else
   fail "mock-grok not found/executable"
+fi
+
+# Test 9b: dootsabha actually FORWARDS the configured model to grok, and surfaces
+# the backend id it gets back.
+#
+# REGRESSION GUARD. L5 drove grok through the binary extensively, but only on
+# FAILURE paths — every grok assertion pointed at /nonexistent/grok or a hostile
+# stub. And mock-grok hardcoded its own model string, so even a success-path test
+# could not have seen a model-forwarding regression. The mock now echoes the -m
+# it was handed, and this asserts the whole chain end-to-end.
+# --config /dev/null so a developer's ~/.dootsabha config cannot mask the default.
+GROK_JSON=$(DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok" \
+  "$BINARY" consult --agent grok --json --config /dev/null "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+m = d["data"]["Model"]
+assert m == "grok-4.6-build", f"model={m!r}, want grok-4.6-build"
+assert "PONG" in d["data"]["Content"], d["data"]["Content"]
+' <<<"$GROK_JSON" 2>/dev/null; then
+  pass "consult --agent grok forwards the shipped default and reports the backend id"
+else
+  fail "grok default not forwarded end-to-end: $GROK_JSON"
+fi
+
+# Test 9c: an explicitly pinned model is never rewritten. grok-4.5 is still a live
+# model, so bumping the DEFAULT must not move a user who chose 4.5.
+GROK_PIN_CFG=$(mktemp -t dootsabha-grok-pin-XXXXXX)
+trap 'rm -f "$GROK_PIN_CFG"' EXIT
+printf 'providers:\n  grok:\n    binary: %s\n    model: grok-4.5\n' "$PWD/$MOCK_DIR/mock-grok" > "$GROK_PIN_CFG"
+GROK_PIN_JSON=$("$BINARY" consult --agent grok --json --config "$GROK_PIN_CFG" "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+m = d["data"]["Model"]
+assert m == "grok-4.5-build", f"model={m!r}, want grok-4.5-build (a pinned model must survive)"
+' <<<"$GROK_PIN_JSON" 2>/dev/null; then
+  pass "an explicitly pinned grok-4.5 survives the default bump"
+else
+  fail "pinned grok model was rewritten: $GROK_PIN_JSON"
+fi
+
+# Test 9d: a MALFORMED provider pin is a loud config error, not a silent fallback.
+#
+# PRD §6.1 makes this an exit-code contract, so assert the PROCESS exit code, not
+# just the error text: `model: [grok-4.5]` used to load with exit 0 while the
+# bumped default actually ran, which defeats the one guarantee the grok-4.6 bump
+# makes. `flags` IS a list, so writing `model` as one is a plausible typo.
+BAD_PIN_CFG=$(mktemp -t dootsabha-grok-badpin-XXXXXX)
+printf 'providers:\n  grok:\n    model: [grok-4.5]\n' > "$BAD_PIN_CFG"
+RC=0
+BAD_OUT=$("$BINARY" consult --agent grok --config "$BAD_PIN_CFG" "hi" 2>&1) || RC=$?
+rm -f "$BAD_PIN_CFG"
+if [[ "$RC" -eq 6 ]] && grep -q 'providers.grok.model' <<<"$BAD_OUT"; then
+  pass "a malformed provider pin exits 6 and names the key"
+else
+  fail "malformed pin gave exit $RC (want 6): $BAD_OUT"
 fi
 
 # Test 10: mocks stay valid JSON for prompts containing quotes and newlines.

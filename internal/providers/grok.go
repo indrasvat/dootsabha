@@ -28,10 +28,19 @@ const (
 	grokOutputFormat   = "streaming-messages-json"
 	grokSandbox        = "read-only"
 	grokPermissionMode = "bypassPermissions"
-	grokDefaultModel   = "grok-4.5"
 	grokDefaultEffort  = "high"
 	grokDefaultBinary  = "grok"
 )
+
+// GrokDefaultModel is the single source of truth for grok's default model.
+// The plugin's advertised capabilities and the extension-context defaults both
+// read it rather than repeating the literal — duplicated model ids are how
+// `status` ends up claiming one model while `--agent grok` runs another.
+//
+// The viper default in internal/core cannot import this (core is below
+// providers), and configs/default.yaml is a static file; both are covered by
+// TestGrokDefaultModelSourcesAgree instead.
+const GrokDefaultModel = "grok-4.6"
 
 // grokPinnedValueFlags take an argument; grokPinnedBoolFlags do not. Both are
 // removed from config-supplied flags so a stray entry cannot break parsing or
@@ -139,7 +148,7 @@ func (p *GrokProvider) Invoke(ctx context.Context, prompt string, opts InvokeOpt
 		Model:     model, // overwritten below by the modelUsage key when present
 	}
 	// The modelUsage key is the *backend* model id and deliberately differs from
-	// the -m value (e.g. "grok-4.5-build" vs "grok-4.5").
+	// the -m value (e.g. "grok-4.6-build" vs "grok-4.6").
 	for name, mu := range last.ModelUsage {
 		result.Model = name
 		if mu.InputTokens > 0 {
@@ -192,9 +201,10 @@ type grokModelUsage struct {
 }
 
 // grokResult is the final `type:"result"` line of the streaming-messages-json
-// stream. Verified against grok 0.2.118. Note this shape is used for BOTH success
-// and failure: an error carries is_error=true, subtype="error_during_execution",
-// a populated errors[] array, and NO result field.
+// stream. Verified against grok 0.2.118 and re-verified on 1.0.5 / grok-4.6 —
+// the shape did not change. Note it is used for BOTH success and failure: an
+// error carries is_error=true, subtype="error_during_execution", a populated
+// errors[] array, and NO result field.
 //
 // total_cost_usd may be omitted upstream; CostUSD is a plain float64 and makes no
 // claim to distinguish "unreported" from "zero". (total_cost_usd_ticks exists only
@@ -263,7 +273,7 @@ func parseGrokNDJSON(data []byte) *grokResult {
 func (p *GrokProvider) providerConfig() core.ProviderConfig {
 	def := core.ProviderConfig{
 		Binary: grokDefaultBinary,
-		Model:  grokDefaultModel,
+		Model:  GrokDefaultModel,
 	}
 	if p.cfg == nil {
 		return def
@@ -297,12 +307,14 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 				// following flag as the value would both set a nonsense effort and
 				// silently drop that flag.
 				if i+1 < len(flags) && !isFlagToken(flags[i+1]) {
-					effort = flags[i+1]
+					// Consume it either way — leaving a blank behind would forward
+					// it as a stray positional — but a blank is not an effort level.
+					setGrokEffort(&effort, flags[i+1])
 					i++
 				}
 				matched = true
 			case strings.HasPrefix(f, ef+"="):
-				effort = strings.TrimPrefix(f, ef+"=")
+				setGrokEffort(&effort, strings.TrimPrefix(f, ef+"="))
 				matched = true
 			}
 			if matched {
@@ -314,6 +326,37 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 		}
 	}
 	return effort, rest
+}
+
+// setGrokEffort assigns v as the effort unless it is unusable.
+//
+// Two rejections, both falling back to the default:
+//
+//   - Blank. `--reasoning-effort ""`, `--reasoning-effort=` and
+//     `--reasoning-effort " "` all mean "no level given"; forwarding the blank
+//     makes the real CLI reject the entire invocation with "unknown effort
+//     level" and dootsabha exits 3 without ever reaching the model.
+//   - Flag-shaped. The space form already refuses to eat a following flag as its
+//     value; the equals form used to accept one, so `--reasoning-effort=-x` put
+//     a leading-dash token where grok expects a level, and
+//     `--reasoning-effort=--sandbox=danger-full-access` smuggled a pinned flag
+//     into argv. Inert in practice (grok is clap-based and refuses
+//     hyphen-leading option values, and the pinned --sandbox still wins on
+//     last-wins), but containment should not lean on the downstream parser.
+//
+// dootsabha deliberately does NOT validate the level itself — the CLI rejects an
+// unknown one with a clear message, and hard-coding an allowlist would need a
+// code change every xAI release.
+func setGrokEffort(effort *string, v string) {
+	// Assign the TRIMMED value, not the raw one: checking TrimSpace but storing v
+	// let `--reasoning-effort=" xhigh "` reach argv with its padding, which grok
+	// rejects. Trimming honours the level the user meant instead of silently
+	// falling back to a different one.
+	t := strings.TrimSpace(v)
+	if t == "" || isFlagToken(t) {
+		return
+	}
+	*effort = t
 }
 
 // stripPinnedFlags removes provider-controlled flags (and their values) from
@@ -352,6 +395,16 @@ func matchPinned(f string) (pinned, consumesValue bool) {
 	}
 	if slices.Contains(grokPinnedBoolFlags, name) {
 		return true, false
+	}
+	// Attached short-option form. grok is clap-based, so `-mgrok-9` parses as
+	// `-m grok-9` — verified against the real binary. Splitting on "=" alone
+	// misses it, and the stray flag then reaches grok and breaks the whole
+	// invocation ("the argument '--model <MODEL>' cannot be used multiple
+	// times"). The value is attached, so no following token is consumed.
+	for _, sf := range grokPinnedValueFlags {
+		if len(sf) == 2 && sf[0] == '-' && sf[1] != '-' && len(f) > 2 && strings.HasPrefix(f, sf) {
+			return true, false
+		}
 	}
 	return false, false
 }

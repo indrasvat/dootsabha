@@ -27,8 +27,8 @@ in the repo). Verify with `dootsabha status --json`.
 | `agy` | — | — | — | ✅ |
 | `grok` | ✅ | ✅ | ✅ | ❌ **opt-in** |
 
-Responses report `Model` as the *backend* id (`grok-4.5-build`), which differs from
-the configured `grok-4.5`. Match on prefix, not equality.
+Responses report `Model` as the *backend* id (`grok-4.6-build`), which differs from
+the configured `grok-4.6`. Match on prefix, not equality.
 
 `agy` runs plain-text print mode, so its token/cost/session fields are `0`/empty.
 

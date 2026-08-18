@@ -86,9 +86,11 @@ func (s *grokPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesRes
 		// returning. Advertising streaming would promise consumers a mode that is
 		// unreachable through this interface.
 		SupportsStreaming: false,
-		SupportedModels:   []string{"grok-4.5"},
-		DefaultModel:      "grok-4.5",
-		MaxContextTokens:  500000,
+		// grok-4.5 is NOT retired — `grok models` still lists it, so it stays
+		// selectable. The default is read from the provider, never repeated.
+		SupportedModels:  []string{providers.GrokDefaultModel, "grok-4.5"},
+		DefaultModel:     providers.GrokDefaultModel,
+		MaxContextTokens: 500000,
 	}, nil
 }
 

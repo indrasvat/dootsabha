@@ -63,8 +63,8 @@ func TestGrokProviderInvokeArgs(t *testing.T) {
 	if got := flagValue(args, "--permission-mode"); got != "bypassPermissions" {
 		t.Errorf("--permission-mode = %q, want bypassPermissions", got)
 	}
-	if got := flagValue(args, "-m"); got != "grok-4.5" {
-		t.Errorf("-m = %q, want grok-4.5", got)
+	if got := flagValue(args, "-m"); got != "grok-4.6" {
+		t.Errorf("-m = %q, want grok-4.6", got)
 	}
 	if got := flagValue(args, "--reasoning-effort"); got != "high" {
 		t.Errorf("--reasoning-effort = %q, want high", got)
@@ -118,7 +118,7 @@ func TestGrokProviderStripsPinnedFlagsFromConfig(t *testing.T) {
 	if got := flagValue(args, "--permission-mode"); got != "bypassPermissions" {
 		t.Errorf("config must not override --permission-mode; got %q", got)
 	}
-	if got := flagValue(args, "-m"); got != "grok-4.5" {
+	if got := flagValue(args, "-m"); got != "grok-4.6" {
 		t.Errorf("config must not override -m; got %q", got)
 	}
 	if slices.Contains(args, "--verbatim") {
@@ -137,7 +137,7 @@ func TestGrokProviderStripsPinnedFlagsFromConfig(t *testing.T) {
 }
 
 func TestGrokProviderModelOverride(t *testing.T) {
-	const override = "grok-4.5-fast"
+	const override = "grok-4.6-fast"
 	runner := &mockRunner{}
 	p := providers.NewGrokProvider(defaultConfig(t), runner)
 
@@ -207,7 +207,7 @@ func TestGrokProviderNilConfigDoesNotPanic(t *testing.T) {
 	}()
 	_, _ = p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
 
-	if got := flagValue(runner.capturedArgs, "-m"); got != "grok-4.5" {
+	if got := flagValue(runner.capturedArgs, "-m"); got != "grok-4.6" {
 		t.Errorf("nil config should fall back to defaults; -m = %q", got)
 	}
 }
@@ -224,8 +224,8 @@ func TestGrokProviderPartialConfigMergesDefaults(t *testing.T) {
 	if runner.capturedBin != "grok" {
 		t.Errorf("empty Binary should fall back to %q, got %q", "grok", runner.capturedBin)
 	}
-	if got := flagValue(runner.capturedArgs, "-m"); got != "grok-4.5" {
-		t.Errorf("empty Model should fall back to grok-4.5, got %q", got)
+	if got := flagValue(runner.capturedArgs, "-m"); got != "grok-4.6" {
+		t.Errorf("empty Model should fall back to grok-4.6, got %q", got)
 	}
 }
 
@@ -264,7 +264,7 @@ func resultLine(text string, in, out int, cost float64) string {
 		`"total_cost_usd":` + fmt.Sprintf("%g", cost) + `,` +
 		`"usage":{"input_tokens":` + fmt.Sprint(in) + `,"output_tokens":` + fmt.Sprint(out) +
 		`,"cache_read_input_tokens":62336,"cache_creation_input_tokens":0},` +
-		`"modelUsage":{"grok-4.5-build":{"inputTokens":` + fmt.Sprint(in) +
+		`"modelUsage":{"grok-4.6-build":{"inputTokens":` + fmt.Sprint(in) +
 		`,"outputTokens":` + fmt.Sprint(out) + `,"costUSD":` + fmt.Sprintf("%g", cost) + `}}}`
 }
 
@@ -274,7 +274,7 @@ func quote(s string) string {
 }
 
 const (
-	grokSystemLine    = `{"type":"system","subtype":"init","session_id":"019fbc10","model":"grok-4.5"}`
+	grokSystemLine    = `{"type":"system","subtype":"init","session_id":"019fbc10","model":"grok-4.6"}`
 	grokAssistantLine = `{"type":"assistant","message":{"id":"msg_0","role":"assistant",` +
 		`"content":[{"type":"text","text":"I'll read the file first."}]}}`
 )
@@ -306,8 +306,8 @@ func TestGrokProviderInvokeSuccess(t *testing.T) {
 		t.Errorf("CostUSD = %v, want 0.1049568", result.CostUSD)
 	}
 	// modelUsage key deliberately differs from the -m value.
-	if result.Model != "grok-4.5-build" {
-		t.Errorf("Model = %q, want grok-4.5-build (modelUsage key, not the -m value)", result.Model)
+	if result.Model != "grok-4.6-build" {
+		t.Errorf("Model = %q, want grok-4.6-build (modelUsage key, not the -m value)", result.Model)
 	}
 }
 

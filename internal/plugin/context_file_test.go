@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+
+	"github.com/indrasvat/dootsabha/internal/providers"
 )
 
 func TestWriteContextFileCreatesValidJSON(t *testing.T) {
@@ -211,8 +213,16 @@ func TestDefaultContextFile(t *testing.T) {
 	if len(ctx.Providers) != 4 {
 		t.Errorf("providers count = %d, want 4", len(ctx.Providers))
 	}
-	if _, ok := ctx.Providers["grok"]; !ok {
+	grokCtx, ok := ctx.Providers["grok"]
+	if !ok {
 		t.Error("grok missing from the extension context provider map")
+	}
+	// This is a LIVE path, not sample docs: internal/cli/root.go writes this JSON
+	// to DOOTSABHA_CONTEXT_FILE and every extension reads it. A stale model here
+	// tells extensions one thing while `--agent grok` runs another.
+	if grokCtx.Model != providers.GrokDefaultModel {
+		t.Errorf("extension context advertises grok model %q, want %q",
+			grokCtx.Model, providers.GrokDefaultModel)
 	}
 	if !ctx.Capabilities.Council {
 		t.Error("council capability should be true")
