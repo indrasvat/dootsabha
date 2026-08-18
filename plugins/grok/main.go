@@ -86,8 +86,8 @@ func (s *grokPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesRes
 		// returning. Advertising streaming would promise consumers a mode that is
 		// unreachable through this interface.
 		SupportsStreaming: false,
-		SupportedModels:   []string{"grok-4.5"},
-		DefaultModel:      "grok-4.5",
+		SupportedModels:   []string{"grok-4.6", "grok-4.5"},
+		DefaultModel:      "grok-4.6",
 		MaxContextTokens:  500000,
 	}, nil
 }

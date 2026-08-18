@@ -210,10 +210,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.agy.model", "Gemini 3.5 Flash (High)")
 	v.SetDefault("providers.agy.flags", []string{"--dangerously-skip-permissions"})
 	v.SetDefault("providers.grok.binary", "grok")
-	v.SetDefault("providers.grok.model", "grok-4.5")
+	v.SetDefault("providers.grok.model", "grok-4.6")
 	// Correctness-critical flags (--output-format, --sandbox, --permission-mode, -m,
 	// --no-plan) are pinned by the provider and stripped from this list, so only
-	// user-tunable settings belong here.
+	// user-tunable settings belong here. Effort is xhigh|high|medium|low as of
+	// grok-4.6; "high" is grok's own default and stays दूतसभा's.
 	v.SetDefault("providers.grok.flags", []string{"--reasoning-effort", "high"})
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)

@@ -4,11 +4,16 @@
 # preamble block, then the final `result` event that dootsabha actually parses.
 set -euo pipefail
 PROMPT=""
+# Default matches the shipped dootsabha default; -m overrides it. The mock ECHOES
+# the model it was handed, so an integration test can prove dootsabha forwards it
+# rather than just asserting a hardcoded string against itself.
+MODEL="grok-4.6"
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --version) echo "grok 0.2.118 (mock) [stable]"; exit 0 ;;
+    --version) echo "grok 1.0.5 (mock) [stable]"; exit 0 ;;
     -p|--single) PROMPT="$2"; shift 2 ;;
-    --output-format|-m|--model|--reasoning-effort|--effort) shift 2 ;;
+    -m|--model) MODEL="$2"; shift 2 ;;
+    --output-format|--reasoning-effort|--effort) shift 2 ;;
     --sandbox|--permission-mode|--max-turns|--cwd|--prompt-file) shift 2 ;;
     --always-approve|--no-plan|--no-subagents|--no-auto-update) shift ;;
     *) PROMPT="${PROMPT:-$1}"; shift ;;
@@ -25,9 +30,11 @@ sleep "${MOCK_GROK_DELAY:-0}"
 json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read()))'; }
 
 SESSION="019fbc10-9c47-77f2-a8d4-046ae03de003"
-echo '{"type":"system","subtype":"init","session_id":"'"$SESSION"'","model":"grok-4.5"}'
+echo '{"type":"system","subtype":"init","session_id":"'"$SESSION"'","model":"'"$MODEL"'"}'
 # An assistant text block that is NOT the answer — proves dootsabha reads the
 # result event rather than concatenating assistant blocks (the `.text` trap).
 echo '{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me look at that."}]}}'
 PROMPT_JSON=$(printf '%s' "Mock response to: $PROMPT" | json_str)
-printf '{"type":"result","subtype":"success","is_error":false,"result":%s,"stop_reason":"end_turn","session_id":"%s","duration_ms":1234,"num_turns":1,"total_cost_usd":0.0102368,"usage":{"input_tokens":3322,"output_tokens":29,"cache_read_input_tokens":1024,"cache_creation_input_tokens":0},"modelUsage":{"grok-4.5-build":{"inputTokens":3322,"outputTokens":29,"costUSD":0.0102368}}}\n' "$PROMPT_JSON" "$SESSION"
+# The modelUsage key is the BACKEND id ("<model>-build"), deliberately not the -m
+# value — mirroring the real CLI, verified live on grok-4.6.
+printf '{"type":"result","subtype":"success","is_error":false,"result":%s,"stop_reason":"end_turn","session_id":"%s","duration_ms":1234,"num_turns":1,"total_cost_usd":0.0102368,"usage":{"input_tokens":3322,"output_tokens":29,"cache_read_input_tokens":1024,"cache_creation_input_tokens":0},"modelUsage":{"%s-build":{"inputTokens":3322,"outputTokens":29,"costUSD":0.0102368}}}\n' "$PROMPT_JSON" "$SESSION" "$MODEL"

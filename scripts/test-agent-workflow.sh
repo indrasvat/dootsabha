@@ -185,6 +185,41 @@ else
   fail "status only lists $FOUND/4 providers"
 fi
 
+# ── Workflow 5a-grok: the opt-in provider on its SUCCESS path ────────────────
+#
+# COVERAGE GAP. Every other grok assertion in this file points at
+# /nonexistent/grok or a hostile stub — the failure paths were well covered and
+# the happy path was not covered at all. A model-forwarding regression could not
+# be seen from L5.
+
+echo ""
+echo "--- grok success path ---"
+
+GROK_OK=$("$BINARY" consult --agent grok --json --config /dev/null "PONG" 2>/dev/null || true)
+if python3 -c "
+import json,sys
+d = json.load(sys.stdin)['data']
+assert 'PONG' in d['Content'], d['Content']
+# The mock echoes the -m it received as '<model>-build', so this asserts the
+# whole chain: shipped default -> argv -> CLI -> parsed back out.
+assert d['Model'] == 'grok-4.6-build', 'Model=%r, want grok-4.6-build' % d['Model']
+assert d['TokensIn'] > 0 and d['TokensOut'] > 0, 'token telemetry lost'
+assert d['CostUSD'] > 0, 'cost telemetry lost'
+assert d['SessionID'], 'session id lost'
+" <<<"$GROK_OK" 2>/dev/null; then
+  pass "grok success path: content, backend model, tokens, cost and session id"
+else
+  fail "grok success path broken: $GROK_OK"
+fi
+
+RC=0; DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok" \
+  "$BINARY" consult --agent grok --config /dev/null "PONG" >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 0 ]; then
+  pass "grok success path exits 0"
+else
+  fail "grok success path exited $RC (want 0)"
+fi
+
 # ── Workflow 5b: Absent providers degrade gracefully ─────────────────────────
 #
 # REGRESSION GUARD. Every other test here supplies a mock binary for every

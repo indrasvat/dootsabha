@@ -154,6 +154,12 @@ func TestExtractGrokEffort(t *testing.T) {
 		{"reads --reasoning-effort", []string{"--reasoning-effort", "low", "--keep"}, "low", []string{"--keep"}},
 		{"reads --effort alias", []string{"--effort", "medium"}, "medium", []string{}},
 		{"reads equals form", []string{"--reasoning-effort=low"}, "low", []string{}},
+		{"reads xhigh (new in grok-4.6)", []string{"--reasoning-effort", "xhigh"}, "xhigh", []string{}},
+		{"reads xhigh equals form", []string{"--effort=xhigh"}, "xhigh", []string{}},
+		// An empty value must fall back, never forward `--reasoning-effort ""`,
+		// which the CLI rejects outright.
+		{"empty equals value falls back", []string{"--reasoning-effort="}, "high", []string{}},
+		{"empty equals value on alias falls back", []string{"--effort=", "--keep"}, "high", []string{"--keep"}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

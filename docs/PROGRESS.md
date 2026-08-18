@@ -234,9 +234,24 @@ All 4 items addressed in PRD v1.6.
 - Tests: 23/23 L3, 234/234 L5, new unit coverage in core/cli/plugin, `-race` clean.
   Real-CLI proof of old-vs-new in `.shux/out/20/09-real-cli-before-after.png`.
 
+### What Works End-to-End (706)
+
+- Default grok model bumped `grok-4.5` → **`grok-4.6`** (grok CLI 1.0.5's own
+  default). All four declaration sites — provider constant, viper default, plugin
+  `Capabilities`, `configs/default.yaml` — bumped together and now guarded by a
+  drift test.
+- **Not a migration.** `grok-4.5` is still live and still offered in
+  `SupportedModels`; an explicit `providers.grok.model: grok-4.5` is never rewritten.
+- `xhigh` reasoning effort (new in grok-4.6) passes through in all four spellings;
+  the default stays `high`. Fixed `--reasoning-effort=` (empty value) forwarding an
+  empty argv token.
+- `mock-grok` now **echoes** the `-m` it receives as `<model>-build`, so L3/L5 can
+  prove model forwarding end-to-end — previously nothing drove grok through the
+  binary at all.
+
 ### What Works End-to-End (704)
 
-- `grok` (xAI Grok CLI, `grok-4.5`) is a fourth agent, **opt-in**: default council,
+- `grok` (xAI Grok CLI, `grok-4.6`) is a fourth agent, **opt-in**: default council,
   refine reviewers and review defaults are unchanged. Select with `--agent grok`,
   `--agents …,grok`, `--chair grok`, `--reviewers …,grok`.
 - Parses `--output-format streaming-messages-json`, taking the last `type=="result"`

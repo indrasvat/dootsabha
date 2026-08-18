@@ -28,7 +28,7 @@ const (
 	grokOutputFormat   = "streaming-messages-json"
 	grokSandbox        = "read-only"
 	grokPermissionMode = "bypassPermissions"
-	grokDefaultModel   = "grok-4.5"
+	grokDefaultModel   = "grok-4.6"
 	grokDefaultEffort  = "high"
 	grokDefaultBinary  = "grok"
 )
@@ -139,7 +139,7 @@ func (p *GrokProvider) Invoke(ctx context.Context, prompt string, opts InvokeOpt
 		Model:     model, // overwritten below by the modelUsage key when present
 	}
 	// The modelUsage key is the *backend* model id and deliberately differs from
-	// the -m value (e.g. "grok-4.5-build" vs "grok-4.5").
+	// the -m value (e.g. "grok-4.6-build" vs "grok-4.6").
 	for name, mu := range last.ModelUsage {
 		result.Model = name
 		if mu.InputTokens > 0 {
@@ -192,9 +192,10 @@ type grokModelUsage struct {
 }
 
 // grokResult is the final `type:"result"` line of the streaming-messages-json
-// stream. Verified against grok 0.2.118. Note this shape is used for BOTH success
-// and failure: an error carries is_error=true, subtype="error_during_execution",
-// a populated errors[] array, and NO result field.
+// stream. Verified against grok 0.2.118 and re-verified on 1.0.5 / grok-4.6 —
+// the shape did not change. Note it is used for BOTH success and failure: an
+// error carries is_error=true, subtype="error_during_execution", a populated
+// errors[] array, and NO result field.
 //
 // total_cost_usd may be omitted upstream; CostUSD is a plain float64 and makes no
 // claim to distinguish "unreported" from "zero". (total_cost_usd_ticks exists only
@@ -302,7 +303,12 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 				}
 				matched = true
 			case strings.HasPrefix(f, ef+"="):
-				effort = strings.TrimPrefix(f, ef+"=")
+				// A bare `--reasoning-effort=` carries no value. Forwarding the
+				// empty string makes the CLI reject the whole invocation; keep
+				// the default instead, matching the valueless space form above.
+				if v := strings.TrimPrefix(f, ef+"="); v != "" {
+					effort = v
+				}
 				matched = true
 			}
 			if matched {

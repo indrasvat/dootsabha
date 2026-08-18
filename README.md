@@ -251,7 +251,7 @@ providers:
       - --dangerously-skip-permissions
   grok:
     binary: grok
-    model: grok-4.5
+    model: grok-4.6
     flags:
       - --reasoning-effort
       - high

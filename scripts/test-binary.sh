@@ -86,7 +86,7 @@ fi
 
 # Test 9: mock-grok works (streaming-messages-json NDJSON)
 if [[ -x "$MOCK_DIR/mock-grok" ]]; then
-  RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.5 \
+  RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.6 \
     --reasoning-effort high --sandbox read-only --permission-mode bypassPermissions \
     --always-approve --no-plan --no-subagents --no-auto-update -p "PONG" 2>&1)
   # The answer must come from the result event, not the assistant preamble block.
@@ -95,8 +95,55 @@ if [[ -x "$MOCK_DIR/mock-grok" ]]; then
   else
     fail "mock-grok output unexpected: $RESULT"
   fi
+  # The mock ECHOES the -m it was handed as "<model>-build", mirroring the real
+  # CLI's backend-id convention. Without this the mock would assert a hardcoded
+  # string against itself and could never catch a forwarding regression.
+  if echo "$RESULT" | grep -q '"grok-4.6-build"'; then
+    pass "mock-grok echoes the model it was given as the backend id"
+  else
+    fail "mock-grok did not echo -m into modelUsage: $RESULT"
+  fi
 else
   fail "mock-grok not found/executable"
+fi
+
+# Test 9b: dootsabha actually FORWARDS the configured model to grok, and surfaces
+# the backend id it gets back.
+#
+# REGRESSION GUARD. The default model is declared in four unsynced places
+# (provider constant, viper default, plugin capabilities, YAML skeleton). Nothing
+# previously drove grok *through the binary*, so a partial bump was invisible:
+# every unit test could pass while `--agent grok` still ran the old model.
+# --config /dev/null so a developer's ~/.dootsabha config cannot mask the default.
+GROK_JSON=$(DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok" \
+  "$BINARY" consult --agent grok --json --config /dev/null "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+m = d["data"]["Model"]
+assert m == "grok-4.6-build", f"model={m!r}, want grok-4.6-build"
+assert "PONG" in d["data"]["Content"], d["data"]["Content"]
+' <<<"$GROK_JSON" 2>/dev/null; then
+  pass "consult --agent grok forwards the shipped default and reports the backend id"
+else
+  fail "grok default not forwarded end-to-end: $GROK_JSON"
+fi
+
+# Test 9c: an explicitly pinned model is never rewritten. grok-4.5 is still a live
+# model, so bumping the DEFAULT must not move a user who chose 4.5.
+GROK_PIN_CFG=$(mktemp -t dootsabha-grok-pin-XXXXXX)
+trap 'rm -f "$GROK_PIN_CFG"' EXIT
+printf 'providers:\n  grok:\n    binary: %s\n    model: grok-4.5\n' "$PWD/$MOCK_DIR/mock-grok" > "$GROK_PIN_CFG"
+GROK_PIN_JSON=$("$BINARY" consult --agent grok --json --config "$GROK_PIN_CFG" "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+m = d["data"]["Model"]
+assert m == "grok-4.5-build", f"model={m!r}, want grok-4.5-build (a pinned model must survive)"
+' <<<"$GROK_PIN_JSON" 2>/dev/null; then
+  pass "an explicitly pinned grok-4.5 survives the default bump"
+else
+  fail "pinned grok model was rewritten: $GROK_PIN_JSON"
 fi
 
 # Test 10: mocks stay valid JSON for prompts containing quotes and newlines.
