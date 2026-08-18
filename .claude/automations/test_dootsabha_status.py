@@ -10,7 +10,7 @@ Tests:
   1. version_correctness — Semver versions present, no "Code)" bug
   2. dot_merged — PROVIDER is first column (dot merged, not separate)
   3. models_populated — Expected models present for all providers
-  4. table_layout — All 3 providers and column headers present
+  4. table_layout — All 4 providers and column headers present
   5. no_ansi_piped — status | cat has no ANSI escapes
   6. json_valid — --json → valid JSON with meta/data/providers/versions/models
 

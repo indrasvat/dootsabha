@@ -348,10 +348,15 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 // unknown one with a clear message, and hard-coding an allowlist would need a
 // code change every xAI release.
 func setGrokEffort(effort *string, v string) {
-	if t := strings.TrimSpace(v); t == "" || isFlagToken(t) {
+	// Assign the TRIMMED value, not the raw one: checking TrimSpace but storing v
+	// let `--reasoning-effort=" xhigh "` reach argv with its padding, which grok
+	// rejects. Trimming honours the level the user meant instead of silently
+	// falling back to a different one.
+	t := strings.TrimSpace(v)
+	if t == "" || isFlagToken(t) {
 		return
 	}
-	*effort = v
+	*effort = t
 }
 
 // stripPinnedFlags removes provider-controlled flags (and their values) from

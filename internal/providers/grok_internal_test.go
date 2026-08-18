@@ -164,6 +164,9 @@ func TestExtractGrokEffort(t *testing.T) {
 		// could ride in as the "effort". Both forms now refuse it.
 		{"equals form rejects a flag-shaped value", []string{"--reasoning-effort=-x"}, "high", []string{}},
 		{"equals form rejects a smuggled pinned flag", []string{"--reasoning-effort=--sandbox=danger-full-access"}, "high", []string{}},
+		// Padding must be trimmed, not forwarded: grok rejects " xhigh ".
+		{"padded value is trimmed", []string{"--reasoning-effort= xhigh "}, "xhigh", []string{}},
+		{"padded space-form value is trimmed", []string{"--reasoning-effort", "  low  "}, "low", []string{}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -1,6 +1,6 @@
 # Task 706: Bump the default Grok model to `grok-4.6`
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 704 (grok provider)
@@ -73,17 +73,17 @@ regression tests.
 
 ## Done Criteria
 
-- [ ] `grok models` default (`grok-4.6`) == दूतसभा's shipped default
-- [ ] Two of the four sources deduplicated into `providers.GrokDefaultModel`; the
+- [x] `grok models` default (`grok-4.6`) == दूतसभा's shipped default
+- [x] Two of the four sources deduplicated into `providers.GrokDefaultModel`; the
       other two (viper default, YAML skeleton) fail a drift test when broken alone
-- [ ] `--config /dev/null` → `consult --agent grok` reports `grok-4.6-build`
-- [ ] A pinned `providers.grok.model: grok-4.5` still yields `grok-4.5-build`
-- [ ] A *malformed* pin (non-string `model`/`binary`) is a loud config error,
+- [x] `--config /dev/null` → `consult --agent grok` reports `grok-4.6-build`
+- [x] A pinned `providers.grok.model: grok-4.5` still yields `grok-4.5-build`
+- [x] A *malformed* pin (non-string `model`/`binary`) is a loud config error,
       not a silent fallback to the bumped default
-- [ ] `xhigh` reaches argv in all four spellings; every blank spelling falls back to `high`
-- [ ] `SupportedModels` still offers 4.5 — it is a live model
-- [ ] L1–L5 green; adversarial agents find nothing unaddressed
-- [ ] L4 evidence from the REAL grok CLI doing real work (no mocks in frames)
+- [x] `xhigh` reaches argv in all four spellings; every blank spelling falls back to `high`
+- [x] `SupportedModels` still offers 4.5 — it is a live model
+- [x] L1–L5 green; adversarial agents find nothing unaddressed
+- [x] L4 evidence from the REAL grok CLI doing real work (no mocks in frames)
 
 ## Commit
 

@@ -156,6 +156,23 @@ else
   fail "pinned grok model was rewritten: $GROK_PIN_JSON"
 fi
 
+# Test 9d: a MALFORMED provider pin is a loud config error, not a silent fallback.
+#
+# PRD §6.1 makes this an exit-code contract, so assert the PROCESS exit code, not
+# just the error text: `model: [grok-4.5]` used to load with exit 0 while the
+# bumped default actually ran, which defeats the one guarantee the grok-4.6 bump
+# makes. `flags` IS a list, so writing `model` as one is a plausible typo.
+BAD_PIN_CFG=$(mktemp -t dootsabha-grok-badpin-XXXXXX)
+printf 'providers:\n  grok:\n    model: [grok-4.5]\n' > "$BAD_PIN_CFG"
+RC=0
+BAD_OUT=$("$BINARY" consult --agent grok --config "$BAD_PIN_CFG" "hi" 2>&1) || RC=$?
+rm -f "$BAD_PIN_CFG"
+if [[ "$RC" -eq 6 ]] && grep -q 'providers.grok.model' <<<"$BAD_OUT"; then
+  pass "a malformed provider pin exits 6 and names the key"
+else
+  fail "malformed pin gave exit $RC (want 6): $BAD_OUT"
+fi
+
 # Test 10: mocks stay valid JSON for prompts containing quotes and newlines.
 #
 # REGRESSION GUARD. council/refine/review build multi-line prompts (they embed
