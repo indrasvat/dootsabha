@@ -5,6 +5,11 @@ from the real `grok` binary (0.2.117 → 0.2.118, macOS arm64, 2026-08-01), not 
 Screenshots proving these live in `.shux/out/grok-provider/` (gitignored — attached to
 the PR as review evidence, not committed).
 
+> ⚠️ **Partly superseded.** The findings below were true for grok 0.2.117/0.2.118.
+> By grok 1.0.5 the default model is `grok-4.6` and `xhigh` joined the
+> reasoning-effort set. See the **grok 1.0.5 addendum at the end of this file**
+> before relying on any model or effort claim here.
+
 ## Key Findings (grok 0.2.117 → 0.2.118, verified on the real binary)
 
 > The binary **self-updated 0.2.117 → 0.2.118 mid-research**, which is itself the argument

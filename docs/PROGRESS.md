@@ -211,6 +211,7 @@ All 4 items addressed in PRD v1.6.
 | 703 | Replace Gemini provider with Antigravity (agy) | DONE | — |
 | 704 | Add xAI Grok CLI as opt-in fourth provider | DONE | — |
 | 705 | Per-provider timeouts + enforced session timeout (#20) | DONE | — |
+| 706 | Default grok model → grok-4.6 (+ xhigh effort) | DONE | — |
 
 ### What Works End-to-End (705)
 
@@ -237,25 +238,34 @@ All 4 items addressed in PRD v1.6.
 ### What Works End-to-End (706)
 
 - Default grok model bumped `grok-4.5` → **`grok-4.6`** (grok CLI 1.0.5's own
-  default). It used to be declared in four unsynced places; now
-  `providers.GrokDefaultModel` is the single source of truth that the plugin's
-  `Capabilities` and the extension-context defaults **read** (so those two cannot
-  drift at all), and the two that structurally cannot import it — the viper
-  default in `internal/core`, and the static `configs/default.yaml` skeleton —
-  are covered by `TestGrokDefaultModelSourcesAgree`. The skeleton was previously
-  guarded by nothing: breaking it alone failed zero tests.
+  default). The literal used to appear in **six** places: the provider constant,
+  the viper default, the plugin's `DefaultModel` *and* `SupportedModels[0]`,
+  `configs/default.yaml`, and the extension-context defaults. Now
+  `providers.GrokDefaultModel` is the single source of truth that the plugin and
+  the extension context **read** (so those cannot drift at all), and the two that
+  structurally cannot import it — the viper default in `internal/core`, and the
+  static `configs/default.yaml` skeleton — are covered by
+  `TestGrokDefaultModelSourcesAgree`. The skeleton was previously guarded by
+  nothing: breaking it alone failed zero tests.
+  (This addresses grok's default only; the other three providers still carry
+  duplicated model literals — same drift class, out of scope here.)
 - **Not a migration.** `grok-4.5` is still live and still offered in
   `SupportedModels`; an explicit `providers.grok.model: grok-4.5` is never rewritten.
-- `xhigh` reasoning effort (new in grok-4.6) passes through in all four spellings;
+- `xhigh` reasoning effort (new in grok-4.6) passes through in all four spellings
+  (`--reasoning-effort`/`--effort`, space and `=` forms), each asserted at argv;
   the default stays `high`. Fixed `--reasoning-effort=` (empty value) forwarding an
   empty argv token.
 - `mock-grok` now **echoes** the `-m` it receives as `<model>-build`, so L3/L5 can
-  prove model forwarding end-to-end — previously nothing drove grok through the
-  binary at all.
+  prove model forwarding end-to-end. L5 already drove grok through the binary
+  extensively, but only on **failure** paths (`/nonexistent/grok`, hostile stubs);
+  the success path had no coverage, and the mock's hardcoded model meant even that
+  could not have caught a forwarding regression. Its default is now a sentinel
+  (`unset`), so a dropped `-m` fails loudly instead of echoing the right answer
+  by accident.
 
 ### What Works End-to-End (704)
 
-- `grok` (xAI Grok CLI, `grok-4.6`) is a fourth agent, **opt-in**: default council,
+- `grok` (xAI Grok CLI) is a fourth agent, **opt-in**: default council,
   refine reviewers and review defaults are unchanged. Select with `--agent grok`,
   `--agents …,grok`, `--chair grok`, `--reviewers …,grok`.
 - Parses `--output-format streaming-messages-json`, taking the last `type=="result"`

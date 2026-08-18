@@ -178,6 +178,31 @@ func TestExtractGrokEffort(t *testing.T) {
 // ["--sandbox", "--keep-me"] previously dropped --keep-me entirely, and
 // ["--effort", "--keep-me"] set effort to "--keep-me".
 // Found by grok reviewing this provider through dootsabha.
+// grok is clap-based, so `-mgrok-9` parses as `-m grok-9` — the attached short
+// form is real, and matchPinned's "=" split alone did not see it. The stray flag
+// then reached grok and broke the whole invocation ("the argument
+// '--model <MODEL>' cannot be used multiple times"). Found by an adversarial
+// agent driving the real binary.
+func TestStripPinnedFlagsHandlesAttachedShortOptions(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   []string
+		want []string
+	}{
+		{"attached -m", []string{"-mgrok-9", "--keep"}, []string{"--keep"}},
+		{"attached -p", []string{"-pPWN", "--keep"}, []string{"--keep"}},
+		{"bare -m still consumes its value", []string{"-m", "grok-9", "--keep"}, []string{"--keep"}},
+		{"lone dash is a value, not a flag", []string{"-", "--keep"}, []string{"-", "--keep"}},
+		{"unrelated short flag survives", []string{"-c", "--keep"}, []string{"-c", "--keep"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := stripPinnedFlags(tc.in); !slices.Equal(got, tc.want) {
+				t.Errorf("stripPinnedFlags(%v) = %v, want %v", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestStripPinnedFlagsDoesNotSwallowFollowingFlag(t *testing.T) {
 	got := stripPinnedFlags([]string{"--sandbox", "--keep-me"})
 	if !slices.Equal(got, []string{"--keep-me"}) {

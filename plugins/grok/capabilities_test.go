@@ -6,9 +6,10 @@ import (
 	"testing"
 )
 
-// The plugin advertises the grok defaults to every gRPC consumer. It is a
-// separate copy of the same facts the in-process provider holds, so it drifts
-// silently unless something asserts it.
+// The plugin advertises the grok defaults to every gRPC consumer. It no longer
+// holds its own copy of the model id — DefaultModel and SupportedModels[0] both
+// read providers.GrokDefaultModel — so this pins the VALUE that constant must
+// carry, and the shape of what the plugin promises consumers.
 func TestGrokPluginCapabilities(t *testing.T) {
 	caps, err := newGrokPluginServer().Capabilities(context.Background())
 	if err != nil {

@@ -34,7 +34,7 @@ const (
 
 // GrokDefaultModel is the single source of truth for grok's default model.
 // The plugin's advertised capabilities and the extension-context defaults both
-// read it rather than repeating the literal — three copies of a model id is how
+// read it rather than repeating the literal — duplicated model ids are how
 // `status` ends up claiming one model while `--agent grok` runs another.
 //
 // The viper default in internal/core cannot import this (core is below
@@ -307,17 +307,14 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 				// following flag as the value would both set a nonsense effort and
 				// silently drop that flag.
 				if i+1 < len(flags) && !isFlagToken(flags[i+1]) {
-					effort = flags[i+1]
+					// Consume it either way — leaving a blank behind would forward
+					// it as a stray positional — but a blank is not an effort level.
+					setGrokEffort(&effort, flags[i+1])
 					i++
 				}
 				matched = true
 			case strings.HasPrefix(f, ef+"="):
-				// A bare `--reasoning-effort=` carries no value. Forwarding the
-				// empty string makes the CLI reject the whole invocation; keep
-				// the default instead, matching the valueless space form above.
-				if v := strings.TrimPrefix(f, ef+"="); v != "" {
-					effort = v
-				}
+				setGrokEffort(&effort, strings.TrimPrefix(f, ef+"="))
 				matched = true
 			}
 			if matched {
@@ -329,6 +326,18 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 		}
 	}
 	return effort, rest
+}
+
+// setGrokEffort assigns v as the effort unless it is blank.
+//
+// `--reasoning-effort ""`, `--reasoning-effort=` and `--reasoning-effort " "`
+// all mean "no level given". Forwarding the blank makes the real CLI reject the
+// entire invocation ("unknown effort level ”; use one of: xhigh, high, medium,
+// low"), so every spelling falls back to the default instead.
+func setGrokEffort(effort *string, v string) {
+	if strings.TrimSpace(v) != "" {
+		*effort = v
+	}
 }
 
 // stripPinnedFlags removes provider-controlled flags (and their values) from
@@ -367,6 +376,16 @@ func matchPinned(f string) (pinned, consumesValue bool) {
 	}
 	if slices.Contains(grokPinnedBoolFlags, name) {
 		return true, false
+	}
+	// Attached short-option form. grok is clap-based, so `-mgrok-9` parses as
+	// `-m grok-9` — verified against the real binary. Splitting on "=" alone
+	// misses it, and the stray flag then reaches grok and breaks the whole
+	// invocation ("the argument '--model <MODEL>' cannot be used multiple
+	// times"). The value is attached, so no following token is consumed.
+	for _, sf := range grokPinnedValueFlags {
+		if len(sf) == 2 && sf[0] == '-' && sf[1] != '-' && len(f) > 2 && strings.HasPrefix(f, sf) {
+			return true, false
+		}
 	}
 	return false, false
 }

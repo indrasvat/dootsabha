@@ -4,10 +4,13 @@
 # preamble block, then the final `result` event that dootsabha actually parses.
 set -euo pipefail
 PROMPT=""
-# Default matches the shipped dootsabha default; -m overrides it. The mock ECHOES
-# the model it was handed, so an integration test can prove dootsabha forwards it
-# rather than just asserting a hardcoded string against itself.
-MODEL="grok-4.6"
+# The mock ECHOES the model it was handed, so an integration test can prove
+# dootsabha forwards it rather than asserting a hardcoded string against itself.
+#
+# The default is a SENTINEL, deliberately not the shipped default: if it were
+# "grok-4.6", a regression that dropped -m entirely would still echo
+# grok-4.6-build and read as a pass. "unset" makes a missing flag fail loudly.
+MODEL="unset"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --version) echo "grok 1.0.5 (mock) [stable]"; exit 0 ;;

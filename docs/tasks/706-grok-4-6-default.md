@@ -14,10 +14,13 @@ configuring the CLI, only by editing `providers.grok.model`.
 
 Two things made this riskier than a one-constant edit:
 
-- The default is declared in **four unsynced places** — `grokDefaultModel`,
-  the viper default, the plugin's `Capabilities`, and `configs/default.yaml` —
-  and **nothing drove grok through the binary**, so a partial bump would have
-  been invisible to every existing test.
+- The literal appeared in **six** places — the provider constant, the viper
+  default, the plugin's `DefaultModel` *and* `SupportedModels[0]`,
+  `configs/default.yaml`, and `internal/plugin/context_file.go`. Unit tests
+  covered the constant and the viper default, but **`configs/default.yaml` was
+  guarded by nothing** — breaking it alone failed zero tests. And while L5 drove
+  grok through the binary extensively, it did so only on **failure** paths, so no
+  integration test exercised model forwarding at all.
 - `grok-4.5` is **not retired** (`grok models` still lists it). Unlike the
   gemini→agy sunset (703) this must not migrate anyone: a user who pinned 4.5
   keeps 4.5.
@@ -29,7 +32,7 @@ Two things made this riskier than a one-constant edit:
 
 | File | Change |
 |---|---|
-| `internal/providers/grok.go` | `grokDefaultModel` → `grok-4.6`; empty-`=`-effort fallback fix |
+| `internal/providers/grok.go` | exported `GrokDefaultModel` = `grok-4.6`; blank-effort fallback; attached short-flag stripping |
 | `internal/core/config.go` | viper default → `grok-4.6`; effort comment |
 | `plugins/grok/main.go` | reads `providers.GrokDefaultModel`; `SupportedModels` keeps 4.5 |
 | `configs/default.yaml` | model + `xhigh` in the effort comment |
@@ -57,8 +60,16 @@ Two things made this riskier than a one-constant edit:
 ```
 make ci-fast · make test · make test-binary · make test-plugins · make test-agent
 ```
-plus parallel adversarial agents driving the real binary, and shux L4 frames of
-real `grok-4.6` work.
+
+L4 is captured by `.shux/scripts/grok-4-6-evidence.sh` (stills) and
+`.shux/scripts/grok-4-6-video.sh` (motion), following the `issue-20-evidence.sh`
+precedent — real `grok` 1.0.5 on grok-4.6, no mock providers in any frame.
+`make test-visual` covers the iTerm2 L4 suite, including the `status` model-column
+check in `.claude/automations/test_dootsabha_status.py`, which now expects grok.
+
+Plus parallel adversarial agents driving the real binary — they found two real
+defects (blank-effort forwarding, attached short-flag smuggling), both fixed with
+regression tests.
 
 ## Done Criteria
 
@@ -67,11 +78,47 @@ real `grok-4.6` work.
       other two (viper default, YAML skeleton) fail a drift test when broken alone
 - [ ] `--config /dev/null` → `consult --agent grok` reports `grok-4.6-build`
 - [ ] A pinned `providers.grok.model: grok-4.5` still yields `grok-4.5-build`
-- [ ] `xhigh` reaches argv in all four spellings; empty `=` value falls back to `high`
+- [ ] `xhigh` reaches argv in all four spellings; every blank spelling falls back to `high`
 - [ ] `SupportedModels` still offers 4.5 — it is a live model
 - [ ] L1–L5 green; adversarial agents find nothing unaddressed
 - [ ] L4 evidence from the REAL grok CLI doing real work (no mocks in frames)
 
+## Commit
+
+```
+feat(grok): bump the default model to grok-4.6
+
+grok 1.0.5 ships grok-4.6 as its own default; -m is a pinned flag, so दूतसभा was
+forcing every call back onto grok-4.5. Not a migration: grok-4.5 is still live,
+stays in SupportedModels, and an explicit pin is never rewritten.
+
+The literal appeared in six places. GrokDefaultModel is now the single source of
+truth the plugin and extension context read; the viper default and the YAML
+skeleton are covered by a drift test (the skeleton previously failed nothing).
+mock-grok echoes the -m it receives, so L3/L5 can see forwarding at all.
+```
+
+## Session Protocol
+
+1. `cm context`
+2. Read `CLAUDE.md`, `docs/PROGRESS.md`, this file
+3. Mark this task **IN PROGRESS** before any code change
+4. Work the TDD steps in order, capturing each RED
+5. L1–L5 + adversarial agents + shux L4 before DONE
+
 ## Visual Test Results
 
-_Pending — L4 shux capture._
+Captured with `.shux/scripts/grok-4-6-evidence.sh` — real `grok` 1.0.5, real work,
+no mocks. Frames in `.shux/out/706/final/` (gitignored; attached to the PR):
+
+| Frame | Shows |
+|---|---|
+| `01-grok-models` | the premise — the CLI's own default is `grok-4.6`, with `grok-4.5` still listed |
+| `02-status` | `status` reports grok `1.0.5` / `grok-4.6`, healthy, alongside the other three |
+| `03-consult-default` | a real answer about this repo; footer `grok-4.6-build` |
+| `04-consult-json` | JSON contract: `grok-4.6-build`, real tokens, real cost, session id |
+| `05-pin-4-5` | a pinned `grok-4.5` still yields `grok-4.5-build` — not a migration |
+| `06-council` | 3-agent council (codex, agy, grok) with grok as chair |
+| `07-review` | grok-4.6 reviewing this branch and finding the drift-guard overclaim |
+| `08-review-after` | grok-4.6 re-reviewing after the fixes |
+| `grok-4-6-council.mp4` | live council, 2160×1292 |

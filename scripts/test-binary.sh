@@ -110,10 +110,11 @@ fi
 # Test 9b: dootsabha actually FORWARDS the configured model to grok, and surfaces
 # the backend id it gets back.
 #
-# REGRESSION GUARD. The default model is declared in four unsynced places
-# (provider constant, viper default, plugin capabilities, YAML skeleton). Nothing
-# previously drove grok *through the binary*, so a partial bump was invisible:
-# every unit test could pass while `--agent grok` still ran the old model.
+# REGRESSION GUARD. L5 drove grok through the binary extensively, but only on
+# FAILURE paths — every grok assertion pointed at /nonexistent/grok or a hostile
+# stub. And mock-grok hardcoded its own model string, so even a success-path test
+# could not have seen a model-forwarding regression. The mock now echoes the -m
+# it was handed, and this asserts the whole chain end-to-end.
 # --config /dev/null so a developer's ~/.dootsabha config cannot mask the default.
 GROK_JSON=$(DOOTSABHA_PROVIDERS_GROK_BINARY="$MOCK_DIR/mock-grok" \
   "$BINARY" consult --agent grok --json --config /dev/null "PONG" 2>/dev/null || true)

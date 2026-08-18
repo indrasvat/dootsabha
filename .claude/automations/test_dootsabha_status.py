@@ -357,7 +357,9 @@ async def main(connection):
 
         # ── Test 3: Models populated ─────────────────────────────
         print_test_header("models_populated", 3)
-        expected_models = ["claude-opus-4-8", "gpt-5.5", "Gemini 3.5 Flash"]
+        # grok included deliberately: the model column is exactly the surface a
+        # default-model bump changes, and omitting grok made this check blind to it.
+        expected_models = ["claude-opus-4-8", "gpt-5.5", "Gemini 3.5 Flash", "grok-4.6"]
         found_models = []
         missing_models = []
 

@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/spf13/viper"
+
 	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/providers"
 )
@@ -57,16 +59,29 @@ func TestGrokDefaultModelSourcesAgree(t *testing.T) {
 	// Nothing loads it at runtime, so it is the surface most likely to be forgotten
 	// — and forgetting it hands every new install a stale model.
 	t.Run("configs/default.yaml skeleton", func(t *testing.T) {
-		t.Setenv("HOME", t.TempDir())
-		// Loaded through the app's own loader, so this also proves the shipped
-		// skeleton still parses — not just that a string appears in the file.
-		skeleton, err := core.LoadConfig(filepath.Join("..", "..", "configs", "default.yaml"))
-		if err != nil {
-			t.Fatalf("load skeleton: %v", err)
+		path := filepath.Join("..", "..", "configs", "default.yaml")
+
+		// Read the FILE ONLY — no defaults, no env. core.LoadConfig applies
+		// setDefaults before reading the file, so going through it would let the
+		// viper default paper over a key that was deleted or mis-nested: both
+		// mutations passed green before this was split out.
+		v := viper.New()
+		v.SetConfigFile(path)
+		if err := v.ReadInConfig(); err != nil {
+			t.Fatalf("parse skeleton: %v", err)
 		}
-		if got := skeleton.Providers["grok"].Model; got != want {
+		switch got := v.GetString("providers.grok.model"); {
+		case got == "":
+			t.Errorf("configs/default.yaml has no providers.grok.model key — deleted or mis-nested")
+		case got != want:
 			t.Errorf("configs/default.yaml ships model %q, the provider default is %q — "+
 				"the skeleton is not loaded at runtime, so nothing else would catch this", got, want)
+		}
+
+		// Separately, prove the shipped skeleton still loads through the real path.
+		t.Setenv("HOME", t.TempDir())
+		if _, err := core.LoadConfig(path); err != nil {
+			t.Errorf("shipped skeleton no longer loads: %v", err)
 		}
 	})
 }
@@ -105,7 +120,14 @@ func TestGrokEffortPassthroughIncludesXhigh(t *testing.T) {
 		{"xhigh space form", []string{"--reasoning-effort", "xhigh"}, "xhigh"},
 		{"xhigh equals form", []string{"--reasoning-effort=xhigh"}, "xhigh"},
 		{"xhigh via --effort alias", []string{"--effort", "xhigh"}, "xhigh"},
+		{"xhigh via --effort= alias", []string{"--effort=xhigh"}, "xhigh"},
 		{"low still works", []string{"--reasoning-effort", "low"}, "low"},
+		// Every blank spelling falls back. Forwarding a blank makes the real CLI
+		// reject the whole invocation: "unknown effort level ''".
+		{"blank space-form value falls back", []string{"--reasoning-effort", ""}, "high"},
+		{"blank alias space-form falls back", []string{"--effort", ""}, "high"},
+		{"whitespace-only value falls back", []string{"--reasoning-effort", " "}, "high"},
+		{"blank equals-form falls back", []string{"--reasoning-effort="}, "high"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := defaultConfig(t)
