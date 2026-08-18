@@ -174,8 +174,25 @@ func validateRawConfig(v *viper.Viper) error {
 			return fmt.Errorf("providers: expected a mapping, got %T", raw)
 		}
 		for name, entry := range m {
-			if _, ok := entry.(map[string]any); !ok {
+			fields, ok := entry.(map[string]any)
+			if !ok {
 				return fmt.Errorf("providers.%s: expected a mapping, got %T", name, entry)
+			}
+			// `binary` and `model` are strings. Without this, viper's GetString
+			// cast fails silently, the field arrives empty, and the provider
+			// substitutes its built-in default — so a mistyped pin runs a
+			// DIFFERENT model or binary than the config names, while
+			// `config show` still displays what the user wrote. `model:
+			// [grok-4.5]` is a plausible typo because the sibling `flags` key IS
+			// a list. Exit 6, not a silent fallback (PRD §6.1).
+			for _, leaf := range []string{"binary", "model"} {
+				raw, present := fields[leaf]
+				if !present || raw == nil {
+					continue
+				}
+				if _, ok := raw.(string); !ok {
+					return fmt.Errorf("providers.%s.%s: expected a string, got %T", name, leaf, raw)
+				}
 			}
 		}
 	}

@@ -96,12 +96,21 @@ if [[ -x "$MOCK_DIR/mock-grok" ]]; then
     fail "mock-grok output unexpected: $RESULT"
   fi
   # The mock ECHOES the -m it was handed as "<model>-build", mirroring the real
-  # CLI's backend-id convention. Without this the mock would assert a hardcoded
-  # string against itself and could never catch a forwarding regression.
-  if echo "$RESULT" | grep -q '"grok-4.6-build"'; then
+  # CLI's backend-id convention. A SYNTHETIC model is used deliberately: asserting
+  # grok-4.6-build here would move both sides together every bump and prove
+  # nothing. probe-9.9 can only appear if the flag really was read.
+  ECHO_RESULT=$("$MOCK_DIR/mock-grok" -m probe-9.9 -p "PONG" 2>&1)
+  if echo "$ECHO_RESULT" | grep -q '"probe-9.9-build"'; then
     pass "mock-grok echoes the model it was given as the backend id"
   else
-    fail "mock-grok did not echo -m into modelUsage: $RESULT"
+    fail "mock-grok did not echo -m into modelUsage: $ECHO_RESULT"
+  fi
+  # ...and with no -m at all it must NOT invent a plausible model, or a
+  # regression that dropped the flag would read as a pass.
+  if "$MOCK_DIR/mock-grok" -p "PONG" 2>&1 | grep -q '"unset-build"'; then
+    pass "mock-grok reports a sentinel when -m is absent"
+  else
+    fail "mock-grok masks a missing -m"
   fi
 else
   fail "mock-grok not found/executable"

@@ -250,7 +250,11 @@ All 4 items addressed in PRD v1.6.
   (This addresses grok's default only; the other three providers still carry
   duplicated model literals — same drift class, out of scope here.)
 - **Not a migration.** `grok-4.5` is still live and still offered in
-  `SupportedModels`; an explicit `providers.grok.model: grok-4.5` is never rewritten.
+  `SupportedModels`; an explicit `providers.grok.model: grok-4.5` is never
+  rewritten. A *malformed* pin (`model: [grok-4.5]` — a plausible typo, since the
+  sibling `flags` key IS a list) used to be silently dropped, so the bumped
+  default ran while `config show` still displayed the pin. `LoadConfig` now
+  rejects a non-string `binary`/`model` for any provider with exit 6.
 - `xhigh` reasoning effort (new in grok-4.6) passes through in all four spellings
   (`--reasoning-effort`/`--effort`, space and `=` forms), each asserted at argv;
   the default stays `high`. Fixed `--reasoning-effort=` (empty value) forwarding an

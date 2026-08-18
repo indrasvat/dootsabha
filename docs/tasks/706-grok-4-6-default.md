@@ -78,6 +78,8 @@ regression tests.
       other two (viper default, YAML skeleton) fail a drift test when broken alone
 - [ ] `--config /dev/null` → `consult --agent grok` reports `grok-4.6-build`
 - [ ] A pinned `providers.grok.model: grok-4.5` still yields `grok-4.5-build`
+- [ ] A *malformed* pin (non-string `model`/`binary`) is a loud config error,
+      not a silent fallback to the bumped default
 - [ ] `xhigh` reaches argv in all four spellings; every blank spelling falls back to `high`
 - [ ] `SupportedModels` still offers 4.5 — it is a live model
 - [ ] L1–L5 green; adversarial agents find nothing unaddressed

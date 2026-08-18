@@ -328,16 +328,30 @@ func extractGrokEffort(flags []string) (effort string, rest []string) {
 	return effort, rest
 }
 
-// setGrokEffort assigns v as the effort unless it is blank.
+// setGrokEffort assigns v as the effort unless it is unusable.
 //
-// `--reasoning-effort ""`, `--reasoning-effort=` and `--reasoning-effort " "`
-// all mean "no level given". Forwarding the blank makes the real CLI reject the
-// entire invocation ("unknown effort level ”; use one of: xhigh, high, medium,
-// low"), so every spelling falls back to the default instead.
+// Two rejections, both falling back to the default:
+//
+//   - Blank. `--reasoning-effort ""`, `--reasoning-effort=` and
+//     `--reasoning-effort " "` all mean "no level given"; forwarding the blank
+//     makes the real CLI reject the entire invocation with "unknown effort
+//     level" and dootsabha exits 3 without ever reaching the model.
+//   - Flag-shaped. The space form already refuses to eat a following flag as its
+//     value; the equals form used to accept one, so `--reasoning-effort=-x` put
+//     a leading-dash token where grok expects a level, and
+//     `--reasoning-effort=--sandbox=danger-full-access` smuggled a pinned flag
+//     into argv. Inert in practice (grok is clap-based and refuses
+//     hyphen-leading option values, and the pinned --sandbox still wins on
+//     last-wins), but containment should not lean on the downstream parser.
+//
+// dootsabha deliberately does NOT validate the level itself — the CLI rejects an
+// unknown one with a clear message, and hard-coding an allowlist would need a
+// code change every xAI release.
 func setGrokEffort(effort *string, v string) {
-	if strings.TrimSpace(v) != "" {
-		*effort = v
+	if t := strings.TrimSpace(v); t == "" || isFlagToken(t) {
+		return
 	}
+	*effort = v
 }
 
 // stripPinnedFlags removes provider-controlled flags (and their values) from

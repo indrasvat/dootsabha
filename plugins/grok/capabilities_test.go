@@ -27,11 +27,11 @@ func TestGrokPluginCapabilities(t *testing.T) {
 		t.Errorf("SupportedModels = %v, want %v (newest first, 4.5 still selectable)", got, want)
 	}
 
-	// Invariant, not a literal: whatever the default is, it must be offered.
-	if !slices.Contains(caps.GetSupportedModels(), caps.GetDefaultModel()) {
-		t.Errorf("DefaultModel %q is not in SupportedModels %v",
-			caps.GetDefaultModel(), caps.GetSupportedModels())
-	}
+	// NOTE: do not "restore" a DefaultModel ∈ SupportedModels check here. Both
+	// now read providers.GrokDefaultModel, so SupportedModels[0] IS the default
+	// by construction and such a check can never fail. The literals above are
+	// the real guard — they are the only pin of the constant's value from
+	// outside the providers package.
 
 	// docs.x.ai lists 500k for both 4.5 and 4.6 — the bump must not "helpfully"
 	// change this.

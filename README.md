@@ -249,11 +249,11 @@ providers:
     model: Gemini 3.5 Flash (High)
     flags:
       - --dangerously-skip-permissions
-  grok:
+  grok:                             # opt-in; grok-4.5 stays pinnable here
     binary: grok
     model: grok-4.6
     flags:
-      - --reasoning-effort
+      - --reasoning-effort          # xhigh | high | medium | low
       - high
 
 council:

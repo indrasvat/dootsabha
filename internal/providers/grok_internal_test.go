@@ -160,6 +160,10 @@ func TestExtractGrokEffort(t *testing.T) {
 		// which the CLI rejects outright.
 		{"empty equals value falls back", []string{"--reasoning-effort="}, "high", []string{}},
 		{"empty equals value on alias falls back", []string{"--effort=", "--keep"}, "high", []string{"--keep"}},
+		// The equals form used to accept a flag-shaped value, so a pinned flag
+		// could ride in as the "effort". Both forms now refuse it.
+		{"equals form rejects a flag-shaped value", []string{"--reasoning-effort=-x"}, "high", []string{}},
+		{"equals form rejects a smuggled pinned flag", []string{"--reasoning-effort=--sandbox=danger-full-access"}, "high", []string{}},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

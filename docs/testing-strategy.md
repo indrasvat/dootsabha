@@ -77,6 +77,7 @@ echo "Mock response to: $PROMPT"
 # Simulates the xAI Grok CLI — emits the NDJSON stream, not a single object.
 set -euo pipefail
 PROMPT=""
+MODEL="unset"        # SENTINEL, not the shipped default — see below
 while [[ $# -gt 0 ]]; do
   case $1 in
     --version) echo "grok 1.0.5 (mock) [stable]"; exit 0 ;;
@@ -92,6 +93,15 @@ done
 # the final result event. The preamble proves dootsabha reads `result` rather
 # than concatenating assistant text (grok's `--output-format json` .text trap).
 ```
+
+`mock-grok` **echoes the model it was handed**: `-m` is captured into `MODEL`
+and emitted both in the system-init line and as the `modelUsage` key
+`"<model>-build"`, mirroring the real CLI's backend-id convention. That is what
+lets L3/L5 prove दूतसभा actually forwards the configured model, instead of
+asserting a hardcoded string against itself. `MODEL` defaults to the sentinel
+`unset` rather than the shipped default, so a regression that dropped `-m`
+entirely fails loudly instead of echoing the right answer by accident.
+
 
 > **Why the preamble block matters:** grok's `--output-format json` merges every
 > assistant text block into `.text` with no separator, so tool-call preambles leak
