@@ -78,7 +78,7 @@ frame 02-status 120 8 "$BIN status --config /dev/null"
 # 3. The shipped default, with NO config file, answers a real question about this repo.
 frame 03-consult-default 400 14 \
   "$BIN consult --agent agy --config /dev/null \
-     'In one sentence, what does stripAgyPinnedFlags in internal/providers/agy.go protect against?'"
+     'In one sentence of plain prose, what does stripAgyPinnedFlags in internal/providers/agy.go protect against? No file paths, no links, no markdown.'"
 
 # 4. THE GAP THIS CLOSES: tokens and a session id, which were 0/empty before 707.
 frame 04-consult-json 400 9 \

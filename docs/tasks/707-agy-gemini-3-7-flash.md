@@ -1,6 +1,6 @@
 # Task 707: Bump the default Antigravity model to `Gemini 3.7 Flash (High)`
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 703 (agy provider)
@@ -58,20 +58,21 @@ switching to ids) also keeps the change additive: `status`, `config show` and th
 PRD all already speak display names, and the CLI's own error message prints that
 spelling back.
 
-Separately: **`agy --output-format json` now works** (1.1.17 emits
-`conversation_id`, `status`, `duration_seconds`, `num_turns`, `usage.*`). The
-provider comment claiming it does not exist is stale. Consuming it is a real
-feature with its own tests and is **out of scope here** — filed as task 708. This
-task only stops the docs from asserting something false.
+Separately: **`agy --output-format json` works** (1.1.17 emits `conversation_id`,
+`status`, `duration_seconds`, `num_turns`, `usage.*`). The provider asserted it
+did not exist, so दूतसभा reported `0`/empty telemetry — and, worse, read stderr on
+failure, which is **empty** in JSON mode, losing every error message. Consuming it
+was folded into this task. Full contract in `docs/agy-cli-findings.md`.
 
 ## Files
 
 | File | Change |
 |---|---|
-| `internal/providers/agy.go` | exported `AgyDefaultModel` = `Gemini 3.7 Flash (High)`; stale-JSON comment corrected |
-| `internal/core/config.go` | viper default reads `core.defaultAgyModel` |
+| `internal/providers/agy.go` | exported `AgyDefaultModel`; JSON envelope parsing; spelling-robust pinned-flag stripping; prompt before user flags |
+| `internal/core/config.go` | viper default reads `core.defaultAgyModel`; `providers.*.flags` type-checked (exit 6) |
+| `internal/core/review.go` | `TruncateString` cuts on a rune boundary, not a byte offset |
 | `internal/core/migrate.go` | `agyModel` reads the same `core` constant — one core-side source, not two |
-| `plugins/agy/main.go` | reads `providers.AgyDefaultModel`; `SupportedModels` gains 3.7/3.6, keeps 3.5 |
+| `plugins/agy/main.go` | reads `providers.AgyDefaultModel`; `SupportsJson: true`; `SupportedModels` gains 3.7/3.6, keeps 3.5 |
 | `configs/default.yaml` | model bumped; comment names the effort-suffix rule |
 | `internal/plugin/context_file.go` | reads `providers.AgyDefaultModel` (LIVE path) |
 | `testdata/mock-providers/mock-agy` | **echoes the `--model` it receives**; sentinel default |
@@ -83,7 +84,7 @@ task only stops the docs from asserting something false.
 | `.claude/automations/test_dootsabha_status.py` | model column expects `Gemini 3.7 Flash` |
 | `README.md`, `skill/SKILL.md`, `skill/references/command-reference.md`, `skill/examples/council-deliberation.md`, `commands/dootsabha.md`, `docs/PRD.md`, `docs/PROGRESS.md` | docs |
 | `docs/agy-cli-findings.md` | NEW — dated findings from the real binary |
-| `docs/tasks/708-agy-json-output.md` | NEW — the deferred JSON work, PENDING |
+| `docs/tasks/708-agy-print-timeout.md` | NEW — the `--print-timeout` interaction, PENDING |
 
 ## Steps
 
@@ -100,26 +101,33 @@ task only stops the docs from asserting something false.
 make ci-fast · make test · make test-binary · make test-plugins · make test-agent
 ```
 
-L4 is captured by `.shux/scripts/agy-3-7-evidence.sh` (stills) and
-`.shux/scripts/agy-3-7-video.sh` (motion), following the `grok-4-6-evidence.sh`
-precedent — real `agy` 1.1.17 on Gemini 3.7 Flash, no mock providers in any frame.
-`make test-visual` covers the iTerm2 L4 suite.
+L4 is **shux**, not the iTerm2 suite: `.shux/scripts/agy-3-7-evidence.sh` (stills)
+and `.shux/scripts/agy-3-7-video.sh` (motion) rasterise a real PTY headless, so the
+frames are cell-exact and need no display server. Real `agy` 1.1.17 on Gemini 3.7
+Flash, no mock providers in any frame.
 
-Plus parallel adversarial agents driving the real binary, and a `codex,agy,grok`
-दूतसभा council reviewing the branch.
+Plus four parallel adversarial agents driving the real binary (six argv/parser
+holes found and fixed), and दूतसभा reviewing its own branch — which caught that
+`Decoder.More()` is not a trailing-data check.
+
+Mutation-tested: every declaration site and every fix fails a **named** test when
+reverted alone. That surfaced one uncovered site, `internal/plugin/context_file.go`,
+now guarded.
 
 ## Done Criteria
 
-- [ ] `agy models` top entry == दूतसभा's shipped default
-- [ ] Three of the six sites read `providers.AgyDefaultModel`; the core-side
+- [x] `agy models` top entry == दूतसभा's shipped default
+- [x] Three of the six sites read `providers.AgyDefaultModel`; the core-side
       viper default and migration share one `core` constant; the YAML skeleton
       fails a drift test when broken alone
-- [ ] `--config /dev/null` → `consult --agent agy` forwards `Gemini 3.7 Flash (High)`
-- [ ] A pinned `providers.agy.model` still yields that pin — bump, not migration
-- [ ] `config migrate` writes the bumped model, not the stale one
-- [ ] `SupportedModels` still offers 3.6/3.5/3.1 — they are live models
-- [ ] L1–L5 green; adversarial agents find nothing unaddressed
-- [ ] L4 evidence from the REAL agy CLI doing real work (no mocks in frames)
+- [x] `--config /dev/null` → `consult --agent agy` forwards `Gemini 3.7 Flash (High)`
+- [x] A pinned `providers.agy.model` still yields that pin — bump, not migration
+- [x] `config migrate` writes the bumped model, not the stale one
+- [x] `SupportedModels` still offers 3.6/3.5/3.1 — they are live models
+- [x] agy telemetry (tokens + conversation id) parsed; cost honestly `0`
+- [x] A pinned flag cannot be overridden from config in ANY spelling agy accepts
+- [x] L1–L5 green; adversarial agents find nothing unaddressed
+- [x] L4 evidence from the REAL agy CLI doing real work (no mocks in frames)
 
 ## Commit
 
@@ -148,4 +156,20 @@ L3/L5 can see forwarding at all.
 
 ## Visual Test Results
 
-_Pending — captured with `.shux/scripts/agy-3-7-evidence.sh`._
+Captured with `.shux/scripts/agy-3-7-evidence.sh` — real `agy` 1.1.17, real work,
+no mocks. Frames in `.shux/out/707/` (gitignored; attached to the PR):
+
+| Frame | Shows |
+|---|---|
+| `01-agy-models` | the premise — the CLI's own list leads with 3.7 Flash, and still offers 3.6/3.5/3.1 |
+| `02-status` | `status` reports agy `1.1.17` / `Gemini 3.7 Flash (High)`, healthy, alongside the other three |
+| `03-consult-default` | a real answer about this repo's own source, describing the pinned-flag fix |
+| `04-consult-json` | the gap this closes — real `TokensIn`/`TokensOut`/`SessionID`, `CostUSD` honestly `0` |
+| `05-pin-3-5` | a pinned `Gemini 3.5 Flash (High)` still yields 3.5 — not a migration |
+| `06-error-envelope` | agy's stdout-only error reaching the user in full, with the whole model list intact |
+| `07-council` | 3-agent council (codex, agy, grok) with agy as chair |
+| `08-review` | 3.7 Flash reviewing this branch |
+| `agy-3-7-council.mp4` | live council, motion |
+
+L4 here is **shux**, not the iTerm2 suite: it rasterises a real PTY headless, so
+the frames are cell-exact and need no display server.

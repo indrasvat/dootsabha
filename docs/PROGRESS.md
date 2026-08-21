@@ -295,7 +295,20 @@ All 4 items addressed in PRD v1.6.
   (sentinel default `unset`), so L3/L5 can see forwarding at all — it previously
   discarded the flag outright.
 - `AgyProvider.providerConfig` is nil-safe, matching `GrokProvider`.
-- L3 28 → 33, L5 236 → 238.
+- **Adversarial review found six argv/parser holes**, all fixed with named
+  regression tests: agy parses argv with Go's stdlib `flag` package, so `-model`
+  IS `--model` and a repeat is last-wins — a config `-output-format text` broke
+  every parse and a config `-model X` silently ran a different model than
+  दूतसभा reported. `-p/--print/--prompt` are pinned too (a config copy replaced
+  the prompt outright), a stray non-flag token no longer swallows `-p <prompt>`,
+  `providers.*.flags` must be a list of strings (exit 6), and the envelope
+  decodes only the fields दूतसभा consumes.
+- **`Decoder.More()` is not a trailing-data check** — it returns false for
+  `{…}}{"second":…}`, so a second envelope was silently dropped. `json.Unmarshal`
+  now. Found by दूतसभा reviewing its own branch.
+- `core.TruncateString` cuts on a rune boundary; it was stranding lead bytes and
+  emitting invalid UTF-8 into other agents' prompts. All four providers benefit.
+- L3 28 → 38, L5 236 → 238.
 - Real-CLI findings recorded in `docs/agy-cli-findings.md`; the
   `--print-timeout` interaction it uncovered is tracked as task 708.
 

@@ -152,7 +152,9 @@ func (p *AgyProvider) Invoke(ctx context.Context, prompt string, opts InvokeOpti
 		return nil, fmt.Errorf("agy invoke: empty response")
 	}
 
-	// A tool failed inside a still-usable turn: surface under -v, do not discard.
+	// A tool failed inside a still-usable turn. Warn is the default level in text
+	// mode and is raised to Error under --json, so this reaches a human without
+	// ever polluting the JSON document. Never discard the answer.
 	if resp.Status != agyStatusSuccess {
 		slog.Warn("agy reported a degraded turn",
 			"status", resp.Status,

@@ -109,7 +109,9 @@ answered correctly:
 
 …with **exit code 0**. `status` is a *tool-level* diagnostic. Treating
 `status != "SUCCESS"` as failure would discard a usable answer, so the exit code
-decides and a degraded turn is logged at Warn instead.
+decides and a degraded turn is logged at Warn instead — visible on stderr in
+text mode, suppressed under `--json` (unless `-v`), so the JSON document stays
+clean.
 
 ### Known interaction: `--print-timeout`
 
