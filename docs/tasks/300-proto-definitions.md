@@ -1,6 +1,6 @@
 # Task 3.1: Proto Definitions + Code Generation
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 - Phase 2 complete (council pipeline working with hardcoded providers)
@@ -113,3 +113,11 @@ feat(proto): add gRPC proto definitions for provider, strategy, hook
 8. **Change status to `DONE`**
 9. Update `docs/PROGRESS.md`
 10. Commit
+
+## Visual Test Results
+
+_N/A — nothing output-visible._ This task defines `.proto` files and runs code
+generation; it renders nothing to a terminal, so there is no frame to capture.
+L4 is required for output-visible changes (CLAUDE.md), and this is not one. The
+generated code is covered by `go test ./proto/...` and by the plugin handshake
+smoke in `make test-plugins`.

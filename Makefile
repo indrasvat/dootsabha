@@ -78,18 +78,14 @@ test-plugins: build-mock-plugins build-plugins ## L3: Plugin smoke tests (mock +
 	@printf "$(COLOR_BLUE)>> Running plugin smoke tests...$(COLOR_RESET)\n"
 	@bash scripts/test-plugin-smoke.sh
 
-.PHONY: test-visual
-test-visual: ## L4: Visual integration tests via iTerm2-driver
-	@printf "$(COLOR_BLUE)>> Running L4 visual tests...$(COLOR_RESET)\n"
-	@bash scripts/verify-visual-tests.sh
 
 .PHONY: test-agent
-test-agent: build ## L5: Agent workflow tests (real CLIs)
+test-agent: build ## L5: Agent workflow tests (mock providers — offline, deterministic)
 	@printf "$(COLOR_BLUE)>> Running L5 agent workflow tests...$(COLOR_RESET)\n"
 	@bash scripts/test-agent-workflow.sh
 
 .PHONY: test-all
-test-all: test test-race test-binary test-visual test-agent ## Run all test layers
+test-all: test test-race test-binary test-agent ## Run all test layers (L4 is shux — see .shux/scripts/)
 
 # ── Lint & Format ─────────────────────────────────────────────────────────────
 

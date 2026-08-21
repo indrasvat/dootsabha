@@ -865,7 +865,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 
 ## 10. Testing Strategy
 
-> **Cardinal Rule:** Every feature MUST be verified by _actually running_ the binary and visually inspecting output via iTerm2-driver screenshots. Unit tests are necessary but NOT sufficient.
+> **Cardinal Rule:** Every feature MUST be verified by _actually running_ the binary and visually inspecting the output as shux frames. Unit tests are necessary but NOT sufficient.
 >
 > **Full reference:** `docs/testing-strategy.md` — all implementation details, templates, scripts, hooks.
 > Task files reference specific sections as `testing-strategy.md §N`.
@@ -877,7 +877,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 | **L1** | Compile + lint + `go vet` + `gofumpt` | <5s | `make ci-fast` | N/A | No |
 | **L2** | Unit tests (`go test -race -shuffle=on`) | <2s | `make test` | Yes | No |
 | **L3** | Binary smoke (mock providers + exit codes) | <10s | `make test-binary` | Mock CLIs | No |
-| **L4** | Integration + visual (real CLIs + iTerm2-driver) | 30-60s | `make test-visual` | No | ~$0.05 |
+| **L4** | Integration + visual (real CLIs + shux frames) | 30-60s | `.shux/scripts/*-evidence.sh` | No | ~$0.05 |
 | **L5** | Agent workflow (JSON, exit codes, no ANSI, perf) | 2-5min | `make test-agent` | No | ~$0.50 |
 
 ### 10.2 Make Targets (Full Set)
@@ -885,7 +885,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 | Category | Targets |
 |----------|---------|
 | **Build** | `build` (depends on `hooks`), `install`, `clean` |
-| **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-visual` (L4), `test-agent` (L5), `test-all` |
+| **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-agent` (L5), `test-all`; L4 is `.shux/scripts/*-evidence.sh` |
 | **Lint** | `lint`, `lint-fix`, `fmt`, `fmt-check`, `vet`, `fix` (`go fix`), `fix-check` (dry-run) |
 | **Deps** | `tidy`, `verify` |
 | **CI** | `pre-commit` (fmt-check+vet+fix-check), `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+fix+lint+vet+test+smoke) |
@@ -909,7 +909,7 @@ Full Makefile with build flags, gotestsum, colored output — implemented during
 | Component | Location | Reference |
 |-----------|----------|-----------|
 | Mock providers (claude, codex, agy) | `testdata/mock-providers/` | `testing-strategy.md §1` |
-| iTerm2-driver canonical template | `.claude/automations/` | `testing-strategy.md §2` |
+| shux capture-script template | `.shux/scripts/` | `testing-strategy.md §2` |
 | L4 gating hooks (pre-task-done, pre-push) | `scripts/hooks/` | `testing-strategy.md §3` |
 | L5 agent workflow tests | `scripts/test-agent-workflow.sh` | `testing-strategy.md §4` |
 | Task verification checklist | (in task files) | `testing-strategy.md §6` |

@@ -115,145 +115,55 @@ Mock providers are activated via config override: `DOOTSABHA_CLAUDE_BIN=testdata
 
 ---
 
-## §2 iTerm2-driver Automation (L4 Visual Verification)
+## §2 shux Automation (L4 Visual Verification)
 
-> Unit tests cannot verify terminal rendering. Only screenshots prove visual correctness.
+> Unit tests cannot verify terminal rendering. Only frames prove visual correctness.
 
-### §2.1 Canonical Script Template
+L4 is [shux](https://github.com/indrasvat/shux): it rasterises a real PTY to PNG
+headless — no terminal emulator, no display server, no window focus to lose. The
+iTerm2-driver suite it replaced was removed in `chore/claude-md-refresh`; recover
+it from git history if ever needed.
 
-All iTerm2-driver scripts live in `.claude/automations/` and follow this exact template:
+### §2.1 Canonical capture script
 
-```python
-# /// script
-# requires-python = ">=3.14"
-# dependencies = ["iterm2", "pyobjc", "pyobjc-framework-Quartz"]
-# ///
-"""
-L4 Visual Test: dootsabha {command}
-Tests: {list of numbered tests}
-Screenshots: {list of expected screenshot names}
-"""
-import asyncio, iterm2, subprocess, time, os, sys
-from datetime import datetime
-
-# ─── Result Tracking ────────────────────────────────────────────
-results = {
-    "passed": 0, "failed": 0, "unverified": 0,
-    "tests": [],
-    "screenshots": [],
-    "start_time": None, "end_time": None,
-}
-
-def log_result(test_name: str, status: str, details: str = "", screenshot: str = None):
-    """status: PASS, FAIL, UNVERIFIED"""
-    results["tests"].append({
-        "name": test_name, "status": status,
-        "details": details, "screenshot": screenshot,
-    })
-    results[{"PASS": "passed", "FAIL": "failed", "UNVERIFIED": "unverified"}[status]] += 1
-    icon = {"PASS": "✓", "FAIL": "✗", "UNVERIFIED": "?"}[status]
-    print(f"  {icon} {test_name}: {details}")
-
-# ─── Screenshot Capture ─────────────────────────────────────────
-SCREENSHOT_DIR = os.path.join(os.path.dirname(__file__), "..", "screenshots")
-
-def get_iterm2_window_id():
-    import Quartz
-    windows = Quartz.CGWindowListCopyWindowInfo(
-        Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID
-    )
-    for w in windows:
-        if w.get("kCGWindowOwnerName") == "iTerm2":
-            return w.get("kCGWindowNumber")
-    return None
-
-def capture_screenshot(name: str) -> str:
-    os.makedirs(SCREENSHOT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filepath = os.path.join(SCREENSHOT_DIR, f"{name}_{ts}.png")
-    wid = get_iterm2_window_id()
-    if wid:
-        subprocess.run(["screencapture", "-x", "-l", str(wid), filepath], check=True)
-    else:
-        subprocess.run(["screencapture", "-x", filepath], check=True)
-    results["screenshots"].append(filepath)
-    return filepath
-
-# ─── Screen Verification ────────────────────────────────────────
-async def verify_screen_contains(session, expected: str, description: str, timeout: float = 10.0) -> bool:
-    """Poll screen content until expected text appears or timeout."""
-    start = time.monotonic()
-    while (time.monotonic() - start) < timeout:
-        screen = await session.async_get_screen_contents()
-        for i in range(screen.number_of_lines):
-            if expected in screen.line(i).string:
-                return True
-        await asyncio.sleep(0.3)
-    return False
-
-async def get_all_screen_text(session) -> list[str]:
-    """Return all non-empty screen lines."""
-    screen = await session.async_get_screen_contents()
-    return [screen.line(i).string for i in range(screen.number_of_lines) if screen.line(i).string.strip()]
-
-async def dump_screen(session, label: str):
-    """Debug: print all screen lines with line numbers."""
-    lines = await get_all_screen_text(session)
-    print(f"\n--- SCREEN DUMP: {label} ---")
-    for i, line in enumerate(lines):
-        print(f"  {i:3d} | {line}")
-    print(f"--- END DUMP ---\n")
-
-# ─── Cleanup ────────────────────────────────────────────────────
-async def cleanup_session(session):
-    """Exit cleanly: Ctrl+C, then q, then wait."""
-    try:
-        await session.async_send_text("\x03")  # Ctrl+C
-        await asyncio.sleep(0.5)
-        await session.async_send_text("q")
-        await asyncio.sleep(0.5)
-    except Exception:
-        pass
-
-# ─── Summary ────────────────────────────────────────────────────
-def print_summary() -> int:
-    results["end_time"] = datetime.now().isoformat()
-    total = results["passed"] + results["failed"] + results["unverified"]
-    print(f"\n{'='*60}")
-    print(f"Results: {results['passed']}/{total} PASS, {results['failed']} FAIL, {results['unverified']} UNVERIFIED")
-    print(f"Screenshots: {len(results['screenshots'])} captured")
-    if results["failed"] > 0:
-        print("\nFailed tests:")
-        for t in results["tests"]:
-            if t["status"] == "FAIL":
-                print(f"  ✗ {t['name']}: {t['details']}")
-    return 1 if results["failed"] > 0 else 0
-```
-
-### §2.2 Running L4 Tests
+Capture scripts are committed to `.shux/scripts/<topic>-evidence.sh`; frames go to
+`.shux/out/<task>/`, which is gitignored and attached to the PR instead. Copy
+`.shux/scripts/agy-3-7-evidence.sh` — it is the reference implementation. Its
+shape:
 
 ```bash
-# Individual test
-uv run .claude/automations/test_dootsabha_consult.py
+export XDG_RUNTIME_DIR=/tmp/shux<task>     # private socket dir, short path
+trap cleanup EXIT                          # kill every session, then daemon stop
 
-# All visual tests (via Makefile target)
-make test-visual   # runs scripts/verify-visual-tests.sh
+frame() {                                  # name, max-seconds, rows, command
+  shux session create "$sess" -d --cwd "$REPO" \
+    -- bash -lc "cd '$REPO' && clear && { $cmd; }; touch '$DONE_DIR/$name'; sleep 3600"
+  shux pane set-size -s "$sess" --cols 100 --rows "$rows"
+  wait_done "$name" "$max"                 # poll a FILE, never an on-screen marker
+  shux pane snapshot -s "$sess" -o "$OUT/$name.png"
+  shux session kill "$sess"
+}
 ```
 
-### §2.3 Screenshot Naming Convention
+### §2.2 Rules that came from getting these wrong
 
-Format: `dootsabha_{command}_{state}_{timestamp}.png`
+- **Signal completion with a file**, not `echo __DONE__` — an on-screen marker is
+  captured into the evidence itself.
+- **Size rows per frame.** A six-line result framed in 24 blank rows reads as sloppy.
+- **Read every PNG back** before attaching it. This is how a `$HOME` path leak and
+  an incorrect code comment were both caught after the fact.
+- **Never edit a script while it is running** — bash re-reads it by byte offset and
+  dies mid-run, losing frames.
+- **Stop every daemon you start:** `XDG_RUNTIME_DIR=<dir> shux daemon stop`, once
+  per runtime dir. Killing sessions does not stop the daemon.
+- Motion evidence: snapshot the live pane on a cadence and stitch with `ffmpeg` —
+  shux has no video primitive by design. See `.shux/scripts/agy-3-7-video.sh`.
 
-Examples:
-- `dootsabha_consult_launch_20260301_143000.png`
-- `dootsabha_council_dispatch_20260301_143012.png`
-- `dootsabha_council_synthesis_20260301_143025.png`
-- `dootsabha_status_healthy_20260301_143030.png`
-- `dootsabha_status_degraded_20260301_143035.png`
+### §2.3 Cloud sessions
 
-Screenshots saved to `.claude/screenshots/` (gitignored). Matched by prefix (timestamp optional).
-
----
+A cloud session has no provider CLIs installed or authenticated, so L4 cannot be
+captured there. Record `N/A` in the task file **with the reason**; the gate in §3
+accepts that and rejects a bare `N/A`. Never fabricate evidence.
 
 ## §3 L4 Gating Hooks (Anti-Hallucination)
 
@@ -261,47 +171,22 @@ Screenshots saved to `.claude/screenshots/` (gitignored). Matched by prefix (tim
 
 ### §3.1 Task Verification Script (`scripts/verify-visual-tests.sh`)
 
-Verifies L4 requirements for task completion. Called by both pre-task-done gate and pre-push hook.
+Verifies L4 evidence before a task may reach DONE. Called by both the
+pre-task-done gate and the pre-push hook. Source is the script itself — it is not
+duplicated here, because a pasted copy drifts.
 
 **Checks:**
-1. L4 test scripts referenced in task file "Files to Create" section exist on disk
-2. Expected screenshots (listed in L4 verification section) exist in `.claude/screenshots/`
-3. Task file contains `## Visual Test Results` section with actual review content (not just heading)
+1. The task file has a `## Visual Test Results` section, with content.
+2. That section names at least one `.shux/scripts/*.sh` capture script, **and
+   every script it names exists on disk.** Frames are not checked: `.shux/out/` is
+   gitignored, so the reproducible script is the durable artifact.
+3. A cloud session may record `N/A` instead — but only *with a stated reason*. A
+   bare `N/A` fails.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-TASK_FILE="$1"
-ERRORS=()
-
-# 1. Check L4 scripts exist
-SCRIPTS=$(grep -oP '\.claude/automations/test_dootsabha_\w+\.py' "$TASK_FILE" || true)
-for script in $SCRIPTS; do
-  [[ -f "$script" ]] || ERRORS+=("L4 script missing: $script")
-done
-
-# 2. Check screenshots exist (match by prefix)
-SCREENSHOTS=$(grep -oP 'dootsabha_\w+\.png' "$TASK_FILE" || true)
-for shot in $SCREENSHOTS; do
-  prefix="${shot%.png}"
-  found=$(find .claude/screenshots -name "${prefix}*" 2>/dev/null | head -1)
-  [[ -n "$found" ]] || ERRORS+=("Screenshot missing: $shot")
-done
-
-# 3. Check Visual Test Results section exists with content
-if ! grep -q '^## Visual Test Results' "$TASK_FILE"; then
-  ERRORS+=("Missing '## Visual Test Results' section in task file")
-elif [[ $(sed -n '/^## Visual Test Results/,/^## /p' "$TASK_FILE" | wc -l) -lt 5 ]]; then
-  ERRORS+=("Visual Test Results section is too thin (needs actual findings)")
-fi
-
-if [[ ${#ERRORS[@]} -gt 0 ]]; then
-  echo "❌ L4 GATE FAILED for $(basename "$TASK_FILE"):"
-  for err in "${ERRORS[@]}"; do echo "  • $err"; done
-  exit 2
-fi
-echo "✓ L4 gate passed for $(basename "$TASK_FILE")"
-```
+> It uses `grep -oE`, not `-oP`. The original paired `-oP` with `|| true`, and
+> since BSD grep on macOS has no `-P`, every check it performed was silently
+> skipped — the gate passed everything for as long as it existed on a Mac. If you
+> extend it, verify the failure path actually fails.
 
 ### §3.2 Pre-Task-Done Gate (`scripts/hooks/pre-task-done-gate.sh`)
 
@@ -440,21 +325,21 @@ Every task file in `docs/tasks/` MUST include these two sections. This is a hard
 | **L1** | `make test` — expected: all pass | Always required |
 | **L2** | `make test-integration` — expected: all pass | If integration tests exist |
 | **L3** | `make build` + actual binary commands with expected output + `--json \| jq .` + `\| cat` (no ANSI) | Always required |
-| **L4** | `uv run .claude/automations/test_dootsabha_{command}.py` + list of expected screenshot names | Required for any output-visible change |
+| **L4** | `.shux/scripts/<topic>-evidence.sh` + what each frame shows | Required for any output-visible change |
 | **L5** | `make test-agent` | Required for commands with `--json` output |
 
 **Section 2: `## Visual Test Results`** — must contain actual evidence (not a placeholder):
 
 | Field | Required? | Description |
 |-------|-----------|-------------|
-| L4 Script path | YES | `.claude/automations/test_dootsabha_{command}.py` |
-| Date | YES | `YYYY-MM-DD` |
-| Status | YES | `PASS (N/M)` or `FAIL (N/M)` |
-| Test result table | YES | Each test with PASS/FAIL + detail column |
-| Screenshots reviewed | YES | Each screenshot name + specific observation about what's visible |
+| Capture script | YES | `.shux/scripts/<topic>-evidence.sh` — must exist; the gate checks it |
+| Frame table | YES | One row per frame: filename + what it proves |
 | Findings | YES | Deviations, learnings, or "No issues found" |
 
-**Minimum content:** The Visual Test Results section must be at least 5 lines long (enforced by gating hook). Empty or placeholder-only sections will be rejected.
+A cloud session has no provider CLIs and cannot capture L4. Record
+`_N/A — <reason>_` instead; the gate accepts a reasoned N/A and rejects a bare one.
+
+**Minimum content:** at least 5 lines, and it must name a `.shux/scripts/*.sh` that exists (or a reasoned N/A). Enforced by `scripts/verify-visual-tests.sh`; the section ends at the next `##` heading, so padding from a later section does not count.
 
 ---
 
