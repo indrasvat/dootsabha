@@ -15,7 +15,7 @@ them, so they are contracts, not output formatting.
 ```bash
 make build        # bin/dootsabha (auto-installs git hooks)
 make ci           # lint + unit tests — the pre-push gate
-make check        # everything: fmt + fix + lint + vet + test + L3 + installer
+make check        # fmt + fix + lint + vet + unit + L3 + installer (not L4/L5/plugins)
 make pre-commit   # fast: fmt-check + vet + fix-check
 make test-binary  # L3 smoke (mock providers)
 make test-agent   # L5 JSON / exit codes / perf
@@ -32,7 +32,7 @@ fails the hook. `make fix-check` diffs against the **index**, so stage first.
 ## Testing levels
 | Level | Command | What |
 |---|---|---|
-| L1 | `make ci-fast` | compile + lint + vet |
+| L1 | `make ci-fast` | fmt + vet + unit tests (a superset of L2) |
 | L2 | `make test` | unit (mocks) |
 | L3 | `make test-binary` | real binary + mock providers |
 | L4 | `.shux/scripts/*.sh` | **shux** — real CLIs, headless PTY, PNG frames |
@@ -113,8 +113,10 @@ context already reflects both bounds.
 ## Conventions
 - All command output through `internal/output.Renderer` — never `fmt.Print` in a command.
 - `NO_COLOR`: test **presence**, not value — `_, set := os.LookupEnv("NO_COLOR")`.
-- Every command needs a Devanagari alias (`sabha` → `council`); key flags too
-  (`--dootas` → `--agents`). Root needs `Args: cobra.ArbitraryArgs` or extension
+- Every command needs a Devanagari alias (`sabha` → `council`), and so do its
+  principal flags (`--dootas` → `--agents`). Which flags count is not a judgement
+  call — each command's `_test.go` enumerates the required ones; add yours there
+  in the same commit. Root needs `Args: cobra.ArbitraryArgs` or extension
   discovery never fires.
 - Log via `internal/observability`; `-v` Warn/Info, `-vv` Debug, `-vvv` +source.
   Warn is the default level in text mode and is raised to Error under `--json`,

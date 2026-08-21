@@ -80,7 +80,7 @@ test-plugins: build-mock-plugins build-plugins ## L3: Plugin smoke tests (mock +
 
 
 .PHONY: test-agent
-test-agent: build ## L5: Agent workflow tests (real CLIs)
+test-agent: build ## L5: Agent workflow tests (mock providers — offline, deterministic)
 	@printf "$(COLOR_BLUE)>> Running L5 agent workflow tests...$(COLOR_RESET)\n"
 	@bash scripts/test-agent-workflow.sh
 

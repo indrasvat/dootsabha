@@ -197,6 +197,7 @@ func newConfigShowCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:          "show",
+		Aliases:      []string{"pradarshan", "प्रदर्शन"},
 		Short:        "Display merged configuration (with redaction by default)",
 		Args:         usageArgs(cobra.NoArgs),
 		SilenceUsage: true,

@@ -3,6 +3,7 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -132,5 +133,28 @@ func TestConfigMigrateCmdExplicitMissingConfigErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not found") {
 		t.Errorf("error %q should mention the missing file", err.Error())
+	}
+}
+
+// Every command carries a Devanagari alias; `config show` was the one that did
+// not, which made the rule in CLAUDE.md an aspiration rather than an invariant.
+// Found by a दूतसभा council reading the instructions cold.
+func TestConfigSubcommandsHaveDevanagariAliases(t *testing.T) {
+	want := map[string][]string{
+		"show":    {"pradarshan", "प्रदर्शन"},
+		"migrate": {"sthaanaantaran", "स्थानांतरण"},
+	}
+	cmd := newConfigCmd()
+	for _, sub := range cmd.Commands() {
+		aliases, ok := want[sub.Name()]
+		if !ok {
+			t.Errorf("config subcommand %q has no expected alias set — add one", sub.Name())
+			continue
+		}
+		for _, alias := range aliases {
+			if !slices.Contains(sub.Aliases, alias) {
+				t.Errorf("config %s: missing alias %q (has %v)", sub.Name(), alias, sub.Aliases)
+			}
+		}
 	}
 }

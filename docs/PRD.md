@@ -885,7 +885,7 @@ These are verified gotchas from cm memory and gh-ghent CLAUDE.md:
 | Category | Targets |
 |----------|---------|
 | **Build** | `build` (depends on `hooks`), `install`, `clean` |
-| **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-visual` (L4), `test-agent` (L5), `test-all` |
+| **Test** | `test`, `test-race`, `coverage`, `test-integration`, `test-binary` (L3), `test-agent` (L5), `test-all`; L4 is `.shux/scripts/*-evidence.sh` |
 | **Lint** | `lint`, `lint-fix`, `fmt`, `fmt-check`, `vet`, `fix` (`go fix`), `fix-check` (dry-run) |
 | **Deps** | `tidy`, `verify` |
 | **CI** | `pre-commit` (fmt-check+vet+fix-check), `ci` (lint+test+vet), `ci-fast` (fmt+vet+test), `check` (fmt+fix+lint+vet+test+smoke) |
