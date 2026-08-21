@@ -126,10 +126,10 @@ Written directly (no envelope wrapper). All fields snake_case.
 }
 ```
 
-> **Note on `agy`:** `agy` contributes `tokens_in`/`tokens_out` and a
-> `session_id` (its conversation id), but its `cost_usd` is always `0` — the
-> Antigravity CLI reports no cost. Only `claude` and `grok` contribute to
-> `total_cost_usd`.
+> **Note on `agy`:** `agy` contributes `tokens_in`/`tokens_out`, but its
+> `cost_usd` is always `0` — the Antigravity CLI reports no cost. Only `claude`
+> and `grok` contribute to `total_cost_usd`. Session IDs are **not** part of the
+> council schema for any provider; `consult` exposes them, council does not.
 
 ### Exit Codes
 
@@ -173,9 +173,11 @@ Wrapped in envelope. Fields are PascalCase (no json tags on ProviderResult struc
 
 Extract content: `jq -r '.data.Content'`
 
-> **Note on `agy`:** When `--agent agy` is used, the Antigravity CLI runs in
-> plain-text mode and reports no usage data — `CostUSD`, `TokensIn`,
-> `TokensOut` are `0` and `SessionID` is empty.
+> **Note on `agy`:** `--agent agy` runs the Antigravity CLI with
+> `--output-format json`, so `TokensIn`, `TokensOut` and `SessionID` (its
+> conversation id) are populated. `CostUSD` is always `0` — agy reports no cost,
+> and दूतसभा does not estimate one. Needs `agy` **1.1.8+**; on anything older
+> `status` reports the provider unhealthy rather than failing every call.
 
 ### Exit Codes
 

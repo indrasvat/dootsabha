@@ -308,6 +308,10 @@ All 4 items addressed in PRD v1.6.
   now. Found by दूतसभा reviewing its own branch.
 - `core.TruncateString` cuts on a rune boundary; it was stranding lead bytes and
   emitting invalid UTF-8 into other agents' prompts. All four providers benefit.
+- **Minimum `agy` is now 1.1.8** — print mode gained `--output-format` there
+  (`agy changelog`). दूतसभा always sends it, so on an older build every call would
+  fail before the prompt ran; `HealthCheck` reports such an install unhealthy with
+  a `agy update` hint rather than letting `status` show a green row.
 - L3 28 → 38, L5 236 → 238.
 - Real-CLI findings recorded in `docs/agy-cli-findings.md`; the
   `--print-timeout` interaction it uncovered is tracked as task 708.
@@ -339,5 +343,5 @@ All 4 items addressed in PRD v1.6.
 - `dootsabha config migrate` (स्थानांतरण) — rewrites stale `providers.gemini`/`council.chair: gemini` → `agy`, writes `<config>.bak`; `--dry-run`, `--json`
 - TTY stderr nudge when a stale `gemini` config reference is detected
 - `mock-agy` (plain text) replaces `mock-gemini`; all gemini references removed from code/config/scripts/docs/skill
-- Real-CLI verified: consult/council/review/refine/status against live `agy` 1.0.8
+- Real-CLI verified: consult/council/review/refine/status against live `agy` 1.0.8 *(707 raises the floor to 1.1.8 — see above)*
 - `make ci` — 0 lint issues, all tests pass; `make test-binary` — 8/8 L3 smoke

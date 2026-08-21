@@ -965,7 +965,7 @@ Mark DONE → Update PROGRESS.md → Commit
 | Q3 | Should providers be hardcoded in MVP, plugins deferred to v0.2? | Open | Build plan has both in MVP (P1-P2 hardcoded → P3 plugins). Could ship P1-P2 as v0.1, plugins as v0.2. |
 | Q4 | Should we vendor proto-generated code? | Open | Vendoring avoids protoc dependency for contributors. But adds git bloat. |
 | Q5 | BubbleTea TUI extension (`dootsabha-tui`) — scope it for MVP? | Open | Build plan mentions it as future extension. Could be v0.2. |
-| Q6 | agy invocation mode — how do we send the prompt? | Resolved | `agy -p "<prompt>" --output-format json`. v1.0.8 had no JSON; v1.1.17 does, and दूतसभा parses it (tokens + conversation id, no cost). |
+| Q6 | agy invocation mode — how do we send the prompt? | Resolved | `agy -p "<prompt>" --output-format json`. Print mode gained `--output-format` in v1.1.8, so दूतसभा requires 1.1.8+ and reports older builds unhealthy. Yields tokens + conversation id; no cost. |
 | Q7 | agy yolo flag? | Resolved | Use `--dangerously-skip-permissions` in v1.0.8 (skips approval prompts). |
 | Q8 | `--watch` streaming — what does it look like? | Open | Deferred to Phase 4. Needs spec for TTY stream events, non-TTY line-buffered format, and `--json` NDJSON stream. |
 

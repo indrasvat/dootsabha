@@ -543,3 +543,38 @@ func TestAgyProviderPromptCannotBeHijackedFromConfig(t *testing.T) {
 		})
 	}
 }
+
+// दूतसभा always sends --output-format json, which agy print mode only accepts
+// from 1.1.8. On an older build every call fails before the prompt runs, so
+// `status` must not report it healthy. Raised by Codex on PR #27.
+func TestAgyProviderHealthCheckRejectsPreJSONVersions(t *testing.T) {
+	for _, tc := range []struct {
+		version string
+		healthy bool
+	}{
+		{"1.0.8", false}, // the version 703 shipped against — no --output-format
+		{"1.1.7", false}, // last release before the flag
+		{"1.1.8", true},  // the release that added it
+		{"1.1.17", true}, // verified working
+		{"2.0.0", true},  // future major
+		{"1.1.8-beta", true},
+		{"devel", true}, // unparseable must NOT be declared broken
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			p := providers.NewAgyProvider(defaultConfig(t), &mockRunner{stdout: []byte(tc.version + "\n")})
+			status, err := p.HealthCheck(context.Background())
+			if err != nil {
+				t.Fatalf("HealthCheck should not return error: %v", err)
+			}
+			if status.Healthy != tc.healthy {
+				t.Errorf("Healthy = %v, want %v (error: %s)", status.Healthy, tc.healthy, status.Error)
+			}
+			if status.CLIVersion != tc.version {
+				t.Errorf("CLIVersion = %q, want %q", status.CLIVersion, tc.version)
+			}
+			if !tc.healthy && !strings.Contains(status.Error, "agy update") {
+				t.Errorf("error %q must tell the user how to fix it", status.Error)
+			}
+		})
+	}
+}

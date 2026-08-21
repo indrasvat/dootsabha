@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/indrasvat/dootsabha/internal/core"
@@ -23,6 +24,12 @@ import (
 // import providers) and configs/default.yaml cannot; TestAgyDefaultModelSourcesAgree
 // guards those. Do not add a fifth copy.
 const AgyDefaultModel = "Gemini 3.7 Flash (High)"
+
+// agyMinVersion is the first agy release whose PRINT mode accepts
+// --output-format (1.1.8, per `agy changelog`). Older builds reject the flag, so
+// every invocation fails before the prompt runs — HealthCheck reports that rather
+// than letting `status` show an incompatible install as healthy.
+const agyMinVersion = "1.1.8"
 
 // agyStatusSuccess marks a clean turn. Any other value is a tool-level
 // diagnostic, not an invocation failure — see Invoke.
@@ -231,12 +238,64 @@ func (p *AgyProvider) HealthCheck(ctx context.Context) (*HealthStatus, error) {
 		}, nil
 	}
 
+	version := parseVersion(strings.TrimSpace(string(res.Stdout)))
+	if versionOlderThan(version, agyMinVersion) {
+		return &HealthStatus{
+			Healthy:    false,
+			CLIVersion: version,
+			Model:      pc.Model,
+			Error: fmt.Sprintf("agy %s predates --output-format (added in %s); run `agy update`",
+				version, agyMinVersion),
+		}, nil
+	}
+
 	return &HealthStatus{
 		Healthy:    true,
-		CLIVersion: parseVersion(strings.TrimSpace(string(res.Stdout))),
+		CLIVersion: version,
 		Model:      pc.Model,
 		AuthValid:  true,
 	}, nil
+}
+
+// versionOlderThan compares dotted numeric versions. An UNPARSEABLE version is
+// never "older": a source build or a future scheme must not be declared broken
+// on a string it merely failed to recognise.
+func versionOlderThan(v, minimum string) bool {
+	have, want := versionParts(v), versionParts(minimum)
+	if have == nil {
+		return false
+	}
+	for i, w := range want {
+		var h int
+		if i < len(have) {
+			h = have[i]
+		}
+		if h != w {
+			return h < w
+		}
+	}
+	return false
+}
+
+// versionParts splits "1.1.8-beta" into [1 1 8], stopping at the first component
+// that does not start with a digit.
+func versionParts(v string) []int {
+	var out []int
+	for field := range strings.SplitSeq(strings.TrimPrefix(v, "v"), ".") {
+		end := 0
+		for end < len(field) && field[end] >= '0' && field[end] <= '9' {
+			end++
+		}
+		if end == 0 {
+			break
+		}
+		n, err := strconv.Atoi(field[:end])
+		if err != nil {
+			break
+		}
+		out = append(out, n)
+	}
+	return out
 }
 
 // providerConfig returns the agy ProviderConfig, falling back to defaults if the

@@ -42,7 +42,7 @@ You need at least one of these AI CLI tools installed:
 |-------|---------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) |
+| [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) — **1.1.8+** |
 | [Grok CLI](https://docs.x.ai) | xAI Grok Build TUI (`grok`) — optional, opt-in |
 
 > **Note:** `agy` is Google's Go-built [Antigravity CLI](https://github.com/google/antigravity), the official successor to the retired Gemini CLI (Google sunset the Gemini CLI on 2026-06-18). The dootsabha provider name and binary are both `agy`.

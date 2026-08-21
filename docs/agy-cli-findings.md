@@ -31,8 +31,12 @@ and 3.1 Pro are all **still listed** — a default bump is not a retirement.
 
 ### `--output-format json`
 
-v1.0.8 had no JSON; **1.1.17 does**, and दूतसभा parses it. stdout is exactly one
-JSON document; stderr is empty.
+Print mode gained `--output-format` in **1.1.8** (`agy changelog`); 1.0.8, which
+703 shipped against, predates it. दूतसभा therefore requires **1.1.8+** and
+`HealthCheck` reports an older build unhealthy — otherwise `status` would show a
+green row while every call failed before the prompt ran.
+
+Verified on 1.1.17: stdout is exactly one JSON document; stderr is empty.
 
 ```json
 {"conversation_id":"…","status":"SUCCESS","response":"PONG\n",
