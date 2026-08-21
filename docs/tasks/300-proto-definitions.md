@@ -1,6 +1,6 @@
 # Task 3.1: Proto Definitions + Code Generation
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 - Phase 2 complete (council pipeline working with hardcoded providers)

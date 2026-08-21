@@ -41,8 +41,8 @@ fails the hook. `make fix-check` diffs against the **index**, so stage first.
 Never mark a task DONE without L1+L2+L3 green. L4 is required for
 output-visible changes.
 
-**L4 is shux.** The iTerm2 suite (`.claude/automations/`, `make test-visual`) is
-retired — do not run or extend it. Copy `.shux/scripts/agy-3-7-evidence.sh`:
+**L4 is shux.** The iTerm2 suite and `make test-visual` were removed — do not
+reintroduce them. Copy `.shux/scripts/agy-3-7-evidence.sh`:
 signal completion with a **file** marker (an on-screen marker lands in the
 evidence), size each frame to its own output, **read every PNG back** before
 attaching it, and stop every daemon you started

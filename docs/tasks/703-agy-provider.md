@@ -1,6 +1,6 @@
 # Task 703: Replace Gemini Provider with Antigravity (agy)
 
-**Status:** IN PROGRESS
+**Status:** DONE
 **Depends On:** 105 (codex+gemini providers), 302 (extract providers)
 **Parallelizable With:** —
 
