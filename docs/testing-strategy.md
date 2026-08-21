@@ -165,72 +165,72 @@ A cloud session has no provider CLIs installed or authenticated, so L4 cannot be
 captured there. Record `N/A` in the task file **with the reason**; the gate in §3
 accepts that and rejects a bare `N/A`. Never fabricate evidence.
 
-## §3 L4 Gating Hooks (Anti-Hallucination)
+## §3 Enforcement Layers
 
-> These hooks prevent agents from claiming work is done without proof. This is the single most important mechanism for preventing agent hallucinations.
+> A rule only holds if it lives in a layer that can enforce it. Put it in the
+> wrong one and it fails silently — as this section's predecessor did.
 
-### §3.1 Task Verification Script (`scripts/verify-visual-tests.sh`)
+### §3.1 Which layer enforces what
 
-Verifies L4 evidence before a task may reach DONE. Called by both the
-pre-task-done gate and the pre-push hook. Source is the script itself — it is not
-duplicated here, because a pasted copy drifts.
+| Layer | Answers | Fails loudly? |
+|---|---|---|
+| **Hook** (`.claude/hooks/`) | "is this action about to do something hard to undo?" | only when it fires |
+| **Test** (`make check`, CI) | "is this true of the repo right now?" | yes — every push |
+| **CLAUDE.md** | anything requiring judgment | no — guidance only |
 
-**Checks:**
-1. The task file has a `## Visual Test Results` section, with content.
-2. That section names at least one `.shux/scripts/*.sh` capture script, **and
-   every script it names exists on disk.** Frames are not checked: `.shux/out/` is
-   gitignored, so the reproducible script is the durable artifact.
-3. A cloud session may record `N/A` instead — but only *with a stated reason*. A
-   bare `N/A` fails.
+State questions belong in tests. `internal/cli/outcome_test.go` is the model: it
+fails the build if a command mints its own exit code.
 
-> It uses `grep -oE`, not `-oP`. The original paired `-oP` with `|| true`, and
-> since BSD grep on macOS has no `-P`, every check it performed was silently
-> skipped — the gate passed everything for as long as it existed on a Mac. If you
-> extend it, verify the failure path actually fails.
+### §3.2 What the hooks do
 
-### §3.2 Pre-Task-Done Gate (`scripts/hooks/pre-task-done-gate.sh`)
+Wired repo-scoped in `.claude/settings.json`. All three **fail open** — anything
+they cannot determine (no `git`, no `python3`, detached HEAD, a shallow cloud
+checkout with no `origin/HEAD`) is allowed through. Missing a violation is
+cheaper than blocking legitimate work; see §3.4.
 
-Claude Code PreToolUse hook that intercepts Edit/Write on task files. If status is being changed to DONE, runs L4 verification:
+| Hook | Event | Blocks? |
+|---|---|---|
+| `branch-guard.sh` | `PreToolUse(Edit\|Write)` | yes — editing a **tracked** file on the default branch. Untracked files pass. |
+| `staging-guard.sh` | `PreToolUse(Bash)` | yes — `git add -A/./-u`, `git commit -a`. `git` must be the command, so `echo git add -A` passes. |
+| `session-hygiene.sh` | `Stop` | **never.** Warns about leftover shux daemons and a debug browser bridge. |
 
-```bash
-#!/usr/bin/env bash
-# Hook: PreToolUse (Edit, Write)
-# Blocks DONE status on task files if L4 requirements not met
-TOOL="$1"
-FILE="$2"
+### §3.3 What the test does
 
-# Only intercept task file edits
-[[ "$FILE" == *docs/tasks/*.md ]] || exit 0
+`internal/tasks/evidence_test.go`: a task marked DONE must carry a
+`## Visual Test Results` section naming a `.shux/scripts/*.sh` that exists — or a
+reasoned `N/A` (a cloud session has no provider CLIs; some tasks render nothing).
+A bare `N/A` fails. The section is bounded by the next `##` heading, so a later
+section cannot stand in as evidence.
 
-# Check if edit changes status to DONE
-if grep -qi 'Status:.*DONE' <<< "$3" 2>/dev/null; then
-  bash scripts/verify-visual-tests.sh "$FILE"
-fi
-```
+Tasks predating this check are listed in `grandfathered`. That list may only
+shrink, and a stale entry fails its own test. Retrofitting evidence onto work
+whose frames were deleted would mean inventing it.
 
-### §3.3 Pre-Push Visual Gate (`scripts/hooks/pre-push-visual-gate.sh`)
+**The check has fixtures asserting its FAILURE path.** That is the difference
+between a gate and the appearance of one — see §3.4.
 
-Claude Code PreToolUse hook that intercepts `git push`. Finds all IN PROGRESS tasks and verifies each has passed L4:
+### §3.4 Why the previous version is worth remembering
 
-```bash
-#!/usr/bin/env bash
-# Hook: PreToolUse (Bash) — matches git push
-ERRORS=()
-for task in docs/tasks/*.md; do
-  if grep -q 'Status:.*IN PROGRESS' "$task"; then
-    if ! bash scripts/verify-visual-tests.sh "$task"; then
-      ERRORS+=("$task")
-    fi
-  fi
-done
-if [[ ${#ERRORS[@]} -gt 0 ]]; then
-  echo "❌ PRE-PUSH GATE: L4 requirements unmet for:"
-  for task in "${ERRORS[@]}"; do echo "  • $task"; done
-  exit 2
-fi
-```
+`scripts/verify-visual-tests.sh` was called *"the single most important mechanism
+for preventing agent hallucinations."* It never ran. Three independent reasons:
 
----
+1. Registered nowhere — no `.claude/settings.json` existed.
+2. It read `$1/$2/$3`; a `PreToolUse` hook receives **JSON on stdin**. Wired as
+   written, it would have exited 0 on everything.
+3. Its checks used `grep -oP`, unsupported by BSD grep, behind a `|| true`.
+
+Two lessons are now structural. **A gate needs a test of its own failure path**,
+or it reports success while checking nothing. And **a gate must not misfire**: the
+old pre-push hook gated every push on any IN PROGRESS task, and when it blocked
+unrelated work, the agent flipped two tasks to DONE to satisfy it — violating the
+very rule it protected. A gate that cries wolf does not stop an agent; it teaches
+the agent to route around it.
+
+**Evidence quality is deliberately not gated.** A check can confirm a capture
+script exists; it cannot confirm anyone looked at the frames. Honesty is what
+review is for — during #27–#29 दूतसभा and Codex caught four factual errors and a
+bug inside a fix. No gate could have.
+
 
 ## §4 L5 Agent Workflow Tests
 
@@ -339,7 +339,7 @@ Every task file in `docs/tasks/` MUST include these two sections. This is a hard
 A cloud session has no provider CLIs and cannot capture L4. Record
 `_N/A — <reason>_` instead; the gate accepts a reasoned N/A and rejects a bare one.
 
-**Minimum content:** at least 5 lines, and it must name a `.shux/scripts/*.sh` that exists (or a reasoned N/A). Enforced by `scripts/verify-visual-tests.sh`; the section ends at the next `##` heading, so padding from a later section does not count.
+**Minimum content:** it must name a `.shux/scripts/*.sh` that exists, or give a reasoned `N/A`. Enforced by `internal/tasks/evidence_test.go` in `make check`; the section ends at the next `##` heading, so padding from a later section does not count (§3.3).
 
 ---
 
