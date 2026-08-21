@@ -246,7 +246,7 @@ providers:
       - model_reasoning_effort=medium
   agy:
     binary: agy
-    model: Gemini 3.5 Flash (High)
+    model: Gemini 3.7 Flash (High)
     flags:
       - --dangerously-skip-permissions
   grok:                             # opt-in; grok-4.5 stays pinnable here
@@ -325,10 +325,10 @@ dootsabha council "question" | cat
 dootsabha council "question" --quiet
 ```
 
-> **Note on token/cost data:** `claude`, `codex` and `grok` report token counts
-> in `--json` output; `claude` and `grok` also report cost and session IDs.
-> `agy` runs in plain-text print mode (`agy -p "<prompt>"`) and has no JSON
-> output, so its token, cost and session fields are `0`/empty.
+> **Note on token/cost data:** all four agents report token counts in `--json`
+> output. `claude` and `grok` also report cost and session IDs; `agy` reports a
+> session ID (its conversation id) but **no cost** — the Antigravity CLI does not
+> emit one, so `cost_usd` is `0` rather than estimated. `codex` reports neither.
 
 ---
 

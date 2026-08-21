@@ -224,7 +224,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.codex.model", "gpt-5.5")
 	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
 	v.SetDefault("providers.agy.binary", "agy")
-	v.SetDefault("providers.agy.model", "Gemini 3.5 Flash (High)")
+	// defaultAgyModel lives in migrate.go — the migration writer and this
+	// default MUST agree, so core keeps exactly one copy of the literal.
+	v.SetDefault("providers.agy.model", defaultAgyModel)
 	v.SetDefault("providers.agy.flags", []string{"--dangerously-skip-permissions"})
 	v.SetDefault("providers.grok.binary", "grok")
 	v.SetDefault("providers.grok.model", "grok-4.6")

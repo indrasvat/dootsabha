@@ -20,11 +20,16 @@ Each command section lists: flags, pipeline, JSON output schema, exit codes.
 |---|---|---|---|---|---|---|
 | `claude` | `claude` | `claude-opus-4-8` | ✅ | ✅ | ✅ | ✅ (standalone only) |
 | `codex` | `codex` | `gpt-5.5` | ✅ | — | — | ✅ |
-| `agy` | `agy` | `Gemini 3.5 Flash (High)` | — | — | — | ✅ |
+| `agy` | `agy` | `Gemini 3.7 Flash (High)` | ✅ | — | ✅ | ✅ |
 | `grok` | `grok` | `grok-4.6` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
 
-**`agy`** runs in plain-text print mode (`agy -p`) and emits no usage data, so its
-`cost_usd`, `tokens_in`, `tokens_out` and `session_id` fields are `0`/empty.
+**`agy`** is driven with `--output-format json`, so `tokens_in`, `tokens_out` and
+`session_id` (its conversation id) are populated. `cost_usd` stays `0` — the
+Antigravity CLI reports no cost, and दूतसभा does not estimate one.
+
+Its model is a **display name**, not the id in column 1 of `agy models`; the
+`(High|Medium|Low)` suffix selects reasoning effort, and `agy` rejects a separate
+`--effort` for the lower tiers.
 
 **`grok`** (xAI Grok CLI) is never selected automatically — pass `--agent grok`,
 `--agents claude,codex,grok`, `--chair grok`, or `--reviewers codex,grok`.
@@ -121,10 +126,10 @@ Written directly (no envelope wrapper). All fields snake_case.
 }
 ```
 
-> **Note on `agy`:** The `agy` provider (Antigravity CLI) runs in plain-text
-> print mode (`agy -p`) and emits no JSON usage data. Its `cost_usd`,
-> `tokens_in`, and `tokens_out` fields are always `0`, and it has no session ID.
-> Only `claude` and `codex` contribute to `total_cost_usd` / token totals.
+> **Note on `agy`:** `agy` contributes `tokens_in`/`tokens_out` and a
+> `session_id` (its conversation id), but its `cost_usd` is always `0` — the
+> Antigravity CLI reports no cost. Only `claude` and `grok` contribute to
+> `total_cost_usd`.
 
 ### Exit Codes
 

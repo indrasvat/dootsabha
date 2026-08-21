@@ -80,19 +80,30 @@ func (s *agyPluginServer) HealthCheck(ctx context.Context) (*gen.HealthCheckResp
 
 func (s *agyPluginServer) Capabilities(_ context.Context) (*gen.CapabilitiesResponse, error) {
 	return &gen.CapabilitiesResponse{
-		SupportsJson:      false,
+		// agy 1.1.17 print mode supports --output-format json, which the provider
+		// now parses for the conversation id and token counts. Streaming
+		// (--output-format stream-json) exists but is not consumed yet.
+		SupportsJson:      true,
 		SupportsStreaming: false,
+		// Mirrors `agy models` on 1.1.17. 3.6/3.5/3.1 are still live, so bumping
+		// the default must not remove them — a user who pinned one keeps it.
 		SupportedModels: []string{
-			"Gemini 3.5 Flash (Low)",
-			"Gemini 3.5 Flash (Medium)",
+			providers.AgyDefaultModel,
+			"Gemini 3.7 Flash (Medium)",
+			"Gemini 3.7 Flash (Low)",
+			"Gemini 3.6 Flash (High)",
+			"Gemini 3.6 Flash (Medium)",
+			"Gemini 3.6 Flash (Low)",
 			"Gemini 3.5 Flash (High)",
-			"Gemini 3.1 Pro (Low)",
+			"Gemini 3.5 Flash (Medium)",
+			"Gemini 3.5 Flash (Low)",
 			"Gemini 3.1 Pro (High)",
+			"Gemini 3.1 Pro (Low)",
 			"Claude Sonnet 4.6 (Thinking)",
 			"Claude Opus 4.6 (Thinking)",
 			"GPT-OSS 120B (Medium)",
 		},
-		DefaultModel:     "Gemini 3.5 Flash (High)",
+		DefaultModel:     providers.AgyDefaultModel,
 		MaxContextTokens: 1000000,
 	}, nil
 }

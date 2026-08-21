@@ -212,6 +212,8 @@ All 4 items addressed in PRD v1.6.
 | 704 | Add xAI Grok CLI as opt-in fourth provider | DONE | — |
 | 705 | Per-provider timeouts + enforced session timeout (#20) | DONE | — |
 | 706 | Default grok model → grok-4.6 (+ xhigh effort) | DONE | — |
+| 707 | Default agy model → Gemini 3.7 Flash (High) + `--output-format json` | DONE | — |
+| 708 | Forward the per-call budget to `agy --print-timeout` | PENDING | 707 |
 
 ### What Works End-to-End (705)
 
@@ -267,6 +269,36 @@ All 4 items addressed in PRD v1.6.
   (`unset`), so a dropped `-m` fails loudly instead of echoing the right answer
   by accident.
 
+### What Works End-to-End (707)
+
+- Default agy model is **`Gemini 3.7 Flash (High)`** (Google shipped 3.7 Flash on
+  2026-08-13; agy 1.1.17 makes it Antigravity's own default). दूतसभा always emits
+  `--model`, so it had been actively forcing every call back onto 3.5.
+- **Not a migration.** 3.6/3.5/3.1 are still listed by `agy models`, stay in
+  `SupportedModels`, and an explicit `providers.agy.model` is never rewritten.
+- The literal lived in **six** unsynced places. Three now read
+  `providers.AgyDefaultModel`; core's viper default and its migration writer share
+  one `core` constant; `configs/default.yaml` — previously guarded by nothing — is
+  covered by a drift test.
+- **agy is now driven with `--output-format json`.** `TokensIn`/`TokensOut` and
+  `SessionID` (its conversation id) are populated. `CostUSD` stays `0`: the CLI
+  reports no cost and दूतसभा does not estimate one.
+- **Error text is no longer lost.** In JSON mode agy writes the reason to *stdout*
+  and leaves stderr empty; the old provider read stderr and surfaced a bare
+  `exit code 1`.
+- `status` is a **tool-level** diagnostic, not the failure discriminator: a turn
+  whose tool call failed but which still answered returns exit 0 + `status:
+  "ERROR"` + a usable response. The exit code decides; degraded turns log at Warn.
+- `--output-format` joins `--model` as a **pinned** flag — a configured
+  `--output-format text` can no longer break the parser.
+- `mock-agy` now speaks the JSON envelope and **echoes the `--model`** it receives
+  (sentinel default `unset`), so L3/L5 can see forwarding at all — it previously
+  discarded the flag outright.
+- `AgyProvider.providerConfig` is nil-safe, matching `GrokProvider`.
+- L3 28 → 33, L5 236 → 238.
+- Real-CLI findings recorded in `docs/agy-cli-findings.md`; the
+  `--print-timeout` interaction it uncovered is tracked as task 708.
+
 ### What Works End-to-End (704)
 
 - `grok` (xAI Grok CLI) is a fourth agent, **opt-in**: default council,
@@ -290,7 +322,7 @@ All 4 items addressed in PRD v1.6.
 - Gemini CLI retired (sunset 2026-06-18) → replaced by `agy` (Antigravity CLI) as the 3rd agent
 - `internal/providers/agy.go` — plain-text print-mode provider (`agy --dangerously-skip-permissions -p`); no token/cost/session data
 - `plugins/agy/` — gRPC provider plugin (replaces `plugins/gemini/`); `make build-plugins` builds `agy-provider`
-- Defaults: council `claude,codex,agy` (`codex,agy` inside Claude Code); refine reviewers `codex,agy`; default model `Gemini 3.5 Flash (High)`
+- Defaults: council `claude,codex,agy` (`codex,agy` inside Claude Code); refine reviewers `codex,agy`; default model `Gemini 3.5 Flash (High)` *(superseded by 707 — see above)*
 - `dootsabha config migrate` (स्थानांतरण) — rewrites stale `providers.gemini`/`council.chair: gemini` → `agy`, writes `<config>.bak`; `--dry-run`, `--json`
 - TTY stderr nudge when a stale `gemini` config reference is detected
 - `mock-agy` (plain text) replaces `mock-gemini`; all gemini references removed from code/config/scripts/docs/skill

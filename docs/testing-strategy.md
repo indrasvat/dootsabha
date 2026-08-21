@@ -54,21 +54,23 @@ echo '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","tex
 echo '{"type":"turn.completed","usage":{"input_tokens":100,"output_tokens":50}}'
 ```
 
-**`testdata/mock-providers/mock-agy`:** (plain-text print mode — no JSON, no tokens/cost/session)
+**`testdata/mock-providers/mock-agy`:** (JSON envelope; echoes the model it was given)
 ```bash
 #!/usr/bin/env bash
-# Simulates agy (Antigravity CLI) for smoke tests — print mode only, no API calls
+# Simulates agy (Antigravity CLI) for smoke tests — no API calls
 set -euo pipefail
-PROMPT=""
+PROMPT=""; FORMAT="text"; MODEL="unset"   # sentinel: a dropped --model must fail loudly
 while [[ $# -gt 0 ]]; do
   case $1 in
+    --model) MODEL="$2"; shift 2 ;;
+    --output-format) FORMAT="$2"; shift 2 ;;
+    -p|--print|--prompt) PROMPT="$2"; shift 2 ;;
     --dangerously-skip-permissions) shift ;;
-    -p|--prompt) PROMPT="$2"; shift 2 ;;
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
-# agy -p is plain text only: no JSON, no token counts, no cost, no session ID
-echo "Mock response to: $PROMPT"
+# The model is echoed into the body — agy's envelope has no model field, so the
+# response text is the only channel an integration test can assert forwarding on.
 ```
 
 **`testdata/mock-providers/mock-grok`:** (streaming-messages-json NDJSON)

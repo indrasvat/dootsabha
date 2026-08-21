@@ -102,8 +102,8 @@ timeout: 10m
 	if agy.Binary != "agy" {
 		t.Errorf("agy.Binary = %q, want agy", agy.Binary)
 	}
-	if agy.Model != "Gemini 3.5 Flash (High)" {
-		t.Errorf("agy.Model = %q, want Gemini 3.5 Flash (High)", agy.Model)
+	if agy.Model != "Gemini 3.7 Flash (High)" {
+		t.Errorf("agy.Model = %q, want Gemini 3.7 Flash (High)", agy.Model)
 	}
 	if len(agy.Flags) != 1 || agy.Flags[0] != "--dangerously-skip-permissions" {
 		t.Errorf("agy.Flags = %v, want [--dangerously-skip-permissions]", agy.Flags)
@@ -159,7 +159,7 @@ func TestMigrateConfigFileIdempotent(t *testing.T) {
 	path := writeConfig(t, `providers:
   agy:
     binary: agy
-    model: Gemini 3.5 Flash (High)
+    model: Gemini 3.7 Flash (High)
 council:
   chair: claude
 `)

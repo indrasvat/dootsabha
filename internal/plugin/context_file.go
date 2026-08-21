@@ -76,7 +76,7 @@ func DefaultContextFile(sessionID string, isTTY bool, termWidth int) ContextFile
 		Providers: map[string]ContextProvider{
 			"claude": {Healthy: true, Model: "claude-opus-4-8"},
 			"codex":  {Healthy: true, Model: "gpt-5.5"},
-			"agy":    {Healthy: true, Model: "Gemini 3.5 Flash (High)"},
+			"agy":    {Healthy: true, Model: providers.AgyDefaultModel},
 			"grok":   {Healthy: true, Model: providers.GrokDefaultModel},
 		},
 		Capabilities: ContextCapabilities{
