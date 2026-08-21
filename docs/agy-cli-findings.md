@@ -117,12 +117,30 @@ decides and a degraded turn is logged at Warn instead — visible on stderr in
 text mode, suppressed under `--json` (unless `-v`), so the JSON document stays
 clean.
 
-### Known interaction: `--print-timeout`
+### `--print-timeout` (task 708)
 
 `agy --print-timeout` defaults to **5m**, exactly दूतसभा's default per-call
-`--timeout`. दूतसभा starts its budget marginally earlier, so on defaults its own
-timeout wins the race and the user gets the named exit `4`.
+`--timeout` — and when it fires, agy reports an ordinary ERROR envelope with
+exit 1:
 
-Raising `--timeout` past 5m does **not** raise agy's: the CLI self-terminates at
-its own 5m and दूतसभा reports a provider failure rather than a timeout. दूतसभा does
-not currently forward its budget to `--print-timeout`. Tracked as task 708.
+```json
+{"status":"ERROR","response":"","error":"timeout waiting for response", …}
+```
+
+Nothing distinguishes that from any other provider failure, so दूतसभा charged the
+caller exit **3** ("nothing usable, try another agent") for what was really exit
+**4** ("raise the timeout"). Raising `--timeout` past 5m did not raise agy's.
+
+दूतसभा now forwards the step's remaining window plus a 30s margin, so its own
+timer always fires first and keeps ownership of the exit code. The margin clears
+the `SIGTERM`→grace→`SIGKILL` sequence (5s by default). `--print-timeout` is
+pinned whenever दूतसभा emits one.
+
+**`--print-timeout 0` does not mean "disabled"** — verified on 1.1.17, it fails
+instantly with `timeout waiting for response`. A non-positive window is therefore
+never emitted.
+
+The no-deadline branch is **defensive, not user-reachable**: `resolveTimeouts`
+never yields a zero per-invocation window (`--timeout 0` falls through to the
+config value, then to the 5m default), so every CLI path forwards a value. It
+covers library and strategy-plugin callers passing a deadline-less context.

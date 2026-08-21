@@ -213,7 +213,7 @@ All 4 items addressed in PRD v1.6.
 | 705 | Per-provider timeouts + enforced session timeout (#20) | DONE | — |
 | 706 | Default grok model → grok-4.6 (+ xhigh effort) | DONE | — |
 | 707 | Default agy model → Gemini 3.7 Flash (High) + `--output-format json` | DONE | — |
-| 708 | Forward the per-call budget to `agy --print-timeout` | PENDING | 707 |
+| 708 | Forward the per-call budget to `agy --print-timeout` | DONE | — |
 
 ### What Works End-to-End (705)
 
@@ -268,6 +268,30 @@ All 4 items addressed in PRD v1.6.
   could not have caught a forwarding regression. Its default is now a sentinel
   (`unset`), so a dropped `-m` fails loudly instead of echoing the right answer
   by accident.
+
+### What Works End-to-End (708)
+
+- दूतसभा forwards its per-call budget to **`agy --print-timeout`**, so an agy
+  timeout exits **4** ("raise the timeout") instead of **3** ("try another
+  agent"). agy's own print timeout defaults to 5m — exactly दूतसभा's default
+  `--timeout` — and reports as a plain `ERROR` envelope with exit 1, so a timeout
+  used to arrive looking like any other provider failure. Raising `--timeout`
+  past 5m did not raise agy's.
+- The value comes from **`ctx.Deadline()`**, never `cfg.Timeout`: `core.Budget`
+  already clips each step to the earlier of the invocation window and the session
+  ceiling. Nothing builds a `context.WithTimeout` — the `outcome_test.go` guard
+  stands. Emitted as `remaining + 30s`, rounded to the second; the margin keeps
+  दूतसभा's timer first and clears the `SIGTERM`→grace→`SIGKILL` window (5s).
+- **`--print-timeout 0` means zero, not "disabled"** (verified live — it fails
+  instantly), so a non-positive window emits no flag at all.
+- `--print-timeout` joins `--model`, `--output-format` and the prompt in the
+  pinned set whenever दूतसभा emits one. Every CLI path emits one:
+  `resolveTimeouts` never yields a zero per-invocation window, so even
+  `--timeout 0 --session-timeout 0` forwards `5m30s`. The no-deadline branch is
+  defensive, for library/plugin callers.
+- `mock-agy` now **honours `--print-timeout`** with a 1s stand-in for agy's 5m,
+  failing with the real timeout envelope — without that no integration test could
+  observe the bug at all. L3 38 → 40.
 
 ### What Works End-to-End (707)
 

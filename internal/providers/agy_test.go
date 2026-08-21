@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/indrasvat/dootsabha/internal/providers"
 )
@@ -574,6 +575,107 @@ func TestAgyProviderHealthCheckRejectsPreJSONVersions(t *testing.T) {
 			}
 			if !tc.healthy && !strings.Contains(status.Error, "agy update") {
 				t.Errorf("error %q must tell the user how to fix it", status.Error)
+			}
+		})
+	}
+}
+
+// agy's own --print-timeout defaults to 5m, exactly दूतसभा's default --timeout.
+// When it fires, agy reports a plain ERROR envelope with exit 1 — so a timeout
+// arrives looking like any other provider failure and the caller gets exit 3
+// ("try another agent") instead of exit 4 ("raise the timeout"). दूतसभा forwards
+// its own step window plus a margin so its timer always fires first. Task 708.
+func TestAgyProviderForwardsStepBudgetAsPrintTimeout(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		window time.Duration
+	}{
+		{"short window", 30 * time.Second},
+		{"past agy's own 5m default", 15 * time.Minute},
+		{"session-sized window", 30 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), tc.window)
+			defer cancel()
+
+			runner := &mockRunner{stdout: agyOK(t, "ok")}
+			p := providers.NewAgyProvider(defaultConfig(t), runner)
+			if _, err := p.Invoke(ctx, "hi", providers.InvokeOptions{}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			raw := flagValue(runner.capturedArgs, "--print-timeout")
+			if raw == "" {
+				t.Fatalf("--print-timeout not forwarded: %v", runner.capturedArgs)
+			}
+			got, err := time.ParseDuration(raw)
+			if err != nil {
+				t.Fatalf("--print-timeout %q is not a duration agy can parse: %v", raw, err)
+			}
+			// Must EXCEED the step window, or the two timers race and agy may win.
+			if got <= tc.window {
+				t.Errorf("--print-timeout %s does not exceed the %s step window", got, tc.window)
+			}
+			// ...but not by so much that a hung call outlives the pipeline.
+			if got > tc.window+2*time.Minute {
+				t.Errorf("--print-timeout %s overshoots the %s window", got, tc.window)
+			}
+		})
+	}
+}
+
+// `--print-timeout 0` means ZERO, not "disabled" — verified on 1.1.17, it fails
+// instantly with "timeout waiting for response". So an unbounded step must emit
+// no flag at all rather than a zero, and the user's own flag stays in control.
+func TestAgyProviderUnboundedStepEmitsNoPrintTimeout(t *testing.T) {
+	t.Run("no deadline", func(t *testing.T) {
+		runner := &mockRunner{stdout: agyOK(t, "ok")}
+		p := providers.NewAgyProvider(defaultConfig(t), runner)
+		if _, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if slices.Contains(runner.capturedArgs, "--print-timeout") {
+			t.Errorf("unbounded step must not pin a timeout: %v", runner.capturedArgs)
+		}
+	})
+
+	// Unbounded is the one case where a user's own --print-timeout survives.
+	t.Run("user flag survives when unbounded", func(t *testing.T) {
+		cfg := defaultConfig(t)
+		pc := cfg.Providers["agy"]
+		pc.Flags = append([]string{"--print-timeout", "45m"}, pc.Flags...)
+		cfg.Providers["agy"] = pc
+
+		runner := &mockRunner{stdout: agyOK(t, "ok")}
+		p := providers.NewAgyProvider(cfg, runner)
+		if _, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got := flagValue(runner.capturedArgs, "--print-timeout"); got != "45m" {
+			t.Errorf("--print-timeout = %q, want the user's 45m: %v", got, runner.capturedArgs)
+		}
+	})
+
+	// A bounded step pins it, in any spelling agy accepts.
+	for _, spelling := range []string{"--print-timeout", "-print-timeout", "--print-timeout=1ms"} {
+		t.Run("bounded step pins "+spelling, func(t *testing.T) {
+			cfg := defaultConfig(t)
+			pc := cfg.Providers["agy"]
+			pc.Flags = append([]string{spelling, "1ms"}, pc.Flags...)
+			cfg.Providers["agy"] = pc
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			runner := &mockRunner{stdout: agyOK(t, "ok")}
+			p := providers.NewAgyProvider(cfg, runner)
+			if _, err := p.Invoke(ctx, "hi", providers.InvokeOptions{}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if n := countFlag(runner.capturedArgs, "--print-timeout"); n != 1 {
+				t.Errorf("--print-timeout appears %d times, want 1: %v", n, runner.capturedArgs)
+			}
+			if got := flagValue(runner.capturedArgs, "--print-timeout"); got == "1ms" {
+				t.Errorf("config overrode दूतसभा's window: %v", runner.capturedArgs)
 			}
 		})
 	}

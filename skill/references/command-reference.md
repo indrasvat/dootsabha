@@ -31,6 +31,11 @@ Its model is a **display name**, not the id in column 1 of `agy models`; the
 `(High|Medium|Low)` suffix selects reasoning effort, and `agy` rejects a separate
 `--effort` for the lower tiers.
 
+दूतसभा forwards its per-call budget to `agy --print-timeout`, so an agy timeout
+exits **4** (raise the timeout) rather than **3** (try another agent). Without
+that, agy's own 5m default would fire first on any `--timeout` above 5m and
+report as an ordinary provider failure.
+
 **`grok`** (xAI Grok CLI) is never selected automatically — pass `--agent grok`,
 `--agents claude,codex,grok`, `--chair grok`, or `--reviewers codex,grok`.
 Notes when using it:

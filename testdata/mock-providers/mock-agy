@@ -9,21 +9,42 @@ FORMAT="text"
 # The default is a SENTINEL, deliberately not the shipped default: were it
 # "Gemini 3.7 Flash (High)", dropping --model entirely would still read as a pass.
 MODEL="unset"
+# agy's OWN print timeout, which is independent of dootsabha's budget. The real
+# default is 5m; 1s here keeps task 708's contract testable in a smoke run.
+PRINT_TIMEOUT="1s"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --version) echo "1.1.17"; exit 0 ;;
     --model) MODEL="$2"; shift 2 ;;
     --output-format) FORMAT="$2"; shift 2 ;;
+    --print-timeout) PRINT_TIMEOUT="$2"; shift 2 ;;
     -p|--print|--prompt) PROMPT="$2"; shift 2 ;;
     --dangerously-skip-permissions|--sandbox) shift ;;
-    --effort|--print-timeout|--agent|--mode) shift 2 ;;
+    --effort|--agent|--mode) shift 2 ;;
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
 
 # Test hook: simulate a slow provider so timeout scoping can be exercised
 # end-to-end (GitHub issue #20). Unset in normal runs, so this is a no-op.
-sleep "${MOCK_AGY_DELAY:-0}"
+DELAY="${MOCK_AGY_DELAY:-0}"
+
+# agy self-terminates at its OWN --print-timeout and reports it as an ordinary
+# ERROR envelope with exit 1 — indistinguishable from any other failure, which is
+# exactly why dootsabha must forward its budget (task 708). Verified on 1.1.17.
+BUDGET=$(python3 -c "
+import re,sys
+s='$PRINT_TIMEOUT'
+m=re.findall(r'([0-9.]+)(ms|s|m|h)', s) or [(s,'s')]
+u={'ms':0.001,'s':1,'m':60,'h':3600}
+print(sum(float(v)*u[x] for v,x in m))
+")
+if python3 -c "import sys; sys.exit(0 if float('$DELAY') > float('$BUDGET') else 1)"; then
+  printf '{"conversation_id":"","status":"ERROR","response":"","error":"timeout waiting for response","duration_seconds":0,"num_turns":1,"usage":{"input_tokens":0,"output_tokens":0,"thinking_tokens":0,"cache_read_tokens":0,"total_tokens":0}}\n'
+  exit 1
+fi
+
+sleep "$DELAY"
 
 BODY="Mock response to: $PROMPT [model=$MODEL]"
 if [[ "$FORMAT" != "json" ]]; then

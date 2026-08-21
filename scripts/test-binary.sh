@@ -195,6 +195,32 @@ else
   fail "malformed flags exited $RC, want 6"
 fi
 
+# Test 8g: agy's OWN timeout must not preempt dootsabha's budget (task 708).
+#
+# agy --print-timeout defaults to 5m, exactly dootsabha's default --timeout, and
+# when it fires agy reports a plain ERROR envelope with exit 1 — so the caller
+# got exit 3 ("try another agent") for what is really exit 4 ("raise the
+# timeout"). mock-agy mirrors that, with a 1s stand-in for agy's 5m default.
+#
+# A call slower than agy's own default but well inside dootsabha's budget must
+# now SUCCEED, because dootsabha forwards its remaining window.
+if MOCK_AGY_DELAY=2 DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy" \
+   "$BINARY" consult --agent agy --config /dev/null --timeout 20s "PONG" >/dev/null 2>&1; then
+  pass "agy's own print timeout no longer preempts dootsabha's budget"
+else
+  fail "a call inside dootsabha's budget died on agy's own timeout"
+fi
+
+# ...and dootsabha's own timer still owns the exit code when IT is the shorter one.
+RC=0
+MOCK_AGY_DELAY=5 DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy" \
+  "$BINARY" consult --agent agy --config /dev/null --timeout 700ms "PONG" >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -eq 4 ]]; then
+  pass "dootsabha's own timeout still wins and exits 4"
+else
+  fail "expected exit 4 from dootsabha's timeout, got $RC"
+fi
+
 # Test 9: mock-grok works (streaming-messages-json NDJSON)
 if [[ -x "$MOCK_DIR/mock-grok" ]]; then
   RESULT=$("$MOCK_DIR/mock-grok" --output-format streaming-messages-json -m grok-4.6 \
