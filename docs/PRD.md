@@ -910,7 +910,7 @@ Full Makefile with build flags, gotestsum, colored output — implemented during
 |-----------|----------|-----------|
 | Mock providers (claude, codex, agy) | `testdata/mock-providers/` | `testing-strategy.md §1` |
 | shux capture-script template | `.shux/scripts/` | `testing-strategy.md §2` |
-| L4 gating hooks (pre-task-done, pre-push) | `scripts/hooks/` | `testing-strategy.md §3` |
+| Enforcement layers (hooks / tests / CLAUDE.md) | `.claude/hooks/`, `internal/tasks/` | `testing-strategy.md §3` |
 | L5 agent workflow tests | `scripts/test-agent-workflow.sh` | `testing-strategy.md §4` |
 | Task verification checklist | (in task files) | `testing-strategy.md §6` |
 | Git hooks (lefthook: pre-commit + pre-push) | `lefthook.yml` | `testing-strategy.md §8` |

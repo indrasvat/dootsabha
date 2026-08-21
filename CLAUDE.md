@@ -103,6 +103,22 @@ fired. Never reuse one context across calls — that is the #20 regression.
 Derive any per-call duration from `ctx.Deadline()`, never from `cfg.Timeout`: the
 context already reflects both bounds.
 
+## What enforces what
+A rule only holds in a layer that can enforce it (`docs/testing-strategy.md §3`):
+
+- **Hooks** (`.claude/hooks/`, wired in `.claude/settings.json`) stop *actions*:
+  editing a tracked file on the default branch, and bulk `git add`. They fail
+  **open** — anything undeterminable is allowed, because a gate that misfires
+  teaches you to route around it. A `Stop` hook warns about leftover daemons and
+  never blocks.
+- **Tests** answer *"is this true of the repo now?"* and fail the build:
+  `internal/cli/outcome_test.go` (exit codes), `internal/tasks/evidence_test.go`
+  (a DONE task carries evidence). Hooks do not run in CI; tests do.
+- **This file** carries judgment, which neither can check.
+
+Evidence *quality* is deliberately not gated — a check can confirm a capture
+script exists, not that you looked at the frames. That is what review is for.
+
 ## Anti-hallucination
 1. Never claim DONE without terminal output as proof.
 2. `make check` before every commit; `make ci` must pass before DONE.
