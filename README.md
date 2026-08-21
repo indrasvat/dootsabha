@@ -42,7 +42,7 @@ You need at least one of these AI CLI tools installed:
 |-------|---------|
 | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm install -g @anthropic-ai/claude-code` |
 | [Codex CLI](https://github.com/openai/codex) | `npm install -g @openai/codex` |
-| [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) |
+| [Antigravity CLI (agy)](https://github.com/google/antigravity) | Install per Google's instructions (`agy`) — **1.1.8+** |
 | [Grok CLI](https://docs.x.ai) | xAI Grok Build TUI (`grok`) — optional, opt-in |
 
 > **Note:** `agy` is Google's Go-built [Antigravity CLI](https://github.com/google/antigravity), the official successor to the retired Gemini CLI (Google sunset the Gemini CLI on 2026-06-18). The dootsabha provider name and binary are both `agy`.
@@ -246,7 +246,7 @@ providers:
       - model_reasoning_effort=medium
   agy:
     binary: agy
-    model: Gemini 3.5 Flash (High)
+    model: Gemini 3.7 Flash (High)
     flags:
       - --dangerously-skip-permissions
   grok:                             # opt-in; grok-4.5 stays pinnable here
@@ -325,10 +325,10 @@ dootsabha council "question" | cat
 dootsabha council "question" --quiet
 ```
 
-> **Note on token/cost data:** `claude`, `codex` and `grok` report token counts
-> in `--json` output; `claude` and `grok` also report cost and session IDs.
-> `agy` runs in plain-text print mode (`agy -p "<prompt>"`) and has no JSON
-> output, so its token, cost and session fields are `0`/empty.
+> **Note on token/cost data:** all four agents report token counts in `--json`
+> output. `claude` and `grok` also report cost and session IDs; `agy` reports a
+> session ID (its conversation id) but **no cost** — the Antigravity CLI does not
+> emit one, so `cost_usd` is `0` rather than estimated. `codex` reports neither.
 
 ---
 

@@ -220,6 +220,48 @@ else
   fail "grok success path exited $RC (want 0)"
 fi
 
+# ── Workflow 5a-agy: JSON envelope + model forwarding ────────────────────────
+#
+# COVERAGE GAP. mock-agy used to discard --model and emit bare text, so neither
+# model forwarding nor the JSON telemetry dootsabha now parses was observable
+# from L5. Both are asserted end-to-end here.
+
+echo ""
+echo "--- agy success path ---"
+
+AGY_OK=$("$BINARY" consult --agent agy --json --config /dev/null "PONG" 2>/dev/null || true)
+if python3 -c "
+import json,sys
+d = json.load(sys.stdin)['data']
+assert 'PONG' in d['Content'], d['Content']
+# The mock echoes the --model it received, so this asserts the whole chain:
+# shipped default -> argv -> CLI -> parsed back out.
+assert 'model=Gemini 3.7 Flash (High)' in d['Content'], d['Content']
+assert d['Model'] == 'Gemini 3.7 Flash (High)', 'Model=%r' % d['Model']
+assert d['TokensIn'] > 0 and d['TokensOut'] > 0, 'token telemetry lost'
+assert d['SessionID'], 'conversation_id lost'
+# agy reports no cost in any output format — a non-zero value here is invented.
+assert d['CostUSD'] == 0, 'CostUSD=%r, agy reports no cost' % d['CostUSD']
+" <<<"$AGY_OK" 2>/dev/null; then
+  pass "agy success path: content, forwarded model, tokens and conversation id"
+else
+  fail "agy success path broken: $AGY_OK"
+fi
+
+# In JSON mode agy writes its failure to STDOUT and leaves stderr EMPTY. A
+# provider reading stderr alone reports a bare exit code and loses the reason.
+AGY_ERR_STUB=$(mktemp -t dootsabha-agy-err-XXXXXX)
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "1.1.17"; exit 0; }\nprintf %%s "{\\"conversation_id\\":\\"\\",\\"status\\":\\"ERROR\\",\\"response\\":\\"\\",\\"error\\":\\"quota exhausted for this project\\",\\"usage\\":{}}"\nexit 1\n' > "$AGY_ERR_STUB"
+chmod +x "$AGY_ERR_STUB"
+AGY_ERR=$(DOOTSABHA_PROVIDERS_AGY_BINARY="$AGY_ERR_STUB" \
+  "$BINARY" consult --agent agy --config /dev/null "PONG" 2>&1 || true)
+rm -f "$AGY_ERR_STUB"
+if grep -qF "quota exhausted for this project" <<<"$AGY_ERR"; then
+  pass "an agy failure reported only on stdout still reaches the user"
+else
+  fail "agy stdout-only error was swallowed: $AGY_ERR"
+fi
+
 # ── Workflow 5b: Absent providers degrade gracefully ─────────────────────────
 #
 # REGRESSION GUARD. Every other test here supplies a mock binary for every

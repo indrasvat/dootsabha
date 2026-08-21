@@ -17,9 +17,14 @@ const (
 )
 
 // agy provider defaults applied during migration.
+//
+// defaultAgyModel is core's ONLY copy of agy's default model: setDefaults in
+// config.go reads it too. It deliberately duplicates providers.AgyDefaultModel
+// because core sits below providers and importing it would cycle;
+// TestAgyDefaultModelSourcesAgree fails the build if the two drift.
 const (
-	agyBinary = "agy"
-	agyModel  = "Gemini 3.5 Flash (High)"
+	agyBinary       = "agy"
+	defaultAgyModel = "Gemini 3.7 Flash (High)"
 )
 
 var agyFlags = []string{"--dangerously-skip-permissions"}
@@ -240,7 +245,7 @@ func newAgyProviderNode() *yaml.Node {
 	// Encode never fails for plain map/string/slice values.
 	_ = node.Encode(map[string]any{
 		"binary": agyBinary,
-		"model":  agyModel,
+		"model":  defaultAgyModel,
 		"flags":  agyFlags,
 	})
 	return &node

@@ -18,7 +18,7 @@ Output (status uses envelope + PascalCase):
 ```json
 {"Name":"claude","Healthy":true,"Model":"claude-opus-4-8"}
 {"Name":"codex","Healthy":true,"Model":"gpt-5.5"}
-{"Name":"agy","Healthy":true,"Model":"Gemini 3.5 Flash (High)"}
+{"Name":"agy","Healthy":true,"Model":"Gemini 3.7 Flash (High)"}
 ```
 
 Exit code: `0` (all healthy).

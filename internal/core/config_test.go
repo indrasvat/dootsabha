@@ -79,8 +79,8 @@ func TestConfigDefaults(t *testing.T) {
 	if _, ok := cfg.Providers["agy"]; !ok {
 		t.Error("providers.agy missing from defaults")
 	}
-	if cfg.Providers["agy"].Model != "Gemini 3.5 Flash (High)" {
-		t.Errorf("agy.Model: got %q, want %q", cfg.Providers["agy"].Model, "Gemini 3.5 Flash (High)")
+	if cfg.Providers["agy"].Model != "Gemini 3.7 Flash (High)" {
+		t.Errorf("agy.Model: got %q, want %q", cfg.Providers["agy"].Model, "Gemini 3.7 Flash (High)")
 	}
 }
 
@@ -169,8 +169,8 @@ func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
 	}
-	if cfg.Providers["agy"].Model != "Gemini 3.5 Flash (High)" {
-		t.Errorf("agy.Model: got %q, want built-in Gemini 3.5 Flash (High)", cfg.Providers["agy"].Model)
+	if cfg.Providers["agy"].Model != "Gemini 3.7 Flash (High)" {
+		t.Errorf("agy.Model: got %q, want built-in Gemini 3.7 Flash (High)", cfg.Providers["agy"].Model)
 	}
 }
 

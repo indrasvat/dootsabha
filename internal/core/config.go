@@ -194,6 +194,24 @@ func validateRawConfig(v *viper.Viper) error {
 					return fmt.Errorf("providers.%s.%s: expected a string, got %T", name, leaf, raw)
 				}
 			}
+
+			// `flags` must be a list of strings. A scalar or mapping silently
+			// becomes an empty list, dropping pinned safety flags — and a scalar
+			// that survives into argv is a NON-FLAG token, which terminates a
+			// stdlib-flag CLI's parsing so `-p <prompt>` is never seen and the
+			// prompt is discarded. Exit 6, not a silent fallback (PRD §6.1).
+			switch raw := fields["flags"].(type) {
+			case nil:
+			case []string:
+			case []any:
+				for i, item := range raw {
+					if _, ok := item.(string); !ok {
+						return fmt.Errorf("providers.%s.flags[%d]: expected a string, got %T", name, i, item)
+					}
+				}
+			default:
+				return fmt.Errorf("providers.%s.flags: expected a list of strings, got %T", name, raw)
+			}
 		}
 	}
 
@@ -224,7 +242,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("providers.codex.model", "gpt-5.5")
 	v.SetDefault("providers.codex.flags", []string{"--sandbox", "danger-full-access", "--ephemeral", "--skip-git-repo-check", "-c", "model_reasoning_effort=medium"})
 	v.SetDefault("providers.agy.binary", "agy")
-	v.SetDefault("providers.agy.model", "Gemini 3.5 Flash (High)")
+	// defaultAgyModel lives in migrate.go — the migration writer and this
+	// default MUST agree, so core keeps exactly one copy of the literal.
+	v.SetDefault("providers.agy.model", defaultAgyModel)
 	v.SetDefault("providers.agy.flags", []string{"--dangerously-skip-permissions"})
 	v.SetDefault("providers.grok.binary", "grok")
 	v.SetDefault("providers.grok.model", "grok-4.6")

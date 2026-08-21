@@ -24,13 +24,14 @@ in the repo). Verify with `dootsabha status --json`.
 |---|---|---|---|---|
 | `claude` | ✅ | ✅ | ✅ | ✅ (standalone only) |
 | `codex` | ✅ | — | — | ✅ |
-| `agy` | — | — | — | ✅ |
+| `agy` | ✅ | — | ✅ | ✅ |
 | `grok` | ✅ | ✅ | ✅ | ❌ **opt-in** |
 
 Responses report `Model` as the *backend* id (`grok-4.6-build`), which differs from
 the configured `grok-4.6`. Match on prefix, not equality.
 
-`agy` runs plain-text print mode, so its token/cost/session fields are `0`/empty.
+`agy` reports tokens and a session id (its conversation id) but never cost — the
+Antigravity CLI emits none, so `CostUSD` stays `0` rather than being estimated.
 
 **`grok` is opt-in.** It never joins a council automatically — name it explicitly:
 `--agent grok`, `--agents claude,codex,grok`, `--chair grok`, `--reviewers codex,grok`.

@@ -72,16 +72,127 @@ else
   fail "mock-codex not found/executable"
 fi
 
-# Test 8: mock-agy works (Antigravity print mode — plain text)
+# Test 8: mock-agy works (Antigravity print mode — JSON envelope)
 if [[ -x "$MOCK_DIR/mock-agy" ]]; then
-  RESULT=$("$MOCK_DIR/mock-agy" --dangerously-skip-permissions --model "Gemini 3.5 Flash (High)" -p "PONG" 2>&1)
-  if echo "$RESULT" | grep -q 'PONG'; then
-    pass "mock-agy produces plain-text response"
+  RESULT=$("$MOCK_DIR/mock-agy" --dangerously-skip-permissions --model "Gemini 3.7 Flash (High)" \
+    --output-format json -p "PONG" 2>&1)
+  if python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+assert d["status"] == "SUCCESS", d
+assert "PONG" in d["response"], d
+assert d["usage"]["input_tokens"] + d["usage"]["output_tokens"] == d["usage"]["total_tokens"], d
+' <<<"$RESULT" 2>/dev/null; then
+    pass "mock-agy emits a parseable JSON envelope"
   else
     fail "mock-agy output unexpected: $RESULT"
   fi
+  # The mock ECHOES the --model it was handed. A SYNTHETIC model is used
+  # deliberately: asserting the shipped default here would move both sides
+  # together every bump and prove nothing.
+  if "$MOCK_DIR/mock-agy" --model "probe-9.9" -p "PONG" 2>&1 | grep -q 'model=probe-9.9'; then
+    pass "mock-agy echoes the model it was given"
+  else
+    fail "mock-agy did not echo --model"
+  fi
+  # ...and with no --model at all it must NOT invent a plausible one, or a
+  # regression that dropped the flag would read as a pass.
+  if "$MOCK_DIR/mock-agy" -p "PONG" 2>&1 | grep -q 'model=unset'; then
+    pass "mock-agy reports a sentinel when --model is absent"
+  else
+    fail "mock-agy masks a missing --model"
+  fi
 else
   fail "mock-agy not found/executable"
+fi
+
+# Test 8b: dootsabha FORWARDS the configured model to agy, and parses the JSON
+# envelope back into session id and token counts.
+#
+# REGRESSION GUARD. mock-agy previously discarded --model outright, so no
+# integration test could observe a forwarding regression at all.
+# --config /dev/null so a developer's ~/.dootsabha config cannot mask the default.
+AGY_JSON=$(DOOTSABHA_PROVIDERS_AGY_BINARY="$MOCK_DIR/mock-agy" \
+  "$BINARY" consult --agent agy --json --config /dev/null "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)["data"]
+assert "model=Gemini 3.7 Flash (High)" in d["Content"], d["Content"]
+assert d["Model"] == "Gemini 3.7 Flash (High)", d["Model"]
+assert d["SessionID"], "conversation_id was not parsed out of the JSON envelope"
+assert d["TokensIn"] > 0 and d["TokensOut"] > 0, d
+' <<<"$AGY_JSON" 2>/dev/null; then
+  pass "consult --agent agy forwards the shipped default and parses JSON telemetry"
+else
+  fail "agy default not forwarded end-to-end: $AGY_JSON"
+fi
+
+# Test 8c: an explicitly pinned model is never rewritten. 3.6/3.5/3.1 are still
+# live, so bumping the DEFAULT must not move a user who chose one.
+AGY_PIN_CFG=$(mktemp -t dootsabha-agy-pin-XXXXXX)
+trap 'rm -f "$AGY_PIN_CFG"' EXIT
+printf 'providers:\n  agy:\n    binary: %s\n    model: Gemini 3.5 Flash (High)\n' \
+  "$PWD/$MOCK_DIR/mock-agy" > "$AGY_PIN_CFG"
+AGY_PIN_JSON=$("$BINARY" consult --agent agy --json --config "$AGY_PIN_CFG" "PONG" 2>/dev/null || true)
+if python3 -c '
+import json,sys
+d = json.load(sys.stdin)["data"]
+assert "model=Gemini 3.5 Flash (High)" in d["Content"], d["Content"]
+' <<<"$AGY_PIN_JSON" 2>/dev/null; then
+  pass "an explicitly pinned agy model survives the default bump"
+else
+  fail "pinned agy model was rewritten: $AGY_PIN_JSON"
+fi
+
+# Test 8d: a user cannot break the parser or smuggle a model from config.
+#
+# agy parses argv with Go's stdlib flag package, so `-model` IS `--model` and a
+# repeat is LAST-WINS. A stripper matching only the double-dash spelling let
+# `-output-format text` break every parse, and `-model X` SILENTLY run a different
+# model than the one dootsabha reports — undetectable, because agy's envelope
+# never echoes the model back.
+AGY_FMT_CFG=$(mktemp -t dootsabha-agy-fmt-XXXXXX)
+trap 'rm -f "$AGY_PIN_CFG" "$AGY_FMT_CFG"' EXIT
+for SPELLING in "--output-format" "-output-format"; do
+  printf 'providers:\n  agy:\n    binary: %s\n    flags:\n      - %s\n      - text\n' \
+    "$PWD/$MOCK_DIR/mock-agy" "$SPELLING" > "$AGY_FMT_CFG"
+  if "$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "PONG" >/dev/null 2>&1; then
+    pass "a configured '$SPELLING text' cannot break the agy parser"
+  else
+    fail "config-supplied '$SPELLING' reached agy and broke the parse"
+  fi
+done
+
+for SPELLING in "--model" "-model"; do
+  printf 'providers:\n  agy:\n    binary: %s\n    model: Gemini 3.7 Flash (High)\n    flags:\n      - %s\n      - SMUGGLED\n' \
+    "$PWD/$MOCK_DIR/mock-agy" "$SPELLING" > "$AGY_FMT_CFG"
+  SMUGGLE_JSON=$("$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "PONG" 2>/dev/null || true)
+  if grep -qF "model=Gemini 3.7 Flash (High)" <<<"$SMUGGLE_JSON" && ! grep -qF "SMUGGLED" <<<"$SMUGGLE_JSON"; then
+    pass "a configured '$SPELLING SMUGGLED' cannot override the pinned model"
+  else
+    fail "'$SPELLING' smuggled a model past the pin: $SMUGGLE_JSON"
+  fi
+done
+
+# Test 8e: a stray NON-FLAG token in flags must not swallow the prompt. agy stops
+# parsing at the first non-flag token, so with -p last the prompt was never sent
+# and agy tried to open an interactive TUI instead.
+printf 'providers:\n  agy:\n    binary: %s\n    flags:\n      - --dangerously-skip-permissions\n      - "true"\n' \
+  "$PWD/$MOCK_DIR/mock-agy" > "$AGY_FMT_CFG"
+STRAY_JSON=$("$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "KEEPTHISPROMPT" 2>/dev/null || true)
+if grep -qF "KEEPTHISPROMPT" <<<"$STRAY_JSON"; then
+  pass "a stray non-flag token in flags does not swallow the prompt"
+else
+  fail "the prompt was lost to a stray flags token: $STRAY_JSON"
+fi
+
+# Test 8f: a malformed `flags` is a loud config error, not a silent empty list.
+printf 'providers:\n  agy:\n    binary: agy\n    flags: 42\n' > "$AGY_FMT_CFG"
+RC=0; "$BINARY" consult --agent agy --config "$AGY_FMT_CFG" "PONG" >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -eq 6 ]]; then
+  pass "a non-list providers.agy.flags exits 6"
+else
+  fail "malformed flags exited $RC, want 6"
 fi
 
 # Test 9: mock-grok works (streaming-messages-json NDJSON)

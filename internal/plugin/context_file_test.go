@@ -224,6 +224,14 @@ func TestDefaultContextFile(t *testing.T) {
 		t.Errorf("extension context advertises grok model %q, want %q",
 			grokCtx.Model, providers.GrokDefaultModel)
 	}
+	agyCtx, ok := ctx.Providers["agy"]
+	if !ok {
+		t.Error("agy missing from the extension context provider map")
+	}
+	if agyCtx.Model != providers.AgyDefaultModel {
+		t.Errorf("extension context advertises agy model %q, want %q",
+			agyCtx.Model, providers.AgyDefaultModel)
+	}
 	if !ctx.Capabilities.Council {
 		t.Error("council capability should be true")
 	}

@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 # Simulates the Antigravity CLI (agy) for smoke tests — no API calls.
-# Print mode emits plain text only (no JSON, no token stats).
+# Emits the `--output-format json` envelope dootsabha parses, or plain text.
 set -euo pipefail
 PROMPT=""
+FORMAT="text"
+# The mock ECHOES the model it was handed, so an integration test can prove
+# dootsabha forwards it instead of asserting a hardcoded string against itself.
+# The default is a SENTINEL, deliberately not the shipped default: were it
+# "Gemini 3.7 Flash (High)", dropping --model entirely would still read as a pass.
+MODEL="unset"
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --version) echo "1.0.8"; exit 0 ;;
-    --dangerously-skip-permissions) shift ;;
-    --sandbox) shift ;;
-    --model) shift 2 ;;
+    --version) echo "1.1.17"; exit 0 ;;
+    --model) MODEL="$2"; shift 2 ;;
+    --output-format) FORMAT="$2"; shift 2 ;;
     -p|--print|--prompt) PROMPT="$2"; shift 2 ;;
+    --dangerously-skip-permissions|--sandbox) shift ;;
+    --effort|--print-timeout|--agent|--mode) shift 2 ;;
     *) PROMPT="${PROMPT:-$1}"; shift ;;
   esac
 done
@@ -17,4 +24,18 @@ done
 # Test hook: simulate a slow provider so timeout scoping can be exercised
 # end-to-end (GitHub issue #20). Unset in normal runs, so this is a no-op.
 sleep "${MOCK_AGY_DELAY:-0}"
-echo "Mock response to: $PROMPT"
+
+BODY="Mock response to: $PROMPT [model=$MODEL]"
+if [[ "$FORMAT" != "json" ]]; then
+  echo "$BODY"
+  exit 0
+fi
+
+# JSON-escape: council/refine embed prior agent responses in the prompt, so
+# multi-line input with quotes is the normal case, not an edge case.
+json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.read()))'; }
+BODY_JSON=$(printf '%s' "$BODY" | json_str)
+
+# total_tokens == input+output and thinking ⊆ output, mirroring the real CLI.
+# `error` is omitted on success, as the real CLI does — it is not emitted as "".
+printf '{"conversation_id":"3963cf7a-446b-479b-846f-1693117031f9","status":"SUCCESS","response":%s,"duration_seconds":1.5,"num_turns":1,"usage":{"input_tokens":1801,"output_tokens":27,"thinking_tokens":25,"cache_read_tokens":0,"total_tokens":1828}}\n' "$BODY_JSON"

@@ -158,7 +158,7 @@ AI coding agents are powerful individually, but each has blind spots, biases, an
 |-----|-------------------|-----------|-----------|
 | claude | 2.1.63 | `--output-format json` | `--dangerously-skip-permissions` |
 | codex | 0.106.0 | `--json` (JSONL stream) | `--sandbox danger-full-access` |
-| agy | 1.0.8 | none (plain-text print mode) | `--dangerously-skip-permissions` |
+| agy | 1.1.17 | `--output-format json` | `--dangerously-skip-permissions` |
 
 **Codex JSONL format (verified):**
 ```
@@ -175,17 +175,26 @@ Final content is in `item.completed` where `item.type == "agent_message"`. Token
 - `usage` in `turn.completed` has an undocumented `cached_input_tokens` field. Add to `Usage` struct.
 - `item.completed` can have `item.type == "error"` with `message` field instead of `text`. Handle gracefully.
 
-**agy flags (verified v1.0.8):**
+**agy flags (verified v1.1.17):**
 - `--dangerously-skip-permissions` is the yolo-equivalent flag (skips approval prompts)
-- `-p "<prompt>"` runs in non-interactive plain-text print mode
+- `-p "<prompt>"` runs a single non-interactive turn; `--output-format json` wraps it
+- `--model` takes a display name or an id; the `(High|Medium|Low)` suffix is the
+  effort selector, and `--effort` is rejected for the lower tiers
 - Antigravity CLI (agy) is Google's Go-built successor to the retired Gemini CLI (sunset 2026-06-18)
 
-**agy plain-text output (Spike 0.3):**
-- `agy` runs in plain-text print mode (`agy -p "<prompt>"`) — there is NO JSON output
-- No token counts, no cost, no session ID: those JSON fields are `0`/empty for `agy`
-- Parsing is simply "capture trimmed stdout as content; no usage data" (claude/codex still report full usage)
-- Default model: `Gemini 3.5 Flash (High)` (a display-name model id reported by agy)
-- Errors: no JSON error format — exit code != 0, empty stdout, plain text on stderr
+**agy JSON output (Spike 0.3, revised for agy 1.1.17 — see `docs/agy-cli-findings.md`):**
+- `agy -p` is driven with `--output-format json`; stdout is exactly one JSON document
+- Yields `conversation_id` (used as session ID) and `usage.{input,output}_tokens`;
+  `total_tokens` == in+out and `thinking_tokens` is a SUBSET of `output_tokens`
+- No cost in any output format — `cost_usd` stays `0`, never estimated
+- The envelope does not echo the model, so `model` is the value दूतसभा sent
+- Default model: `Gemini 3.7 Flash (High)` (a display-name model id reported by agy);
+  the `(High|Medium|Low)` suffix is the effort selector and `--effort` is rejected for
+  the lower tiers
+- Errors: `status` is a TOOL-level diagnostic, not the discriminator — a failed tool
+  call in a turn that still answered returns exit 0 + `status: "ERROR"` + a usable
+  `response`. The exit code decides; on failure the reason is in the envelope's
+  `error` field and **stderr is empty**
 
 **Claude nested session gotcha (Spike 0.2):** `claude -p` cannot be run inside a Claude Code session. Must **remove** (not just empty) all `CLAUDECODE*` and `CLAUDE_CODE*` env vars from subprocess environment. Known vars: `CLAUDECODE=1`, `CLAUDE_CODE_ENTRYPOINT=cli`, `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Setting `CLAUDECODE=""` is NOT sufficient — the key must be absent entirely.
 
@@ -416,7 +425,7 @@ agents: claude ✓ · codex ✓ · agy ✓
   "dispatch": [
     {"provider": "claude", "model": "sonnet-4-6", "content": "...", "duration_ms": 3100, "cost_usd": 0.003, "tokens_in": 847, "tokens_out": 234},
     {"provider": "codex", "model": "gpt-5.3-codex", "content": "...", "duration_ms": 2800},
-    {"provider": "agy", "model": "Gemini 3.5 Flash (High)", "content": "...", "duration_ms": 2200}
+    {"provider": "agy", "model": "Gemini 3.7 Flash (High)", "content": "...", "duration_ms": 2200, "tokens_in": 18054, "tokens_out": 27}
   ],
   "reviews": [
     {"reviewer": "claude", "reviewed": ["codex", "agy"], "content": "..."},
@@ -503,7 +512,7 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 - [ ] FR-CON-03: Styled output with provider color dot, timing, cost
 - [ ] FR-CON-04: `--json` produces valid JSON
 - [ ] FR-CON-05: `--agent codex` uses Codex CLI with JSONL parsing
-- [ ] FR-CON-06: `--agent agy` uses Antigravity CLI (agy) in plain-text print mode (no usage data)
+- [ ] FR-CON-06: `--agent agy` uses Antigravity CLI (agy) with `--output-format json` (tokens + conversation id; no cost)
 - [ ] FR-CON-07: `--model opus-4-6` overrides provider default model
 - [ ] FR-CON-08: `--timeout 30s` kills agent after 30s with structured error
 - [ ] FR-CON-09: Piped output has no ANSI codes, no spinner artifacts
@@ -543,7 +552,7 @@ tokens: 847 in · 234 out │ cost: $0.003 │ session: ds_x7k2m
 PROVIDER   MODEL           STATUS    VERSION    LATENCY
 ● claude   sonnet-4-6              ✓ ready   2.1.63     —
 ● codex    gpt-5.3-codex          ✓ ready   0.106.0    —
-● agy      Gemini 3.5 Flash (High) ✗ auth    1.0.8      —
+● agy      Gemini 3.7 Flash (High) ✗ auth    1.1.17     —
                             ↳ OAuth token expired — run: agy auth login
 
 Plugins: 3 providers · 1 strategy · 0 hooks
@@ -557,7 +566,7 @@ Extensions: bench, cost, tui
   "providers": {
     "claude": {"healthy": true, "model": "sonnet-4-6", "cli_version": "2.1.63", "auth_valid": true},
     "codex": {"healthy": true, "model": "gpt-5.3-codex", "cli_version": "0.106.0", "auth_valid": true},
-    "agy": {"healthy": false, "model": "Gemini 3.5 Flash (High)", "cli_version": "1.0.8", "auth_valid": false, "error": "OAuth token expired"}
+    "agy": {"healthy": false, "model": "Gemini 3.7 Flash (High)", "cli_version": "1.1.17", "auth_valid": false, "error": "OAuth token expired"}
   },
   "plugins": {"providers": 3, "strategies": 1, "hooks": 0},
   "extensions": ["bench", "cost", "tui"]
@@ -956,7 +965,7 @@ Mark DONE → Update PROGRESS.md → Commit
 | Q3 | Should providers be hardcoded in MVP, plugins deferred to v0.2? | Open | Build plan has both in MVP (P1-P2 hardcoded → P3 plugins). Could ship P1-P2 as v0.1, plugins as v0.2. |
 | Q4 | Should we vendor proto-generated code? | Open | Vendoring avoids protoc dependency for contributors. But adds git bloat. |
 | Q5 | BubbleTea TUI extension (`dootsabha-tui`) — scope it for MVP? | Open | Build plan mentions it as future extension. Could be v0.2. |
-| Q6 | agy invocation mode — how do we send the prompt? | Resolved | Use `agy -p "<prompt>"` plain-text print mode in v1.0.8. No JSON output, so no usage data. |
+| Q6 | agy invocation mode — how do we send the prompt? | Resolved | `agy -p "<prompt>" --output-format json`. Print mode gained `--output-format` in v1.1.8, so दूतसभा requires 1.1.8+ and reports older builds unhealthy. Yields tokens + conversation id; no cost. |
 | Q7 | agy yolo flag? | Resolved | Use `--dangerously-skip-permissions` in v1.0.8 (skips approval prompts). |
 | Q8 | `--watch` streaming — what does it look like? | Open | Deferred to Phase 4. Needs spec for TTY stream events, non-TTY line-buffered format, and `--json` NDJSON stream. |
 
@@ -974,3 +983,4 @@ Mark DONE → Update PROGRESS.md → Commit
 | 2026-02-28 | 1.5 | Task files + git hooks: 37 numbered task files (docs/tasks/, P0-P5), lefthook spec delegating to Makefile (pre-commit→`make pre-commit`, pre-push→`make ci`), new targets (pre-commit, fmt-check, fix-check), `make build` depends on `hooks`, two-layer quality system (testing-strategy.md §8) |
 | 2026-02-28 | 1.6 | Phase 0 spike findings integrated: (1) huh v0.8.0 has no `NewSpinner()` — replaced with raw stderr goroutine pattern, (2) `CLAUDECODE*`/`CLAUDE_CODE*` env vars must be removed entirely (not emptied), (3) Codex `type:"error"` events are non-fatal transport fallback, `cached_input_tokens` field added, (4) Gemini dual-model architecture documented (utility_router + main), API latency vs wall-clock, (5) PTY risk resolved — `creack/pty` NOT needed |
 | 2026-06-13 | 1.7 | Provider migration: retired Gemini CLI (Google sunset 2026-06-18) replaced by `agy` (Antigravity CLI), Google's Go-built successor. Provider/binary renamed `gemini`→`agy`, v1.0.8, default model `Gemini 3.5 Flash (High)`, flag `--dangerously-skip-permissions`. agy runs plain-text print mode (`agy -p`) with NO JSON — no token/cost/session data. Defaults updated (council `claude,codex,agy`; refine reviewers `codex,agy`). Added `dootsabha config migrate` (gemini→agy config rewrite with `.bak`, `--dry-run`, `--json`) plus stale-config TTY nudge. |
+| 2026-08-21 | 1.8 | agy default model bumped to `Gemini 3.7 Flash (High)` (Google shipped 3.7 Flash 2026-08-13; agy 1.1.17). Not a migration — 3.6/3.5/3.1 stay live and an explicit pin is never rewritten. agy now driven with `--output-format json`: token counts and `conversation_id` populated, cost still `0` (the CLI reports none). Failure text now read from the envelope, which is where agy puts it — in JSON mode stderr is empty. `status` is a tool-level diagnostic, not the failure discriminator. See `docs/agy-cli-findings.md`. |
