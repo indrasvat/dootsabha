@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -134,5 +135,12 @@ func TruncateString(s string, maxBytes int) string {
 	if len(s) <= maxBytes {
 		return s
 	}
-	return s[:maxBytes] + "\n... [truncated]"
+	// Back off to a rune boundary. Cutting on a byte offset strands a lead byte
+	// and emits invalid UTF-8 — which then travels into another agent's prompt,
+	// or a Devanagari error message onto the terminal as mojibake.
+	cut := maxBytes
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "\n... [truncated]"
 }

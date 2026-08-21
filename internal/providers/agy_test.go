@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -112,8 +113,15 @@ func TestAgyProviderInvokeArgs(t *testing.T) {
 	if slices.Contains(args, "--effort") {
 		t.Errorf("दूतसभा must not emit --effort: %v", args)
 	}
-	if len(args) < 2 || args[len(args)-2] != "-p" || args[len(args)-1] != "Say PONG" {
-		t.Errorf("expected trailing `-p \"Say PONG\"`, got %v", args)
+	// The prompt precedes the user's flags: agy's stdlib flag parser stops at the
+	// first non-flag token, so a stray token in `flags` must not be able to
+	// swallow `-p <prompt>`.
+	pi := slices.Index(args, "-p")
+	if pi < 0 || pi+1 >= len(args) || args[pi+1] != "Say PONG" {
+		t.Fatalf("expected `-p \"Say PONG\"` in args, got %v", args)
+	}
+	if fi := slices.Index(args, "--dangerously-skip-permissions"); fi < pi {
+		t.Errorf("user flags must follow the prompt, got %v", args)
 	}
 }
 
@@ -138,13 +146,20 @@ func TestAgyProviderModelOverride(t *testing.T) {
 // override them. `--output-format text` is the dangerous one — it would silently
 // break every parse.
 func TestAgyProviderStripsPinnedFlagsFromConfig(t *testing.T) {
+	// agy parses argv with Go's stdlib flag package: `-model` IS `--model`, and a
+	// repeat is LAST-WINS. Single-dash spellings therefore had to be matched too —
+	// `-output-format text` broke every parse, and `-model X` silently ran a
+	// different model than the one दूतसभा reported.
 	for _, flags := range [][]string{
 		{"--model", "legacy-model"},
-		{"-m=older-model"},
 		{"--model=other"},
+		{"-model", "legacy-model"},
+		{"-model=other"},
 		{"--output-format", "text"},
 		{"--output-format=stream-json"},
-		{"--model", "legacy", "--output-format", "text", "-m=x"},
+		{"-output-format", "text"},
+		{"-output-format=text"},
+		{"--model", "legacy", "-output-format", "text", "-model=x"},
 	} {
 		t.Run(strings.Join(flags, " "), func(t *testing.T) {
 			cfg := defaultConfig(t)
@@ -171,10 +186,17 @@ func TestAgyProviderStripsPinnedFlagsFromConfig(t *testing.T) {
 			if n := countFlag(args, "--output-format"); n != 1 {
 				t.Errorf("--output-format appears %d times, want 1: %v", n, args)
 			}
-			for _, a := range args {
-				if a == "-m" || strings.HasPrefix(a, "-m=") || strings.HasPrefix(a, "--model=") ||
-					strings.HasPrefix(a, "--output-format=") {
-					t.Errorf("pinned flag %q survived: %v", a, args)
+			// countFlag is an exact string compare, so a surviving `-output-format`
+			// counts as ZERO and the assertions above pass with the hole open.
+			// Normalise before checking, the way agy's own parser does.
+			for i, a := range args {
+				if i == 0 || i == 2 {
+					continue // दूतसभा's own --model / --output-format
+				}
+				name, _, _ := strings.Cut(a, "=")
+				switch strings.TrimLeft(name, "-") {
+				case "model", "output-format":
+					t.Errorf("pinned flag %q survived at index %d: %v", a, i, args)
 				}
 			}
 		})
@@ -338,5 +360,151 @@ func TestAgyProviderHealthCheckNonZeroExit(t *testing.T) {
 	}
 	if status.Healthy {
 		t.Error("expected Healthy=false on non-zero exit")
+	}
+}
+
+// A type change in a field दूतसभा does NOT read must never cost the user the
+// answer — nor, on a failure, the reason. Found by adversarial review: the
+// envelope was decoded strictly, so `duration_seconds` or `num_turns` drifting
+// would have reinstated the exact "bare exit code 1" bug 707 exists to fix.
+func TestAgyProviderToleratesUnreadFieldDrift(t *testing.T) {
+	const answer = "GOOD ANSWER"
+	for _, body := range []string{
+		`{"status":"SUCCESS","response":"` + answer + `","num_turns":1.5,"usage":{"input_tokens":18053.0,"output_tokens":26}}`,
+		`{"status":"SUCCESS","response":"` + answer + `","duration_seconds":"3.5","usage":{}}`,
+		`{"status":"SUCCESS","response":"` + answer + `","thinking_tokens":null,"usage":{"input_tokens":1,"output_tokens":2}}`,
+	} {
+		t.Run(body[:40], func(t *testing.T) {
+			p := providers.NewAgyProvider(defaultConfig(t), &mockRunner{stdout: []byte(body)})
+			result, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+			if err != nil {
+				t.Fatalf("drift in an unread field discarded the answer: %v", err)
+			}
+			if result.Content != answer {
+				t.Errorf("Content = %q, want %q", result.Content, answer)
+			}
+		})
+	}
+
+	// A float token count degrades to its integer value, not to a parse failure.
+	p := providers.NewAgyProvider(defaultConfig(t), &mockRunner{
+		stdout: []byte(`{"status":"SUCCESS","response":"x","usage":{"input_tokens":18053.0,"output_tokens":26}}`),
+	})
+	result, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.TokensIn != 18053 || result.TokensOut != 26 {
+		t.Errorf("tokens = (%d,%d), want (18053,26)", result.TokensIn, result.TokensOut)
+	}
+
+	// An absurd count degrades to 0 rather than overflowing the int32 the gRPC
+	// plugin narrows to.
+	p = providers.NewAgyProvider(defaultConfig(t), &mockRunner{
+		stdout: []byte(`{"status":"SUCCESS","response":"x","usage":{"input_tokens":99999999999999,"output_tokens":-5}}`),
+	})
+	result, err = p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.TokensIn != 0 || result.TokensOut != 0 {
+		t.Errorf("tokens = (%d,%d), want (0,0) for out-of-range counts", result.TokensIn, result.TokensOut)
+	}
+}
+
+// The failure message is decoded independently of the full envelope, so a drift
+// elsewhere cannot strand the user on a bare exit code — stderr is EMPTY in JSON
+// mode, so there is no second chance.
+func TestAgyProviderErrorSurvivesEnvelopeDrift(t *testing.T) {
+	const msg = "Quota exceeded for Gemini 3.7 Flash. Retry after 3600s."
+	runner := &mockRunner{
+		stdout:   []byte(`{"status":"ERROR","response":"","error":"` + msg + `","num_turns":1.5,"usage":{}}`),
+		exitCode: 1,
+	}
+	p := providers.NewAgyProvider(defaultConfig(t), runner)
+
+	_, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), msg) {
+		t.Errorf("error %q lost the envelope message", err.Error())
+	}
+}
+
+// agy's most common failure lists every valid model (~750 bytes). Cutting that
+// removes the only actionable content, so the cap must clear it.
+func TestAgyProviderErrorCapClearsTheModelList(t *testing.T) {
+	long := "model nope is not recognized\nAvailable models:\n" + strings.Repeat("  Gemini 3.7 Flash (High)\n", 30)
+	runner := &mockRunner{
+		stdout:   []byte(`{"status":"ERROR","response":"","error":` + strconv.Quote(long) + `,"usage":{}}`),
+		exitCode: 1,
+	}
+	p := providers.NewAgyProvider(defaultConfig(t), runner)
+
+	_, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), "[truncated]") {
+		t.Errorf("a ~750-byte model list must survive the cap, got: %q", err.Error())
+	}
+
+	// Still capped, so a hostile binary cannot flood the terminal.
+	runner = &mockRunner{
+		stdout:   []byte(`{"status":"ERROR","response":"","error":` + strconv.Quote(strings.Repeat("x", 100_000)) + `,"usage":{}}`),
+		exitCode: 1,
+	}
+	p = providers.NewAgyProvider(defaultConfig(t), runner)
+	_, err = p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+	if err == nil || !strings.Contains(err.Error(), "[truncated]") {
+		t.Errorf("a 100KB error must still be capped, got %v", err)
+	}
+}
+
+// stdout is exactly ONE document. Decode stops at the first value, so without an
+// explicit check a second envelope is dropped and the wrong turn becomes the answer.
+func TestAgyProviderRejectsTrailingDocument(t *testing.T) {
+	for _, tc := range []struct {
+		name, stdout string
+		wantErr      bool
+	}{
+		{"two envelopes", `{"status":"SUCCESS","response":"FIRST"}{"status":"ERROR","response":"SECOND","error":"real failure"}`, true},
+		{"trailing garbage", `{"status":"SUCCESS","response":"ok"} some banner`, true},
+		{"trailing newline is fine", `{"status":"SUCCESS","response":"ok"}` + "\n", false},
+		{"trailing whitespace is fine", `{"status":"SUCCESS","response":"ok"}  ` + "\n\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := providers.NewAgyProvider(defaultConfig(t), &mockRunner{stdout: []byte(tc.stdout)})
+			_, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{})
+			if tc.wantErr && err == nil {
+				t.Error("trailing data was silently ignored — the second turn would be lost")
+			}
+			if !tc.wantErr && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// Stripping a pinned flag must not eat a following FLAG — only its value.
+// grok's stripper guards this; the agy copy had regressed it, silently dropping
+// the auto-approve flag so agy would block on tool permission prompts.
+func TestAgyProviderPinnedFlagDoesNotEatNextFlag(t *testing.T) {
+	cfg := defaultConfig(t)
+	pc := cfg.Providers["agy"]
+	pc.Flags = []string{"--output-format", "--dangerously-skip-permissions", "--effort", "high"}
+	cfg.Providers["agy"] = pc
+
+	runner := &mockRunner{stdout: agyOK(t, "ok")}
+	p := providers.NewAgyProvider(cfg, runner)
+	if _, err := p.Invoke(context.Background(), "hi", providers.InvokeOptions{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !slices.Contains(runner.capturedArgs, "--dangerously-skip-permissions") {
+		t.Errorf("a valueless pinned flag ate the next flag: %v", runner.capturedArgs)
+	}
+	if got := flagValue(runner.capturedArgs, "--effort"); got != "high" {
+		t.Errorf("--effort = %q, want high: %v", got, runner.capturedArgs)
 	}
 }

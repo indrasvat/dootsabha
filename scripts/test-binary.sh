@@ -144,16 +144,55 @@ else
   fail "pinned agy model was rewritten: $AGY_PIN_JSON"
 fi
 
-# Test 8d: a user cannot break the parser from config. --output-format is pinned,
-# so `--output-format text` in flags must be stripped, not forwarded.
+# Test 8d: a user cannot break the parser or smuggle a model from config.
+#
+# agy parses argv with Go's stdlib flag package, so `-model` IS `--model` and a
+# repeat is LAST-WINS. A stripper matching only the double-dash spelling let
+# `-output-format text` break every parse, and `-model X` SILENTLY run a different
+# model than the one dootsabha reports — undetectable, because agy's envelope
+# never echoes the model back.
 AGY_FMT_CFG=$(mktemp -t dootsabha-agy-fmt-XXXXXX)
 trap 'rm -f "$AGY_PIN_CFG" "$AGY_FMT_CFG"' EXIT
-printf 'providers:\n  agy:\n    binary: %s\n    flags:\n      - --output-format\n      - text\n' \
+for SPELLING in "--output-format" "-output-format"; do
+  printf 'providers:\n  agy:\n    binary: %s\n    flags:\n      - %s\n      - text\n' \
+    "$PWD/$MOCK_DIR/mock-agy" "$SPELLING" > "$AGY_FMT_CFG"
+  if "$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "PONG" >/dev/null 2>&1; then
+    pass "a configured '$SPELLING text' cannot break the agy parser"
+  else
+    fail "config-supplied '$SPELLING' reached agy and broke the parse"
+  fi
+done
+
+for SPELLING in "--model" "-model"; do
+  printf 'providers:\n  agy:\n    binary: %s\n    model: Gemini 3.7 Flash (High)\n    flags:\n      - %s\n      - SMUGGLED\n' \
+    "$PWD/$MOCK_DIR/mock-agy" "$SPELLING" > "$AGY_FMT_CFG"
+  SMUGGLE_JSON=$("$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "PONG" 2>/dev/null || true)
+  if grep -qF "model=Gemini 3.7 Flash (High)" <<<"$SMUGGLE_JSON" && ! grep -qF "SMUGGLED" <<<"$SMUGGLE_JSON"; then
+    pass "a configured '$SPELLING SMUGGLED' cannot override the pinned model"
+  else
+    fail "'$SPELLING' smuggled a model past the pin: $SMUGGLE_JSON"
+  fi
+done
+
+# Test 8e: a stray NON-FLAG token in flags must not swallow the prompt. agy stops
+# parsing at the first non-flag token, so with -p last the prompt was never sent
+# and agy tried to open an interactive TUI instead.
+printf 'providers:\n  agy:\n    binary: %s\n    flags:\n      - --dangerously-skip-permissions\n      - "true"\n' \
   "$PWD/$MOCK_DIR/mock-agy" > "$AGY_FMT_CFG"
-if "$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "PONG" >/dev/null 2>&1; then
-  pass "a configured --output-format text cannot break the agy parser"
+STRAY_JSON=$("$BINARY" consult --agent agy --json --config "$AGY_FMT_CFG" "KEEPTHISPROMPT" 2>/dev/null || true)
+if grep -qF "KEEPTHISPROMPT" <<<"$STRAY_JSON"; then
+  pass "a stray non-flag token in flags does not swallow the prompt"
 else
-  fail "config-supplied --output-format reached agy and broke the parse"
+  fail "the prompt was lost to a stray flags token: $STRAY_JSON"
+fi
+
+# Test 8f: a malformed `flags` is a loud config error, not a silent empty list.
+printf 'providers:\n  agy:\n    binary: agy\n    flags: 42\n' > "$AGY_FMT_CFG"
+RC=0; "$BINARY" consult --agent agy --config "$AGY_FMT_CFG" "PONG" >/dev/null 2>&1 || RC=$?
+if [[ "$RC" -eq 6 ]]; then
+  pass "a non-list providers.agy.flags exits 6"
+else
+  fail "malformed flags exited $RC, want 6"
 fi
 
 # Test 9: mock-grok works (streaming-messages-json NDJSON)

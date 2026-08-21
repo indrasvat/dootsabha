@@ -36,9 +36,12 @@ providers:
                                       # effort — agy rejects --effort for Low/Medium.
     flags:
       - --dangerously-skip-permissions  # yolo equivalent — auto-approve tool permissions
-    # PINNED by the provider and stripped from the list above:
+    # PINNED by the provider and stripped from the list above, in ANY spelling
+    # (agy uses Go's stdlib flag package, so -model == --model):
     #   --output-format json  (the envelope is the parser's contract)
     #   --model               (re-added from `model:` above)
+    # Every entry must be a flag or a flag's value: agy stops parsing at the first
+    # non-flag token, so a stray one silently drops the flags after it.
   grok:                             # xAI Grok CLI — opt-in via --agent/--agents, not a council default
     binary: grok
     model: grok-4.6                   # CLI default; grok-4.5 also selectable (see `grok models`)

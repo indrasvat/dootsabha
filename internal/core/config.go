@@ -194,6 +194,24 @@ func validateRawConfig(v *viper.Viper) error {
 					return fmt.Errorf("providers.%s.%s: expected a string, got %T", name, leaf, raw)
 				}
 			}
+
+			// `flags` must be a list of strings. A scalar or mapping silently
+			// becomes an empty list, dropping pinned safety flags — and a scalar
+			// that survives into argv is a NON-FLAG token, which terminates a
+			// stdlib-flag CLI's parsing so `-p <prompt>` is never seen and the
+			// prompt is discarded. Exit 6, not a silent fallback (PRD §6.1).
+			switch raw := fields["flags"].(type) {
+			case nil:
+			case []string:
+			case []any:
+				for i, item := range raw {
+					if _, ok := item.(string); !ok {
+						return fmt.Errorf("providers.%s.flags[%d]: expected a string, got %T", name, i, item)
+					}
+				}
+			default:
+				return fmt.Errorf("providers.%s.flags: expected a list of strings, got %T", name, raw)
+			}
 		}
 	}
 

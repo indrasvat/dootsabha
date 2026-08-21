@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/indrasvat/dootsabha/internal/core"
 )
@@ -156,4 +157,37 @@ func (m *capturingAgent) Name() string { return m.name }
 func (m *capturingAgent) Invoke(_ context.Context, prompt string, _ core.InvokeOptions) (*core.InvokeResult, error) {
 	m.lastPrompt = prompt
 	return m.result, nil
+}
+
+// TruncateString cut on a raw byte offset, stranding a lead byte and emitting
+// invalid UTF-8. It feeds council/refine prompts (32KB) and provider error text,
+// so a mid-rune cut sends broken bytes into another agent's prompt — or renders a
+// Devanagari error as mojibake. Found by adversarial review.
+func TestTruncateStringCutsOnRuneBoundary(t *testing.T) {
+	for _, tc := range []struct{ name, in string }{
+		{"devanagari", strings.Repeat("क", 500)}, // 3 bytes/rune — 400 is not a multiple
+		{"emoji", strings.Repeat("🙏", 300)},      // 4 bytes/rune
+		{"mixed", strings.Repeat("aक", 300)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := core.TruncateString(tc.in, 400)
+			if !utf8.ValidString(got) {
+				t.Errorf("truncated output is not valid UTF-8: %q", got)
+			}
+			if !strings.HasSuffix(got, "... [truncated]") {
+				t.Errorf("missing truncation marker: %q", got)
+			}
+			if !strings.HasPrefix(tc.in, strings.TrimSuffix(got, "\n... [truncated]")) {
+				t.Error("truncated output is not a prefix of the input")
+			}
+		})
+	}
+
+	// Pure ASCII still cuts at exactly maxBytes, and a short string is untouched.
+	if got := core.TruncateString(strings.Repeat("a", 500), 400); len(got) != 400+len("\n... [truncated]") {
+		t.Errorf("ASCII cut moved: len=%d", len(got))
+	}
+	if got := core.TruncateString("short", 400); got != "short" {
+		t.Errorf("short string was modified: %q", got)
+	}
 }

@@ -37,4 +37,5 @@ json_str() { python3 -c 'import json,sys; sys.stdout.write(json.dumps(sys.stdin.
 BODY_JSON=$(printf '%s' "$BODY" | json_str)
 
 # total_tokens == input+output and thinking ⊆ output, mirroring the real CLI.
-printf '{"conversation_id":"3963cf7a-446b-479b-846f-1693117031f9","status":"SUCCESS","response":%s,"error":"","duration_seconds":1.5,"num_turns":1,"usage":{"input_tokens":1801,"output_tokens":27,"thinking_tokens":25,"cache_read_tokens":0,"total_tokens":1828}}\n' "$BODY_JSON"
+# `error` is omitted on success, as the real CLI does — it is not emitted as "".
+printf '{"conversation_id":"3963cf7a-446b-479b-846f-1693117031f9","status":"SUCCESS","response":%s,"duration_seconds":1.5,"num_turns":1,"usage":{"input_tokens":1801,"output_tokens":27,"thinking_tokens":25,"cache_read_tokens":0,"total_tokens":1828}}\n' "$BODY_JSON"

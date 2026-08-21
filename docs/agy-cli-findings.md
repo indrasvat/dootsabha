@@ -35,13 +35,15 @@ v1.0.8 had no JSON; **1.1.17 does**, and दूतसभा parses it. stdout is
 JSON document; stderr is empty.
 
 ```json
-{"conversation_id":"…","status":"SUCCESS","response":"PONG\n","error":"",
+{"conversation_id":"…","status":"SUCCESS","response":"PONG\n",
  "duration_seconds":3.51,"num_turns":1,
  "usage":{"input_tokens":18053,"output_tokens":26,"thinking_tokens":24,
           "cache_read_tokens":0,"total_tokens":18079}}
 ```
 
-Three properties matter for the parser:
+`error` is **absent** on success and present on failure — it is not emitted as `""`.
+
+Five properties matter for the parser:
 
 1. **`total_tokens == input + output`, and `thinking_tokens` is a SUBSET of
    `output_tokens`.** Adding thinking to output double-counts every reasoning turn.
@@ -51,9 +53,49 @@ Three properties matter for the parser:
 3. **The envelope never echoes the model.** `Model` is the value दूतसभा sent, so
    model forwarding can only be proven at argv (unit tests) or via a mock that
    echoes it (L3/L5).
+4. **Only the fields दूतसभा consumes are decoded.** A strict typed decode of a
+   field nothing reads — `duration_seconds` is already a float — turns one
+   upstream type change into a discarded answer, and on a failed call into a lost
+   error message. Token counts are `json.Number`, so one bad number degrades to
+   `0` instead of failing the parse, and the failure text is decoded
+   independently of the rest of the envelope.
+5. **Exactly one document.** `json.Decode` stops at the first value, so a second
+   envelope would be silently dropped and the wrong turn reported as the answer.
+   दूतसभा rejects trailing data explicitly.
 
 There is **no cost field in any output format**. `CostUSD` stays `0`; दूतसभा does
 not estimate one from a price list that would go stale.
+
+### argv is parsed by Go's stdlib `flag` package
+
+Three consequences, all verified against 1.1.17 — and all of them bit दूतसभा:
+
+1. **`-model` IS `--model`.** Single and double dash are the same flag, so a
+   pinned-flag stripper matching only `--model` lets `-model` straight through.
+2. **A repeated flag is LAST-WINS.** Config flags are appended after दूतसभा's own,
+   so a surviving `-model X` would silently win — and because the envelope never
+   echoes the model, nothing downstream could detect that the reported model and
+   the model that ran had diverged.
+3. **Parsing STOPS at the first non-flag token.** One stray token in
+   `providers.agy.flags` — a typo'd value, a bare `true` — swallowed everything
+   after it. With `-p <prompt>` at the end, the prompt was never sent at all:
+
+   ```
+   $ agy --model "…" --output-format json JUNK -p "hi"
+   CLI error: bubbletea: error opening TTY: … /dev/tty: device not configured
+   $ echo $?
+   0
+   ```
+
+   agy abandons print mode and tries to open the interactive TUI, exiting **0**.
+
+दूतसभा therefore normalises leading dashes before matching a pinned flag, emits
+`-p <prompt>` **before** the user's flags, and rejects a `providers.*.flags` that
+is not a list of strings with exit 6.
+
+There is no attached short form to worry about (contrast grok's `-mgrok-9`): agy's
+only single-letter flags are `-c`, `-i` and `-p`, so an `-m` in config reaches the
+CLI and is rejected loudly with exit 2.
 
 ### `status` is not the failure discriminator
 
