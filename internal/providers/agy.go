@@ -198,16 +198,15 @@ func parseAgyJSON(data []byte) (*agyResponse, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, fmt.Errorf("empty output from agy (expected --output-format json)")
 	}
-	dec := json.NewDecoder(bytes.NewReader(data))
+	// json.Unmarshal, NOT a Decoder: it rejects ANY trailing data, so a second
+	// envelope cannot be silently dropped and the wrong turn reported as the
+	// answer. Decoder.More() looks like the check for this and is not — it asks
+	// "another element in the current array/object?", so it returns FALSE for
+	// `{...}}{"second":...}` and lets the second document through. (parseClaudeJSON
+	// uses a Decoder deliberately: claude WANTS the first of two objects.)
 	var resp agyResponse
-	if err := dec.Decode(&resp); err != nil {
+	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("json parse: %w (first 200 bytes: %q)", err, truncate(data, 200))
-	}
-	// Decode stops at the first value. Without this, a second envelope — or a
-	// banner a future release appends — is silently dropped and the wrong turn
-	// is reported as the answer.
-	if dec.More() {
-		return nil, fmt.Errorf("expected exactly one JSON document on stdout, got trailing data")
 	}
 	return &resp, nil
 }
@@ -271,7 +270,10 @@ func (p *AgyProvider) providerConfig() core.ProviderConfig {
 func agyPinned(f string, includeModel bool) bool {
 	name, _, _ := strings.Cut(f, "=")
 	switch strings.TrimLeft(name, "-") {
-	case "output-format":
+	// p/print/prompt are all the same flag. दूतसभा supplies the prompt, and
+	// last-wins means a config copy would REPLACE it — the agent would answer a
+	// question the caller never asked.
+	case "output-format", "p", "print", "prompt":
 		return true
 	case "model":
 		return includeModel

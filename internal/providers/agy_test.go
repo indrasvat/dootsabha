@@ -471,6 +471,14 @@ func TestAgyProviderRejectsTrailingDocument(t *testing.T) {
 	}{
 		{"two envelopes", `{"status":"SUCCESS","response":"FIRST"}{"status":"ERROR","response":"SECOND","error":"real failure"}`, true},
 		{"trailing garbage", `{"status":"SUCCESS","response":"ok"} some banner`, true},
+		// Decoder.More() returns FALSE for these — it asks "another element in the
+		// current array/object?", not "is there trailing data?". A `}` or `]` both
+		// slips through AND masks a second document behind it. Found by दूतसभा's
+		// own review of this branch.
+		{"stray closing brace", `{"status":"SUCCESS","response":"ok"}}`, true},
+		{"stray closing bracket", `{"status":"SUCCESS","response":"ok"}]`, true},
+		{"second document behind a brace", `{"status":"SUCCESS","response":"FIRST"}}{"status":"ERROR","response":"SECOND"}`, true},
+		{"second document behind a bracket", `{"status":"SUCCESS","response":"FIRST"}]{"status":"ERROR","response":"SECOND"}`, true},
 		{"trailing newline is fine", `{"status":"SUCCESS","response":"ok"}` + "\n", false},
 		{"trailing whitespace is fine", `{"status":"SUCCESS","response":"ok"}  ` + "\n\n", false},
 	} {
@@ -506,5 +514,32 @@ func TestAgyProviderPinnedFlagDoesNotEatNextFlag(t *testing.T) {
 	}
 	if got := flagValue(runner.capturedArgs, "--effort"); got != "high" {
 		t.Errorf("--effort = %q, want high: %v", got, runner.capturedArgs)
+	}
+}
+
+// The prompt is दूतसभा's. agy parses argv with the stdlib flag package, so a
+// config copy of -p/--print/--prompt is LAST-WINS and would replace the prompt
+// outright — the agent would answer a question the caller never asked.
+// Found by दूतसभा's own review of this branch.
+func TestAgyProviderPromptCannotBeHijackedFromConfig(t *testing.T) {
+	for _, spelling := range []string{"-p", "--p", "--print", "--prompt", "-prompt"} {
+		t.Run(spelling, func(t *testing.T) {
+			cfg := defaultConfig(t)
+			pc := cfg.Providers["agy"]
+			pc.Flags = append([]string{spelling, "HIJACKED"}, pc.Flags...)
+			cfg.Providers["agy"] = pc
+
+			runner := &mockRunner{stdout: agyOK(t, "ok")}
+			p := providers.NewAgyProvider(cfg, runner)
+			if _, err := p.Invoke(context.Background(), "REAL PROMPT", providers.InvokeOptions{}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if slices.Contains(runner.capturedArgs, "HIJACKED") {
+				t.Errorf("config smuggled a prompt past दूतसभा's: %v", runner.capturedArgs)
+			}
+			if n := countFlag(runner.capturedArgs, "-p"); n != 1 {
+				t.Errorf("-p appears %d times, want 1: %v", n, runner.capturedArgs)
+			}
+		})
 	}
 }
