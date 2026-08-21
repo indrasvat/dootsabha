@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/indrasvat/dootsabha/internal/core"
 )
@@ -30,6 +32,21 @@ const AgyDefaultModel = "Gemini 3.7 Flash (High)"
 // every invocation fails before the prompt runs — HealthCheck reports that rather
 // than letting `status` show an incompatible install as healthy.
 const agyMinVersion = "1.1.8"
+
+// agyPrintTimeoutMargin pads the window दूतसभा forwards to `--print-timeout`.
+//
+// agy's own print timeout defaults to 5m — exactly दूतसभा's default `--timeout` —
+// and when it fires agy emits an ordinary ERROR envelope with exit 1,
+// indistinguishable from any other failure. दूतसभा would then charge the caller
+// exit 3 ("nothing usable, try another agent") for what is really exit 4
+// ("raise the timeout"). Forwarding the step's remaining window plus a margin
+// keeps दूतसभा's own timer first, so it retains ownership of the exit code; the
+// margin clears the SIGTERM→grace→SIGKILL sequence (5s by default).
+const agyPrintTimeoutMargin = 30 * time.Second
+
+// agyAlwaysPinned are the flags दूतसभा emits on EVERY call, normalised to their
+// bare names. --model and --print-timeout are conditional and handled per call.
+var agyAlwaysPinned = []string{"output-format", "p", "print", "prompt"}
 
 // agyStatusSuccess marks a clean turn. Any other value is a tool-level
 // diagnostic, not an invocation failure — see Invoke.
@@ -117,25 +134,38 @@ func (p *AgyProvider) Name() string { return "agy" }
 func (p *AgyProvider) Invoke(ctx context.Context, prompt string, opts InvokeOptions) (*ProviderResult, error) {
 	pc := p.providerConfig()
 
-	args := make([]string, 0, len(pc.Flags)+6)
 	model := pc.Model
 	if opts.Model != "" {
 		model = opts.Model
 	}
-	// --output-format is always ours; --model only when दूतसभा resolved one, so
-	// clearing providers.agy.model still lets a user pick from flags.
-	flags := stripAgyPinnedFlags(pc.Flags, model != "")
+	printTimeout := agyPrintTimeout(ctx)
+
+	// --model and --print-timeout are pinned only when दूतसभा actually emits one,
+	// so clearing providers.agy.model — or running unbounded — leaves the user's
+	// own flag as their control.
+	conditional := make([]string, 0, 2)
+	if model != "" {
+		conditional = append(conditional, "model")
+	}
+	if printTimeout != "" {
+		conditional = append(conditional, "print-timeout")
+	}
+
+	args := make([]string, 0, len(pc.Flags)+8)
 	if model != "" {
 		args = append(args, "--model", model)
 	}
 	args = append(args, "--output-format", "json")
+	if printTimeout != "" {
+		args = append(args, "--print-timeout", printTimeout)
+	}
 	// The prompt goes BEFORE the user's flags. agy parses argv with Go's stdlib
 	// flag package, which STOPS at the first non-flag token — so one stray token
 	// in `flags` (a typo'd value, a bare `true`) used to swallow `-p <prompt>`
 	// entirely: agy then abandoned print mode and tried to open an interactive
 	// TUI. Verified against 1.1.17.
 	args = append(args, "-p", prompt)
-	args = append(args, flags...)
+	args = append(args, stripAgyPinnedFlags(pc.Flags, conditional...)...)
 
 	slog.Debug("agy invoke", "binary", pc.Binary, "model", model, "prompt_len", len(prompt))
 	res, err := p.runner.Run(ctx, pc.Binary, args)
@@ -328,28 +358,44 @@ func (p *AgyProvider) providerConfig() core.ProviderConfig {
 //
 // There is no attached short form to handle: agy's only single-letter flags are
 // -c/-i/-p, so an `-m` in config reaches agy and is rejected loudly (exit 2).
-func agyPinned(f string, includeModel bool) bool {
+func agyPinned(f string, conditional []string) bool {
 	name, _, _ := strings.Cut(f, "=")
-	switch strings.TrimLeft(name, "-") {
+	name = strings.TrimLeft(name, "-")
 	// p/print/prompt are all the same flag. दूतसभा supplies the prompt, and
 	// last-wins means a config copy would REPLACE it — the agent would answer a
 	// question the caller never asked.
-	case "output-format", "p", "print", "prompt":
-		return true
-	case "model":
-		return includeModel
+	return slices.Contains(agyAlwaysPinned, name) || slices.Contains(conditional, name)
+}
+
+// agyPrintTimeout returns the value for --print-timeout, or "" when the step is
+// unbounded and agy's own default must stand.
+//
+// A non-positive window is NEVER emitted: `--print-timeout 0` means zero, not
+// "disabled" — verified on 1.1.17, it fails instantly with "timeout waiting for
+// response". An already-expired context fails on ctx anyway.
+func agyPrintTimeout(ctx context.Context) string {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return ""
 	}
-	return false
+	window := time.Until(deadline)
+	if window <= 0 {
+		return ""
+	}
+	// Rounded to the second: time.Until yields nanosecond noise, and
+	// "15m29.999994625s" in argv (and in ps output) is noise no one can read.
+	// The margin dwarfs the rounding either way.
+	return (window + agyPrintTimeoutMargin).Round(time.Second).String()
 }
 
 // stripAgyPinnedFlags drops flags दूतसभा sets itself, so config cannot duplicate
 // or override them. --output-format always (a user's `text` would break every
 // parse); --model only when one was resolved to re-add.
-func stripAgyPinnedFlags(flags []string, stripModel bool) []string {
+func stripAgyPinnedFlags(flags []string, conditional ...string) []string {
 	out := make([]string, 0, len(flags))
 	for i := 0; i < len(flags); i++ {
 		f := flags[i]
-		if !agyPinned(f, stripModel) {
+		if !agyPinned(f, conditional) {
 			out = append(out, f)
 			continue
 		}

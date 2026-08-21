@@ -40,6 +40,10 @@ providers:
     # (agy uses Go's stdlib flag package, so -model == --model):
     #   --output-format json  (the envelope is the parser's contract)
     #   --model               (re-added from `model:` above)
+    #   -p/--print/--prompt   (dootsabha supplies the prompt; agy is last-wins)
+    #   --print-timeout       (dootsabha's own budget + margin, so ITS timer fires
+    #                          first and a timeout exits 4, not 3; only pinned
+    #                          when the call is bounded)
     # Every entry must be a flag or a flag's value: agy stops parsing at the first
     # non-flag token, so a stray one silently drops the flags after it.
   grok:                             # xAI Grok CLI — opt-in via --agent/--agents, not a council default
