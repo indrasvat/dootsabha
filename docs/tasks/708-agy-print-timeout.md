@@ -43,7 +43,7 @@ The second one is the trap: a naive "no budget → send 0" would kill every call
 | `internal/providers/agy.go` | `agyPrintTimeout(ctx)` derives the value from the step deadline; `--print-timeout` joins the pinned set when emitted |
 | `testdata/mock-providers/mock-agy` | **honours `--print-timeout`**, defaulting to 1s as a stand-in for agy's 5m, and fails with the real timeout envelope |
 | `scripts/test-binary.sh` | L3: agy's own timeout no longer preempts the budget; दूतसभा's own timer still exits 4 |
-| `internal/providers/agy_test.go` | forwarding across window sizes; unbounded emits nothing; every pinned spelling |
+| `internal/providers/agy_test.go` | forwarding across window sizes; a deadline-less context emits nothing; every pinned spelling |
 | `configs/default.yaml`, `docs/agy-cli-findings.md`, `skill/references/command-reference.md`, `docs/PROGRESS.md` | docs |
 
 ## Design
@@ -79,16 +79,27 @@ make ci · make test-binary · make test-plugins · make test-agent
 - [x] `--timeout` past agy's own default on a hanging agy exits `4`, not `3`
 - [x] The emitted `--print-timeout` exceeds the context deadline, never trails it
 - [x] A context with no deadline emits no `--print-timeout` (and never `0`)
+- [x] Every CLI path forwards one — session drain tracked: an 8s ceiling
+      across three steps yields `38s → 36s → 34s`, each above its own deadline
 - [x] `outcome_test.go` guards still pass — no new timeout arithmetic in the CLI layer
 - [x] L3 covers the case with a stub that honours `--print-timeout`
 
-## Residual (by design)
+## The no-deadline branch is defensive, not a user-reachable case
 
-With **both** `--timeout 0` and `--session-timeout 0` the step has no deadline,
-so दूतसभा emits nothing and agy's own 5m default applies. That is the one case
-where a user's own `--print-timeout` in `providers.agy.flags` survives — the
-escape hatch. Detecting agy's timeout by its message would mean string-matching
-error text, which this repo does not do.
+`resolveTimeouts` (internal/cli/budget.go) never yields a zero per-invocation
+window: `--timeout 0` falls through to the config value and then to the 5m
+default. **Every CLI path therefore has a step deadline**, and `--print-timeout`
+is always forwarded — verified with an argv recorder, including
+`--timeout 0 --session-timeout 0`, which still emits `5m30s`.
+
+The empty-string branch exists for callers that are not the CLI — a library or
+strategy-plugin caller passing a context with no deadline, and the unit tests
+that exercise it. There agy's own default applies and a user's own
+`--print-timeout` in `providers.agy.flags` survives, which is the only way to
+change it.
+
+Recognising agy's timeout by its message would mean string-matching error text,
+which this repo does not do.
 
 ## Commit
 

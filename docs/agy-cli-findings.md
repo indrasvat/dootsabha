@@ -140,7 +140,7 @@ pinned whenever दूतसभा emits one.
 instantly with `timeout waiting for response`. A non-positive window is therefore
 never emitted.
 
-Residual, by design: with **both** `--timeout 0` and `--session-timeout 0` the
-step has no deadline, दूतसभा emits nothing, and agy's own 5m default applies. That
-is the one case where a user's own `--print-timeout` in `providers.agy.flags`
-survives, which is the escape hatch.
+The no-deadline branch is **defensive, not user-reachable**: `resolveTimeouts`
+never yields a zero per-invocation window (`--timeout 0` falls through to the
+config value, then to the 5m default), so every CLI path forwards a value. It
+covers library and strategy-plugin callers passing a deadline-less context.

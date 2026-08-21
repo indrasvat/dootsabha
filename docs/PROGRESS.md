@@ -285,9 +285,10 @@ All 4 items addressed in PRD v1.6.
 - **`--print-timeout 0` means zero, not "disabled"** (verified live — it fails
   instantly), so a non-positive window emits no flag at all.
 - `--print-timeout` joins `--model`, `--output-format` and the prompt in the
-  pinned set whenever दूतसभा emits one. Fully unbounded runs
-  (`--timeout 0 --session-timeout 0`) emit nothing, which is the one case a
-  user's own `--print-timeout` survives.
+  pinned set whenever दूतसभा emits one. Every CLI path emits one:
+  `resolveTimeouts` never yields a zero per-invocation window, so even
+  `--timeout 0 --session-timeout 0` forwards `5m30s`. The no-deadline branch is
+  defensive, for library/plugin callers.
 - `mock-agy` now **honours `--print-timeout`** with a 1s stand-in for agy's 5m,
   failing with the real timeout envelope — without that no integration test could
   observe the bug at all. L3 38 → 40.
