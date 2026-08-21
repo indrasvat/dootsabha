@@ -65,3 +65,17 @@ The `gemini` provider name, plugin, config block, mock, and color are removed.
 - No `gemini` references remain in code/config/scripts (docs note the migration).
 - `dootsabha status` shows `agy` healthy.
 - `dootsabha council "..."` uses `claude,codex,agy` by default.
+
+## Visual Test Results
+
+_N/A — evidence not recoverable._ 703 shipped under the iTerm2 L4 suite, which
+was removed when shux replaced it; its screenshots lived in the gitignored
+`.claude/screenshots/` and are gone. The provider it delivered has since been
+re-verified end-to-end against the real `agy` CLI by **707**, whose frames are
+captured by `.shux/scripts/agy-3-7-evidence.sh` and attached to PR #27 —
+including `status` and a live 3-agent council, the two output-visible surfaces
+this task was responsible for.
+
+Marked DONE on that basis rather than re-capturing evidence for a superseded
+implementation. Recorded here instead of left implied, because a DONE status with
+no evidence line is precisely what the anti-hallucination rules exist to prevent.

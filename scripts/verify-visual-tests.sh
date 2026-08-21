@@ -21,19 +21,25 @@ ERRORS=()
 if ! grep -q '^## Visual Test Results' "$TASK_FILE"; then
   ERRORS+=("Missing '## Visual Test Results' section")
 else
-  SECTION=$(sed -n '/^## Visual Test Results/,$p' "$TASK_FILE")
-  if [[ $(wc -l <<<"$SECTION") -lt 5 ]]; then
-    ERRORS+=("Visual Test Results section is too thin (needs actual findings)")
-  fi
+  # Stop at the NEXT level-2 heading. Reading to EOF let a later section satisfy
+  # the checks below — an empty visual section passed if unrelated prose further
+  # down happened to mention "no provider CLIs", and a bare N/A passed once any
+  # later text supplied the word count.
+  SECTION=$(awk '/^## Visual Test Results/{f=1;next} f&&/^## /{exit} f' "$TASK_FILE")
 
-  # A cloud session has no provider CLIs, so L4 cannot be captured there. Saying
-  # so is allowed — inventing evidence is not — but it must name a reason.
-  if grep -qiE '^\s*_?N/A\b|not applicable|no provider CLIs' <<<"$SECTION"; then
+  # A cloud session has no provider CLIs, and some tasks render nothing at all, so
+  # L4 genuinely cannot apply. Saying so is allowed — inventing evidence is not.
+  # Such a section is judged on its REASON, not its length: a one-line reason can
+  # be a complete answer, while five lines of padding is not.
+  if grep -qiE '^[[:space:]]*_?N/A\b|not applicable|no provider CLIs' <<<"$SECTION"; then
     if [[ $(wc -w <<<"$SECTION") -lt 12 ]]; then
       ERRORS+=("L4 marked N/A without a reason — say why it could not be captured")
     fi
   else
-    # Otherwise the section must name a capture script, and it must exist.
+    # Otherwise: real evidence. It needs substance AND a capture script that exists.
+    if [[ $(wc -l <<<"$SECTION") -lt 5 ]]; then
+      ERRORS+=("Visual Test Results section is too thin (needs actual findings)")
+    fi
     SCRIPTS=$(grep -oE '\.shux/scripts/[A-Za-z0-9._-]+\.sh' <<<"$SECTION" | sort -u || true)
     if [[ -z "$SCRIPTS" ]]; then
       ERRORS+=("No .shux/scripts/*.sh capture script referenced — L4 is shux (CLAUDE.md)")

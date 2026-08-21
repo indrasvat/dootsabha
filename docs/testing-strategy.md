@@ -325,21 +325,21 @@ Every task file in `docs/tasks/` MUST include these two sections. This is a hard
 | **L1** | `make test` — expected: all pass | Always required |
 | **L2** | `make test-integration` — expected: all pass | If integration tests exist |
 | **L3** | `make build` + actual binary commands with expected output + `--json \| jq .` + `\| cat` (no ANSI) | Always required |
-| **L4** | `uv run .claude/automations/test_dootsabha_{command}.py` + list of expected screenshot names | Required for any output-visible change |
+| **L4** | `.shux/scripts/<topic>-evidence.sh` + what each frame shows | Required for any output-visible change |
 | **L5** | `make test-agent` | Required for commands with `--json` output |
 
 **Section 2: `## Visual Test Results`** — must contain actual evidence (not a placeholder):
 
 | Field | Required? | Description |
 |-------|-----------|-------------|
-| L4 Script path | YES | `.claude/automations/test_dootsabha_{command}.py` |
-| Date | YES | `YYYY-MM-DD` |
-| Status | YES | `PASS (N/M)` or `FAIL (N/M)` |
-| Test result table | YES | Each test with PASS/FAIL + detail column |
-| Screenshots reviewed | YES | Each screenshot name + specific observation about what's visible |
+| Capture script | YES | `.shux/scripts/<topic>-evidence.sh` — must exist; the gate checks it |
+| Frame table | YES | One row per frame: filename + what it proves |
 | Findings | YES | Deviations, learnings, or "No issues found" |
 
-**Minimum content:** The Visual Test Results section must be at least 5 lines long (enforced by gating hook). Empty or placeholder-only sections will be rejected.
+A cloud session has no provider CLIs and cannot capture L4. Record
+`_N/A — <reason>_` instead; the gate accepts a reasoned N/A and rejects a bare one.
+
+**Minimum content:** at least 5 lines, and it must name a `.shux/scripts/*.sh` that exists (or a reasoned N/A). Enforced by `scripts/verify-visual-tests.sh`; the section ends at the next `##` heading, so padding from a later section does not count.
 
 ---
 
