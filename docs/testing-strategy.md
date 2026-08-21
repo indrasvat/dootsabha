@@ -316,7 +316,7 @@ printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"
 
 ## §6 Task File Verification Checklist
 
-Every task file in `docs/tasks/` MUST include these two sections. This is a hard requirement — gating hooks enforce it.
+Every task file in `docs/tasks/` MUST include these two sections. This is a hard requirement — `internal/tasks/evidence_test.go` fails `make check` without them (§3.3).
 
 **Section 1: `## Verification`** — must contain ALL applicable levels:
 
@@ -372,7 +372,7 @@ Agents MUST follow this protocol for every task:
 
 ## §8 Git Hooks via Lefthook (Code Quality Gates)
 
-> Git hooks are the last line of defense. They run *your code* through automated checks before it leaves the local machine. Combined with §3 gating hooks (Claude Code level), they create a two-layer quality system: lefthook catches code issues, §3 hooks catch process issues.
+> Git hooks run *your code* through automated checks before it leaves the machine. They are one of the three layers in §3: lefthook catches code issues at commit/push, the Claude Code hooks catch actions in flight, and the tests catch repo state.
 
 ### §8.1 `lefthook.yml` Specification
 
@@ -487,6 +487,9 @@ check: fmt vet fix lint test test-binary ## Full quality suite (pre-commit + CI 
 | Layer | Mechanism | What It Catches | When |
 |-------|-----------|----------------|------|
 | **Git hooks (lefthook)** | pre-commit, pre-push | Format, vet, go fix, lint, tests | Every commit/push |
-| **Claude Code hooks (§3)** | PreToolUse on Edit/Write/Bash | Task status violations, missing L4 evidence, missing screenshots | During agent execution |
+| **Claude Code hooks (§3.2)** | PreToolUse on Edit/Write/Bash | Editing a tracked file on the default branch; bulk staging | Before the action runs |
+| **Repo-state tests (§3.3)** | `make check`, CI | A DONE task with no evidence; a command minting its own exit code | Every push |
 
-Both layers are independent — either alone is insufficient. Lefthook catches code problems; §3 hooks catch process problems. Together they prevent both "code doesn't compile" and "agent claimed DONE without running tests."
+The three are independent and catch different things: lefthook catches code that
+does not build, the hooks catch an action about to happen, and the tests catch the
+state of the repo — including in CI, where the hooks do not run at all.

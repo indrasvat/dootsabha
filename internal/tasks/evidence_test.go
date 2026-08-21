@@ -80,9 +80,20 @@ var (
 	doneRe = regexp.MustCompile(`(?mi)^\W*\**Status:\**\s*\**\s*DONE\b`)
 	// `\b` will not do here: markdown emphasis wraps it as `_N/A_`, and `_` is a
 	// word character, so there is no boundary after the A.
-	naRe      = regexp.MustCompile(`(?mi)^\s*[_*]*N/A(?:[^A-Za-z0-9]|$)|not applicable|no provider CLIs|nothing output-visible`)
+	// The exemption requires an explicit N/A MARKER at the start of a line. An
+	// earlier version also accepted bare phrases like "no provider CLIs" anywhere
+	// in the section, so ordinary evidence prose ("no provider CLIs were mocked")
+	// silently skipped the capture-script check.
+	//
+	// `\b` will not do after the A: markdown emphasis wraps it as `_N/A_`, and `_`
+	// is a word character, so there is no boundary there.
+	naRe      = regexp.MustCompile(`(?mi)^[_*>\s-]*(?:N/A|not applicable)(?:[^A-Za-z0-9]|$)`)
 	scriptRe  = regexp.MustCompile(`\.shux/scripts/[A-Za-z0-9._-]+\.sh`)
 	headingRe = regexp.MustCompile(`(?m)^## `)
+	// Anchored to its own line: strings.Cut matched the phrase anywhere, so a
+	// document merely MENTIONING "## Visual Test Results" — in prose or a code
+	// block — had the text after it mistaken for the section.
+	evidenceHeadingRe = regexp.MustCompile(`(?m)^##[ \t]+Visual Test Results[ \t]*$`)
 )
 
 // evidenceSection returns the body of "## Visual Test Results", bounded by the
@@ -90,11 +101,11 @@ var (
 // evidence: an empty visual section passed when unrelated prose further down
 // happened to mention "no provider CLIs".
 func evidenceSection(doc string) (string, bool) {
-	const heading = "## Visual Test Results"
-	_, rest, ok := strings.Cut(doc, heading)
-	if !ok {
+	at := evidenceHeadingRe.FindStringIndex(doc)
+	if at == nil {
 		return "", false
 	}
+	rest := doc[at[1]:]
 	if loc := headingRe.FindStringIndex(rest); loc != nil {
 		rest = rest[:loc[0]]
 	}
@@ -222,6 +233,23 @@ Captured with ` + "`.shux/scripts/ghost.sh`" + ` on the real CLI.
 |---|---|
 | 01 | something that was never actually captured here |`, "missing: .shux/scripts/ghost.sh"},
 		{"too thin to be evidence", "## Status: DONE\n## Visual Test Results\n`.shux/scripts/real.sh`", "too thin"},
+
+		// Raised by Codex on PR #30: the exemption phrases were unanchored, so
+		// ordinary evidence prose that happened to say "no provider CLIs" skipped
+		// the capture-script check entirely.
+		{"prose mentioning a phrase is not an exemption", `## Status: DONE
+## Visual Test Results
+We captured the frames on a real terminal and no provider CLIs were mocked at
+any point during this run, so everything shown here is genuine and complete.`, "no .shux/scripts"},
+
+		// Also #30: the heading was matched anywhere, so a document merely TALKING
+		// about the section had the following text mistaken for it.
+		{
+			"heading mentioned in prose is not the section", `## Status: DONE
+Every task needs a ## Visual Test Results section naming a capture script such
+as ` + "`.shux/scripts/real.sh`" + `, with a table describing each frame it took.`,
+			"no '## Visual Test Results' section",
+		},
 
 		// The bug the previous implementation shipped: the section ran to EOF, so a
 		// LATER section supplied both the exemption wording and the word count.

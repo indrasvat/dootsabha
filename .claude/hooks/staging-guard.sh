@@ -51,9 +51,20 @@ for part in re.split(r"&&|\|\||;|\n|\|", cmd):
     sub, args = rest[i], rest[i + 1:]
 
     if sub == "add":
+        after_sep = False
         for a in args:
             if a == "--":
-                break
+                # Everything after `--` is a pathspec, so `-A` there names a FILE
+                # and is harmless. `.` still means "stage everything", and
+                # `git add -- .` is a common spelling that slipped past a loop
+                # that simply stopped here.
+                after_sep = True
+                continue
+            if after_sep:
+                if a == ".":
+                    print("git add -- . stages everything, including files you have not looked at.")
+                    sys.exit(0)
+                continue
             if a in ("-A", "--all", "-u", "--update", "."):
                 print("git add %s stages everything, including files you have not looked at." % a)
                 sys.exit(0)
