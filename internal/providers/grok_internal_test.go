@@ -2,8 +2,10 @@ package providers
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -11,6 +13,7 @@ import (
 // off $HOME, so an empty HOME severs skills/agents/plugins/MCP/hooks/CLAUDE.md
 // while GROK_HOME keeps auth working.
 func TestGrokIsolatedEnvRedirectsHome(t *testing.T) {
+	freshGrokHome(t)
 	base := []string{"HOME=/Users/someone", "PATH=/usr/bin", "LANG=en_US.UTF-8"}
 
 	env, err := grokIsolatedEnv(base)
@@ -106,7 +109,7 @@ func TestGrokIsolatedEnvIsStableAcrossCalls(t *testing.T) {
 }
 
 func TestGrokEmptyHomeIs0700(t *testing.T) {
-	dir, err := grokEmptyHome()
+	dir, err := grokEmptyHome("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -302,4 +305,129 @@ func TestParseGrokNDJSONHugeLine(t *testing.T) {
 	if got == nil || len(got.Result) != len(big) {
 		t.Errorf("200KB line must parse intact, got len=%d", len(got.Result))
 	}
+}
+
+// freshGrokHome gives the test its own process-wide isolated HOME, so one test's
+// real HOME cannot shape the next (or -count=N), and removes it afterwards.
+func freshGrokHome(t *testing.T) {
+	t.Helper()
+	grokHomeOnce, grokHomeDir, grokHomeErr = sync.Once{}, "", nil
+	t.Cleanup(func() {
+		if grokHomeDir != "" {
+			_ = os.RemoveAll(grokHomeDir)
+		}
+		grokHomeOnce, grokHomeDir, grokHomeErr = sync.Once{}, "", nil
+	})
+}
+
+// Issue #31: grok's read-only profile anchors part of its runtime-socket deny
+// list at $HOME (~/.docker/run/docker.sock) and refuses to start when
+// /var/run/docker.sock links outside that list. The isolated HOME must carry
+// those socket dirs — and nothing else of the real home.
+func TestGrokIsolatedEnvAnchorsRuntimeSocketsButNoHarness(t *testing.T) {
+	freshGrokHome(t)
+	real := t.TempDir()
+	for _, d := range []string{".docker/run", ".docker/desktop", ".docker/mcp", ".claude/skills", ".cursor"} {
+		if err := os.MkdirAll(filepath.Join(real, d), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{".claude.json", ".docker/config.json"} {
+		if err := os.WriteFile(filepath.Join(real, f), []byte("{}"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	env, err := grokIsolatedEnv([]string{"HOME=" + real})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	iso := envLookup(env, "HOME")
+
+	for _, rel := range []string{".docker/run", ".docker/desktop"} {
+		if got, err := os.Readlink(filepath.Join(iso, rel)); err != nil || got != filepath.Join(real, rel) {
+			t.Errorf("isolated HOME %s -> %q (%v), want link to %s", rel, got, err, filepath.Join(real, rel))
+		}
+	}
+	if names := dirNames(t, iso); !slices.Equal(names, []string{".docker"}) {
+		t.Errorf("isolated HOME holds %v, want only .docker", names)
+	}
+	if names := dirNames(t, filepath.Join(iso, ".docker")); !slices.Equal(names, []string{"desktop", "run"}) {
+		t.Errorf("isolated HOME .docker holds %v, want only desktop and run", names)
+	}
+}
+
+// What the caller's side does not offer is skipped, never an error: before #31
+// none of these failed a grok call, and grok itself reports a missing anchor.
+func TestGrokIsolatedEnvSkipsWhatTheRealHomeLacks(t *testing.T) {
+	unsearchable := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(unsearchable, ".docker/run"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(unsearchable, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(unsearchable, 0o700) })
+
+	for name, home := range map[string]string{
+		"no .docker":   t.TempDir(),
+		"unsearchable": unsearchable,
+		"relative":     ".",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if home == unsearchable {
+				if _, err := os.Stat(filepath.Join(home, ".docker/run")); err == nil {
+					t.Skip("mode 000 does not stop this process (root); nothing unsearchable to test")
+				}
+			}
+			freshGrokHome(t)
+			env, err := grokIsolatedEnv([]string{"HOME=" + home, "GROK_HOME=/custom/grok"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if names := dirNames(t, envLookup(env, "HOME")); len(names) != 0 {
+				t.Errorf("isolated HOME holds %v, want nothing", names)
+			}
+		})
+	}
+}
+
+// An entry that is not a directory would make grok refuse its own deny path
+// ("Not a directory"); one malformed entry must not cost the valid other one.
+func TestGrokIsolatedEnvCarriesOnlyRealDirectories(t *testing.T) {
+	for name, plant := range map[string]func(string) error{
+		"regular file":  func(p string) error { return os.WriteFile(p, nil, 0o600) },
+		"dangling link": func(p string) error { return os.Symlink(p+"-gone", p) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			freshGrokHome(t)
+			real := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(real, ".docker/run"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := plant(filepath.Join(real, ".docker/desktop")); err != nil {
+				t.Fatal(err)
+			}
+			env, err := grokIsolatedEnv([]string{"HOME=" + real})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if names := dirNames(t, filepath.Join(envLookup(env, "HOME"), ".docker")); !slices.Equal(names, []string{"run"}) {
+				t.Errorf("isolated HOME .docker holds %v, want only run", names)
+			}
+		})
+	}
+}
+
+func dirNames(t *testing.T, dir string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
 }

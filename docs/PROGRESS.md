@@ -214,6 +214,7 @@ All 4 items addressed in PRD v1.6.
 | 706 | Default grok model → grok-4.6 (+ xhigh effort) | DONE | — |
 | 707 | Default agy model → Gemini 3.7 Flash (High) + `--output-format json` | DONE | — |
 | 708 | Forward the per-call budget to `agy --print-timeout` | DONE | — |
+| 710 | Keep grok's read-only sandbox working under the isolated HOME (#31) | DONE | — |
 
 ### What Works End-to-End (705)
 
