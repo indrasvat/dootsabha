@@ -16,7 +16,7 @@ AFTER="bin/dootsabha"   # relative — an absolute path would leak $HOME into fr
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR_OVERRIDE:-/tmp/shux710}"
 mkdir -p "$XDG_RUNTIME_DIR" "$OUT"
 
-COLS="${COLS:-100}"
+COLS="${COLS:-120}"
 TILDE="sed \"s#\$HOME#~#g\""   # keep the real home path out of the frames
 
 SESSIONS=()
@@ -71,37 +71,47 @@ echo "L4 evidence → $OUT  (${COLS} cols)"
 
 # 1. The premise: Docker Desktop's socket link points into the real home.
 frame 01-premise 30 6 \
-  "$(hdr '$ ls -l /var/run/docker.sock'); ls -l /var/run/docker.sock | $TILDE; grok --version"
+  "$(hdr '$ ls -l /var/run/docker.sock; grok --version     (home path shown as ~)'); \
+   ls -l /var/run/docker.sock | $TILDE; grok --version"
 
 # 2. BEFORE: the released binary — grok refuses to start under the empty HOME.
-frame 02-before 240 12 \
-  "$(hdr "\$ dootsabha consult --agent grok \"Reply with exactly: PONG\"   # v0.10.1"); \
+frame 02-before 240 10 \
+  "$(hdr '$ dootsabha --version'); '$BEFORE' --version; \
+   $(hdr "\$ dootsabha consult --agent grok \"Reply with exactly: PONG\""); \
    '$BEFORE' consult --agent grok --config /dev/null 'Reply with exactly: PONG'; echo \"exit=\$?\""
 
 # 3. AFTER: this branch — the same call answers.
-frame 03-after 240 8 \
-  "$(hdr "\$ bin/dootsabha consult --agent grok \"Reply with exactly: PONG\""); \
+frame 03-after 240 10 \
+  "$(hdr '$ bin/dootsabha --version'); $AFTER --version; \
+   $(hdr "\$ bin/dootsabha consult --agent grok \"Reply with exactly: PONG\""); \
    $AFTER consult --agent grok --config /dev/null 'Reply with exactly: PONG'; echo \"exit=\$?\""
 
-# 4. Still isolated: the HOME grok was handed holds only the two socket-dir links.
-frame 04-isolated-home 30 12 \
-  "$(hdr '$ ls -la <isolated grok HOME> <isolated grok HOME>/.docker'); \
-   d=\$(ls -td \"\${TMPDIR:-/tmp}\"/dootsabha-grok-home-* | head -1); \
-   ls -la \"\$d\" | tail -n +2 | $TILDE; ls -la \"\$d/.docker\" | tail -n +2 | $TILDE"
+# 4. Still isolated: a grok call, then the HOME it was handed (the newest one,
+#    made by that call), every entry listed. The $-text in the headers is shown, not run.
+# shellcheck disable=SC2016
+frame 04-isolated-home 240 16 \
+  "$(hdr '$ bin/dootsabha consult --agent grok "Reply with exactly: PONG" --quiet'); \
+   $AFTER consult --agent grok --config /dev/null --quiet 'Reply with exactly: PONG'; \
+   $(hdr '$ H=$(ls -td $TMPDIR/dootsabha-grok-home-* | head -1)   # the HOME grok just ran with'); \
+   H=\$(ls -td \"\${TMPDIR:-/tmp}\"/dootsabha-grok-home-* | head -1); \
+   $(hdr '$ find $H     (every entry, links with their target; Library/Caches counted, not listed)'); \
+   find \"\$H\" -mindepth 1 -not -path \"\$H/Library/Caches/*\" | sort | while read -r e; do \
+     r=HOME\${e#\"\$H\"}; if [ -L \"\$e\" ]; then echo \"\$r -> \$(readlink \"\$e\")\"; else echo \"\$r\"; fi; \
+   done | $TILDE; \
+   echo \"  + \$(find \"\$H/Library/Caches\" -type f 2>/dev/null | wc -l | tr -d ' ') files under HOME/Library/Caches (python bytecode written by grok's tools)\""
 
 # 5. Still read-only: grok's own write to the working directory is refused.
+P5='Run exactly this with your bash tool: echo hi > .shux/out/710/probe.txt  then reply with only the exact error text, or OK.'
 frame 05-read-only 300 12 \
-  "$(hdr '$ bin/dootsabha consult --agent grok  # asked to write .shux/out/710/probe.txt'); \
-   $AFTER consult --agent grok --config /dev/null \
-     'Run exactly this with your bash tool: echo hi > .shux/out/710/probe.txt — then reply with only the exact error text or OK.'; \
+  "$(hdr "\$ bin/dootsabha consult --agent grok \"$P5\""); \
+   $AFTER consult --agent grok --config /dev/null '$P5'; echo \"exit=\$?\"; \
    $(hdr '$ ls .shux/out/710/probe.txt'); ls .shux/out/710/probe.txt"
 
-# 6. The motivating case: a council that includes grok.
-frame 06-council 900 34 \
-  "$(hdr '$ bin/dootsabha council --agents claude,codex,grok --chair claude'); \
-   $AFTER council --agents claude,codex,grok --chair claude \
-     'One short sentence each: should a CLI wrapper fail loud or fall back silently when a sandbox cannot be applied?'; \
-   echo \"exit=\$?\""
+# 6. The motivating case: a council that includes grok — per-agent status + exit.
+frame 06-council 900 12 \
+  "$(hdr '$ bin/dootsabha council --agents claude,codex,grok --chair claude --json "Name one primary colour, one word." | jq .meta.providers'); \
+   $AFTER council --agents claude,codex,grok --chair claude --json 'Name one primary colour, one word.' > '$OUT/council.json'; \
+   rc=\$?; jq .meta.providers '$OUT/council.json'; echo \"exit=\$rc\""
 
 echo
 echo "Frames:"

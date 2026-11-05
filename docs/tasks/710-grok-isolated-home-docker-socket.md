@@ -109,8 +109,8 @@ read back:
 | Frame | Shows |
 |---|---|
 | `01-premise` | `/var/run/docker.sock -> ~/.docker/run/docker.sock`, grok 1.0.70 |
-| `02-before` | v0.10.1: grok refuses the read-only profile, exit `3` |
-| `03-after` | this branch: same call answers `PONG`, exit `0` |
-| `04-isolated-home` | grok's HOME holds only `.docker/run -> ~/.docker/run` (and grok's own `Library/` cache) |
-| `05-read-only` | grok's write to the working dir: `Operation not permitted`, no file |
-| `06-council` | `council --agents claude,codex,grok`: all three ✓, exit `0` |
+| `02-before` | `dootsabha --version` v0.10.1, then grok refusing the read-only profile, exit `3` |
+| `03-after` | `bin/dootsabha --version` at `b37310f`, same call answers `PONG`, exit `0` |
+| `04-isolated-home` | after a real call, every entry of grok's HOME: only `.docker/run -> ~/.docker/run`, plus `Library/Caches` bytecode its tools wrote |
+| `05-read-only` | the prompt, bash's raw `Operation not permitted`, and no file on disk |
+| `06-council` | `council --agents claude,codex,grok`: `meta.providers` all `ok`, exit `0` |
