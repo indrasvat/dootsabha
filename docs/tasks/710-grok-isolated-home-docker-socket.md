@@ -1,6 +1,6 @@
 # Task 710: Keep grok's read-only sandbox working under the isolated HOME
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 704 (grok provider, isolated HOME). Closes #31.
@@ -75,18 +75,42 @@ Rejected:
 
 | File | Change |
 |---|---|
-| `internal/providers/grok.go` | link `.docker` into the isolated HOME |
+| `internal/providers/grok.go` | link `.docker/run`, `.docker/desktop` into the isolated HOME |
 | `internal/providers/grok_internal_test.go` | pin the env against this case |
 | `.shux/scripts/grok-710-evidence.sh` | L4 before/after with the real CLI |
 
 ## Done Criteria
 
-- [ ] `consult --agent grok` succeeds with `/var/run/docker.sock` linked into the real home
-- [ ] read-only sandbox still applied (pinned flag unchanged; cwd write refused)
-- [ ] grok still sees no `~/.claude/**` (MCP 0)
-- [ ] test pins the env handed to grok for this case
-- [ ] L1+L2+L3 green, L4 evidence read back
+- [x] `consult --agent grok` succeeds with `/var/run/docker.sock` linked into the real home
+- [x] read-only sandbox still applied (pinned flag unchanged; cwd write refused)
+- [x] grok still sees no `~/.claude/**` (MCP 0)
+- [x] test pins the env handed to grok for this case
+- [x] L1+L2+L3 green (`make check`: 0 lint issues, L3 40/40), L4 evidence read back
+
+## Review
+
+Adversarial pass (4 narrow agents) + a codex/grok council through this
+branch's own binary. Fixed: an unsearchable or relative HOME failing every call
+(now skipped); whole-`~/.docker` link exposing `config.json` and writing through
+(narrowed to the two socket dirs); a file or dangling link at
+`.docker/desktop` costing the valid `run` (now carried only if a directory).
+
+Declined: grok refusing a carried dir whose `docker.sock` links outside its list.
+grok refuses the same with the real HOME; the private HOME mirrors the real
+socket dirs rather than re-implementing grok's resolution rules.
 
 ## Visual Test Results
 
-Pending.
+Captured with `.shux/scripts/grok-710-evidence.sh` — real `grok` 1.0.70, real
+calls, no mocks. BEFORE is the installed v0.10.1, AFTER is `bin/dootsabha` at
+`b37310f`. Frames in `.shux/out/710/` (gitignored; attached to the PR), each
+read back:
+
+| Frame | Shows |
+|---|---|
+| `01-premise` | `/var/run/docker.sock -> ~/.docker/run/docker.sock`, grok 1.0.70 |
+| `02-before` | v0.10.1: grok refuses the read-only profile, exit `3` |
+| `03-after` | this branch: same call answers `PONG`, exit `0` |
+| `04-isolated-home` | grok's HOME holds only `.docker/run -> ~/.docker/run` (and grok's own `Library/` cache) |
+| `05-read-only` | grok's write to the working dir: `Operation not permitted`, no file |
+| `06-council` | `council --agents claude,codex,grok`: all three ✓, exit `0` |
