@@ -375,6 +375,11 @@ func TestGrokIsolatedEnvSkipsWhatTheRealHomeLacks(t *testing.T) {
 		"relative":     ".",
 	} {
 		t.Run(name, func(t *testing.T) {
+			if home == unsearchable {
+				if _, err := os.Stat(filepath.Join(home, ".docker/run")); err == nil {
+					t.Skip("mode 000 does not stop this process (root); nothing unsearchable to test")
+				}
+			}
 			freshGrokHome(t)
 			env, err := grokIsolatedEnv([]string{"HOME=" + home, "GROK_HOME=/custom/grok"})
 			if err != nil {
