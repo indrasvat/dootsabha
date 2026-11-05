@@ -415,9 +415,10 @@ var (
 	grokHomeErr  error
 )
 
-// grokEmptyHome returns a process-wide empty directory used as $HOME for grok.
-// Created 0700 via MkdirTemp, so it is race-safe and unpredictable.
-func grokEmptyHome() (string, error) {
+// grokEmptyHome returns a process-wide, harness-free directory used as $HOME for
+// grok. Created 0700 via MkdirTemp, so it is race-safe and unpredictable. Only
+// the first call's realHome is used — the process's HOME does not change.
+func grokEmptyHome(realHome string) (string, error) {
 	grokHomeOnce.Do(func() {
 		dir, err := os.MkdirTemp("", "dootsabha-grok-home-")
 		if err != nil {
@@ -430,13 +431,18 @@ func grokEmptyHome() (string, error) {
 			grokHomeErr = fmt.Errorf("chmod isolated grok HOME: %w", err)
 			return
 		}
+		if err := anchorGrokRuntimeSockets(dir, realHome); err != nil {
+			_ = os.RemoveAll(dir)
+			grokHomeErr = err
+			return
+		}
 		grokHomeDir = dir
 	})
 	return grokHomeDir, grokHomeErr
 }
 
 // grokIsolatedEnv rewrites base so grok cannot inherit the caller's Claude Code
-// harness. grok discovers ~/.claude/** off $HOME, so pointing HOME at an empty
+// harness. grok discovers ~/.claude/** off $HOME, so pointing HOME at a private
 // directory severs skills, agents, plugins, MCP servers, hooks and CLAUDE.md
 // injection in one move — while GROK_HOME keeps auth working.
 //
@@ -444,14 +450,13 @@ func grokEmptyHome() (string, error) {
 //
 // The real grok home MUST be resolved from base before HOME is overridden.
 func grokIsolatedEnv(base []string) ([]string, error) {
+	realHome := envLookup(base, "HOME")
 	realGrokHome := envLookup(base, "GROK_HOME")
-	if realGrokHome == "" {
-		if home := envLookup(base, "HOME"); home != "" {
-			realGrokHome = filepath.Join(home, ".grok")
-		}
+	if realGrokHome == "" && realHome != "" {
+		realGrokHome = filepath.Join(realHome, ".grok")
 	}
 
-	emptyHome, err := grokEmptyHome()
+	emptyHome, err := grokEmptyHome(realHome)
 	if err != nil {
 		return nil, err
 	}
@@ -470,6 +475,41 @@ func grokIsolatedEnv(base []string) ([]string, error) {
 		out = append(out, "GROK_HOME="+realGrokHome)
 	}
 	return out, nil
+}
+
+// grokRuntimeSocketDirs are the home-relative entries of grok's read-only
+// runtime-socket deny list (~/.docker/run/docker.sock and
+// ~/.docker/desktop/docker.sock as of grok 1.0.70). grok anchors them at $HOME
+// and refuses to start when /var/run/docker.sock links outside the list — so a
+// bare isolated HOME broke every call on a machine with Docker Desktop's link
+// (#31). Only these directories are carried over: the rest of ~/.docker
+// (config.json credential helpers, the mcp toolkit) stays out of grok's HOME.
+var grokRuntimeSocketDirs = []string{".docker/run", ".docker/desktop"}
+
+// anchorGrokRuntimeSockets links each grokRuntimeSocketDirs entry that exists
+// under realHome into isoHome. What cannot be seen on the caller's side — no
+// such entry, an unsearchable or relative HOME — is skipped: grok sees the same
+// and, if it needed the anchor, refuses to start with its own named error.
+// Failing to write inside isoHome, which this process just created, is a fault.
+func anchorGrokRuntimeSockets(isoHome, realHome string) error {
+	if !filepath.IsAbs(realHome) {
+		return nil
+	}
+	for _, rel := range grokRuntimeSocketDirs {
+		target := filepath.Join(realHome, rel)
+		if _, err := os.Lstat(target); err != nil {
+			slog.Debug("grok: runtime-socket dir not carried over", "path", target, "err", err)
+			continue
+		}
+		link := filepath.Join(isoHome, rel)
+		if err := os.MkdirAll(filepath.Dir(link), 0o700); err != nil {
+			return fmt.Errorf("isolated grok HOME: %w", err)
+		}
+		if err := os.Symlink(target, link); err != nil {
+			return fmt.Errorf("isolated grok HOME: %w", err)
+		}
+	}
+	return nil
 }
 
 // envLookup returns the value of key in a KEY=VALUE slice, or "".
