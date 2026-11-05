@@ -387,6 +387,33 @@ func TestGrokIsolatedEnvSkipsWhatTheRealHomeLacks(t *testing.T) {
 	}
 }
 
+// An entry that is not a directory would make grok refuse its own deny path
+// ("Not a directory"); one malformed entry must not cost the valid other one.
+func TestGrokIsolatedEnvCarriesOnlyRealDirectories(t *testing.T) {
+	for name, plant := range map[string]func(string) error{
+		"regular file":  func(p string) error { return os.WriteFile(p, nil, 0o600) },
+		"dangling link": func(p string) error { return os.Symlink(p+"-gone", p) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			freshGrokHome(t)
+			real := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(real, ".docker/run"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := plant(filepath.Join(real, ".docker/desktop")); err != nil {
+				t.Fatal(err)
+			}
+			env, err := grokIsolatedEnv([]string{"HOME=" + real})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if names := dirNames(t, filepath.Join(envLookup(env, "HOME"), ".docker")); !slices.Equal(names, []string{"run"}) {
+				t.Errorf("isolated HOME .docker holds %v, want only run", names)
+			}
+		})
+	}
+}
+
 func dirNames(t *testing.T, dir string) []string {
 	t.Helper()
 	entries, err := os.ReadDir(dir)

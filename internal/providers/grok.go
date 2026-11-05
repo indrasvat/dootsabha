@@ -486,10 +486,10 @@ func grokIsolatedEnv(base []string) ([]string, error) {
 // (config.json credential helpers, the mcp toolkit) stays out of grok's HOME.
 var grokRuntimeSocketDirs = []string{".docker/run", ".docker/desktop"}
 
-// anchorGrokRuntimeSockets links each grokRuntimeSocketDirs entry that exists
-// under realHome into isoHome. What cannot be seen on the caller's side — no
-// such entry, an unsearchable or relative HOME — is skipped: grok sees the same
-// and, if it needed the anchor, refuses to start with its own named error.
+// anchorGrokRuntimeSockets links each grokRuntimeSocketDirs entry that is a
+// directory under realHome into isoHome. Anything else — missing, a file or a
+// dangling link (grok refuses to start on those), an unsearchable or relative
+// HOME — is skipped; if grok needed that anchor it still refuses, naming it.
 // Failing to write inside isoHome, which this process just created, is a fault.
 func anchorGrokRuntimeSockets(isoHome, realHome string) error {
 	if !filepath.IsAbs(realHome) {
@@ -497,7 +497,7 @@ func anchorGrokRuntimeSockets(isoHome, realHome string) error {
 	}
 	for _, rel := range grokRuntimeSocketDirs {
 		target := filepath.Join(realHome, rel)
-		if _, err := os.Lstat(target); err != nil {
+		if info, err := os.Stat(target); err != nil || !info.IsDir() {
 			slog.Debug("grok: runtime-socket dir not carried over", "path", target, "err", err)
 			continue
 		}
