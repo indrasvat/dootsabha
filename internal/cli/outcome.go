@@ -51,11 +51,18 @@ func newOutcome(b *core.Budget) *Outcome { return &Outcome{budget: b} }
 // The scope is captured here, from the context that actually bounded the call,
 // rather than by asking the budget afterwards — a subprocess sitting in its
 // SIGTERM grace period can let a later session expiry rewrite the diagnosis.
-func (o *Outcome) Invoke(prov providers.Provider, name, prompt string, opts providers.InvokeOptions) (*providers.ProviderResult, error) {
+//
+// stage names the call in the progress file, which is written from the same
+// error recorded here.
+func (o *Outcome) Invoke(stage string, prov providers.Provider, name, prompt string, opts providers.InvokeOptions) (*providers.ProviderResult, error) {
 	ctx, cancel := o.budget.Step()
 	defer cancel()
 	scope := o.budget.ScopeOf(ctx)
-	res, err := prov.Invoke(ctx, prompt, opts)
+	var res *providers.ProviderResult
+	err := progress.call(stage, name, scope, func() (err error) {
+		res, err = prov.Invoke(ctx, prompt, opts)
+		return err
+	})
 	o.record(name, scope, err)
 	return res, err
 }

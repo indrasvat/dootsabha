@@ -36,6 +36,9 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := startProgress(cmd); err != nil {
+				return err
+			}
 			// Resolve bilingual flag aliases.
 			if dootas, _ := cmd.Flags().GetString("dootas"); dootas != "" && !cmd.Flags().Changed("agents") {
 				agents = dootas
@@ -113,8 +116,12 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 				if provErr != nil {
 					return &ExitError{Code: core.ExitUsage, Message: provErr.Error()}
 				}
-				coreAgents = append(coreAgents, &providerAgent{prov: prov})
+				coreAgents = append(coreAgents, &providerAgent{prov: prov, budget: budget})
 			}
+			progress.runStarted(run{
+				command: "council", agents: agentNames, chair: cfg.Council.Chair,
+				timeout: budget.PerInvoke(), sessionTimeout: budget.SessionLimit(),
+			})
 
 			eng := core.NewEngine(coreAgents, cfg)
 
@@ -279,6 +286,7 @@ Exit codes: 0 success, 2 bad command, 3 all agents failed, 4 timeout, 5 partial 
 	f.BoolVar(&parallel, "parallel", true, "Run agents in parallel")
 	f.Bool("samantar", true, "Alias for --parallel (समान्तर)")
 	_ = f.MarkHidden("samantar")
+	addProgressFlag(cmd)
 
 	return cmd
 }

@@ -1012,6 +1012,102 @@ else
 fi
 rm -f "$IGN_OUT"
 
+# ── Workflow 12: the progress file (GitHub issue #34) ───────────────────────
+#
+# A caller that put a run in the background reads --progress-file while it
+# goes. scripts/progress-check.py holds one file to the contract in
+# skill/references/progress-file.md and to the exit code the process returned.
+
+echo ""
+echo "--- Progress file ---"
+
+PROG_DIR=$(mktemp -d -t dootsabha-progress)
+
+# expect_progress <label> <want-exit> <file> <python check on ev> <command...>
+# progress-check.py also asserts that every line parses, every call_started has
+# exactly one call_finished, run_finished is last and carries the exit code,
+# and the prompt (PROGRESS-SECRET) appears nowhere in the file.
+expect_progress() {
+  local label=$1 want=$2 file=$3 check=$4 rc=0 out msg
+  shift 4
+  out=$("$@" 2>/dev/null) || rc=$?
+  if [ "$rc" -ne "$want" ]; then
+    fail "$label: exit $rc, want $want"
+  elif ! printf '%s' "$out" | one_json; then
+    fail "$label: stdout is not exactly one JSON document"
+  elif msg=$(python3 scripts/progress-check.py "$file" "$rc" "$check"); then
+    pass "$label"
+  else
+    fail "$label: $msg"
+  fi
+}
+
+FINISHED="[e for e in ev if e['event'] == 'call_finished']"
+
+expect_progress "council: every call reported in order, run_started names the run" 0 "$PROG_DIR/council.ndjson" \
+  "[(e['stage'], e['status']) for e in $FINISHED].count(('dispatch', 'ok')) == 2 and [e['stage'] for e in $FINISHED][2:] == ['review', 'review', 'synthesis'] and ev[0]['event'] == 'run_started' and ev[0]['agents'] == ['claude', 'codex'] and ev[0]['chair'] == 'claude' and ev[0]['schema_version'] == 1" \
+  "$BINARY" council --agents claude,codex --chair claude --json --progress-file "$PROG_DIR/council.ndjson" "PROGRESS-SECRET"
+
+expect_progress "council: a timed-out agent is timeout/invocation and the run exits 4" 4 "$PROG_DIR/timeout.ndjson" \
+  "any(e['agent'] == 'codex' and e['stage'] == 'dispatch' and e['status'] == 'timeout' and e['scope'] == 'invocation' for e in $FINISHED)" \
+  env MOCK_CODEX_DELAY=5 "$BINARY" council --agents claude,codex --chair claude --timeout 1s --json \
+  --progress-file "$PROG_DIR/timeout.ndjson" "PROGRESS-SECRET"
+
+expect_progress "review via DOOTSABHA_PROGRESS_FILE: author, then review" 0 "$PROG_DIR/review.ndjson" \
+  "[(e['stage'], e['agent']) for e in $FINISHED] == [('author', 'codex'), ('review', 'claude')] and ev[0]['author'] == 'codex'" \
+  env DOOTSABHA_PROGRESS_FILE="$PROG_DIR/review.ndjson" "$BINARY" review --author codex --reviewer claude --json "PROGRESS-SECRET"
+
+expect_progress "refine: author, review, incorporate" 0 "$PROG_DIR/refine.ndjson" \
+  "[e['stage'] for e in $FINISHED] == ['author', 'review', 'incorporate']" \
+  "$BINARY" refine --author codex --reviewers claude --json --progress-file "$PROG_DIR/refine.ndjson" "PROGRESS-SECRET"
+
+expect_progress "consult: a failed agent is error and the run exits 3" 3 "$PROG_DIR/consult.ndjson" \
+  "[(e['stage'], e['status']) for e in $FINISHED] == [('consult', 'error')]" \
+  env DOOTSABHA_PROVIDERS_GROK_BINARY=/nonexistent/grok "$BINARY" consult --agent grok --json \
+  --progress-file "$PROG_DIR/consult.ndjson" "PROGRESS-SECRET"
+
+expect_progress "a config error before the run began: only run_finished, exit 6" 6 "$PROG_DIR/config.ndjson" \
+  "[e['event'] for e in ev] == ['run_finished']" \
+  "$BINARY" council --config "$PROG_DIR/missing.yaml" --json --progress-file "$PROG_DIR/config.ndjson" "PROGRESS-SECRET"
+
+# A path that cannot be written is a bad command, caught before any agent runs.
+RC=0
+"$BINARY" consult --agent claude --json --progress-file "$PROG_DIR" "hi" >/dev/null 2>&1 || RC=$?
+if [ "$RC" -eq 2 ]; then
+  pass "an unwritable progress path exits 2"
+else
+  fail "an unwritable progress path exited $RC, want 2"
+fi
+
+# SIGTERM mid-council: both open dispatch calls are closed as interrupted and the
+# run ends with the signal and the code a shell sees for it.
+SIG_OUT=$(python3 scripts/signal-case.py --binary "$BINARY" --want 2 -- \
+  council --agents claude,codex --chair claude --json --progress-file "$PROG_DIR/signal.ndjson" "PROGRESS-SECRET")
+if msg=$(python3 scripts/progress-check.py "$PROG_DIR/signal.ndjson" 143 \
+  "ev[-1]['signal'] == 'SIGTERM' and [(e['stage'], e['status']) for e in $FINISHED] == [('dispatch', 'interrupted')] * 2"); then
+  pass "SIGTERM mid-council: open calls interrupted, run_finished 143 + SIGTERM"
+else
+  fail "SIGTERM mid-council: $msg (driver: $SIG_OUT)"
+fi
+
+# The env form must not reach the agents: one that runs dootsabha itself would
+# truncate this run's file.
+ENV_PROBE="$PROG_DIR/env-probe"
+# shellcheck disable=SC2016  # expanded by the generated script, not here
+printf '#!/usr/bin/env bash\necho "${DOOTSABHA_PROGRESS_FILE:-unset}" > "%s"\nexec "%s" "$@"\n' \
+  "$PROG_DIR/env-seen" "$PWD/$MOCK_DIR/mock-claude" > "$ENV_PROBE"
+chmod +x "$ENV_PROBE"
+DOOTSABHA_PROGRESS_FILE="$PROG_DIR/env.ndjson" DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$ENV_PROBE" \
+  "$BINARY" consult --agent claude "hi" >/dev/null 2>&1 || true
+if [ "$(cat "$PROG_DIR/env-seen" 2>/dev/null)" = "unset" ] && [ -s "$PROG_DIR/env.ndjson" ]; then
+  pass "DOOTSABHA_PROGRESS_FILE is used, and not inherited by agents"
+else
+  fail "env form: agent saw '$(cat "$PROG_DIR/env-seen" 2>/dev/null)', file $(wc -c < "$PROG_DIR/env.ndjson" 2>/dev/null) bytes"
+fi
+
+rm -f "$PROG_DIR"/*.ndjson "$PROG_DIR/env-probe" "$PROG_DIR/env-seen"
+rmdir "$PROG_DIR"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"

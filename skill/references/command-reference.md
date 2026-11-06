@@ -71,6 +71,10 @@ Notes when using it:
 the run as a whole cannot exceed 20m. Exit code `4` covers both; the message says
 which fired (`invocation timeout after …` vs `session timeout after …`).
 
+`consult`, `council`, `review` and `refine` also take `--progress-file <path>`
+(env `DOOTSABHA_PROGRESS_FILE`): one JSON line per call start and finish, ending
+with `run_finished` and the exit code. See [progress-file.md](progress-file.md).
+
 ## council (sabha / सभा)
 
 Multi-agent deliberation with dispatch, peer review, and synthesis.

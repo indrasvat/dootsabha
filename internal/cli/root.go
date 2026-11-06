@@ -94,6 +94,7 @@ council-mode deliberation, peer review, and synthesis.
 
 // Execute runs the root command. Called from main().
 func Execute() {
+	progressFromEnv = takeProgressEnv()
 	setupSIGPIPE()
 	setupInterrupt()
 	// Always silence Cobra's built-in "Error: ..." stderr line — we handle

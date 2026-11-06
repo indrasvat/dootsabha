@@ -68,6 +68,11 @@ Stdout is always **exactly one JSON document**, including on failure. Other glob
 flags: `--quiet`, `-v`/`-vv` (stderr only), and the two budgets — `--timeout` (default 15m)
 bounds **one agent call**, `--session-timeout` (default 75m) bounds the **whole pipeline**.
 
+A council takes minutes and prints nothing until it ends. If you background it, add
+`--progress-file run.ndjson` and read `tail -n1 run.ndjson` to see which agent and
+stage it is on; `run_finished` is the last line, with the exit code.
+Contract: [references/progress-file.md](references/progress-file.md).
+
 ## Commands
 
 | Command | Purpose | Key flags |
@@ -149,4 +154,5 @@ shape and every key: [references/command-reference.md](references/command-refere
 
 - [Command reference](references/command-reference.md) — flags, schemas, provider matrix
 - [Exit codes](references/exit-codes.md) — branching logic
+- [Progress file](references/progress-file.md) — watching a run in flight
 - [Council example](examples/council-deliberation.md) · [Review & refine example](examples/review-refine.md)

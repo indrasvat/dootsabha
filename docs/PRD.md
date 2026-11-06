@@ -330,6 +330,7 @@ dootsabha/
 - `--quiet` / `-q` — Suppress non-error output
 - `--timeout` / `--kaalseema` — Max time per individual agent invocation [default: 15m]
 - `--session-timeout` / `--satra-seema` — Max total session time across all stages [default: 75m]
+- `--progress-file` / `--pragati-patra` — on `consult`, `council`, `review`, `refine`: NDJSON stage events for a caller polling a run in flight (env `DOOTSABHA_PROGRESS_FILE`; contract in `skill/references/progress-file.md`)
 - `--watch` / `--nireekshana` — Stream output in real-time (Phase 4+ — see Q8 in §12)
 - `--config` — Config file path [default: ~/.dootsabha/config.yaml]
 

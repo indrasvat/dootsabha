@@ -190,5 +190,6 @@ fi
 | `--quiet` | Suppress progress output |
 | `--timeout` | Budget for one agent call — each call gets its own window (default 15m) |
 | `--session-timeout` | Ceiling for the whole pipeline (default 75m; 0 = unbounded) |
+| `--progress-file` | NDJSON stage events while the run goes; `tail -n1` it (see skill `references/progress-file.md`) |
 | `-v` / `-vv` / `-vvv` | Verbosity (info / debug / debug+source) |
 | `--config path` | Custom config file |

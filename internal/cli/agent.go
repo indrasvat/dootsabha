@@ -20,17 +20,25 @@ import (
 // SynthesisResult the engine returns — which council folds into the ledger with
 // Outcome.AddDispatches, AddReviews and AddSynthesis. Their completeness is what
 // TestOutcomeConsumesEveryResultError enforces.
+//
+// Each call is also reported to the progress file under the stage the engine
+// named on ctx, from the same error the engine puts on its result.
 type providerAgent struct {
-	prov providers.Provider
+	prov   providers.Provider
+	budget *core.Budget
 }
 
 func (a *providerAgent) Name() string { return a.prov.Name() }
 
 func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.InvokeOptions) (*core.InvokeResult, error) {
-	result, err := a.prov.Invoke(ctx, prompt, providers.InvokeOptions{
-		Model:    opts.Model,
-		MaxTurns: opts.MaxTurns,
-		Timeout:  opts.Timeout,
+	var result *providers.ProviderResult
+	err := progress.call(core.StageOf(ctx), a.prov.Name(), a.budget.ScopeOf(ctx), func() (err error) {
+		result, err = a.prov.Invoke(ctx, prompt, providers.InvokeOptions{
+			Model:    opts.Model,
+			MaxTurns: opts.MaxTurns,
+			Timeout:  opts.Timeout,
+		})
+		return err
 	})
 	if err != nil {
 		return nil, err

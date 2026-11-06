@@ -66,6 +66,7 @@ func setupInterrupt() {
 			again := make(chan struct{})
 			go func() { <-signals; close(again) }()
 			n := core.StopAll(agentStopGrace, again)
+			progress.finish(128+int(sig), sig)
 			if !quiet {
 				notice(fmt.Sprintf("dootsabha: %s — stopped %d agent process group(s)\n", sig, n))
 			}
@@ -97,6 +98,7 @@ func notice(msg string) {
 func exit(code int) {
 	shutdown.Do(func() {
 		core.StopAll(agentStopGrace, hurry)
+		progress.finish(code, nil)
 		os.Exit(code)
 	})
 }

@@ -61,6 +61,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := startProgress(cmd); err != nil {
+				return err
+			}
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).
 			if kartaa, _ := cmd.Flags().GetString("kartaa"); kartaa != "" && author == "" {
 				author = kartaa
@@ -106,9 +109,14 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				fmt.Fprintln(os.Stdout)                                           //nolint:errcheck
 			}
 
+			progress.runStarted(run{
+				command: "review", agents: []string{author, reviewer}, author: author,
+				timeout: budget.PerInvoke(), sessionTimeout: budget.SessionLimit(),
+			})
+
 			// Step 1: Invoke author.
 			totalStart := time.Now()
-			authorResult, err := outcome.Invoke(authorProv, author, prompt, invokeOpts)
+			authorResult, err := outcome.Invoke("author", authorProv, author, prompt, invokeOpts)
 			if err != nil {
 				exit := outcome.Exit(fmt.Sprintf("author (%s) failed: %s", author, err))
 				if rc.IsJSON() {
@@ -122,7 +130,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				"Review the following output from %s. Identify strengths, weaknesses, errors. Be specific.\n\n%s",
 				author, authorResult.Content,
 			)
-			reviewerResult, err := outcome.Invoke(reviewerProv, reviewer, reviewPrompt, invokeOpts)
+			reviewerResult, err := outcome.Invoke("review", reviewerProv, reviewer, reviewPrompt, invokeOpts)
 			totalDuration := time.Since(totalStart)
 
 			if err != nil {
@@ -159,6 +167,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 	f.String("pareekshak", "", "Alias for --reviewer (परीक्षक)")
 	_ = f.MarkHidden("pareekshak")
 	f.StringVar(&model, "model", "", "Override model for both agents")
+	addProgressFlag(cmd)
 
 	return cmd
 }
