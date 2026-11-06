@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/indrasvat/dootsabha/internal/core"
 )
 
@@ -152,6 +154,29 @@ providers:
 	}
 	if cfg.Providers["agy"].Model != "agy-from-explicit-config" {
 		t.Errorf("agy.Model: got %q, want agy-from-explicit-config", cfg.Providers["agy"].Model)
+	}
+}
+
+// The skeleton users copy is not loaded at runtime, so a default change that
+// skips it ships the old budgets to everyone who copied it (#33 did, at first).
+func TestShippedSkeletonBudgetsMatchTheBuiltins(t *testing.T) {
+	isolateHome(t)
+	builtin, err := core.LoadConfig(os.DevNull)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	v := viper.New() // the file alone: LoadConfig would fill a missing key
+	v.SetConfigFile(filepath.Join("..", "..", "configs", "default.yaml"))
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatalf("parse skeleton: %v", err)
+	}
+	for key, want := range map[string]time.Duration{
+		"timeout":         builtin.Timeout,
+		"session_timeout": builtin.SessionTimeout,
+	} {
+		if got := v.GetDuration(key); got != want {
+			t.Errorf("configs/default.yaml %s = %s, built-in default is %s", key, got, want)
+		}
 	}
 }
 

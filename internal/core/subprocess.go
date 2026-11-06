@@ -105,9 +105,6 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 		slog.Debug("subprocess skipped, budget already spent", "binary", binary, "error", err)
 		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, err)
 	}
-	if liveGroups.isStopping() {
-		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, ErrStopping)
-	}
 
 	cmd := exec.Command(binary, args...)
 	cmd.Env = cfg.env
@@ -147,7 +144,8 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 
 	slog.Debug("subprocess starting", "binary", binary, "args", args)
 	start := time.Now()
-	if err := cmd.Start(); err != nil {
+	exited, err := liveGroups.start(cmd)
+	if err != nil {
 		_ = outR.Close()
 		_ = outW.Close()
 		_ = errR.Close()
@@ -158,13 +156,6 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	// when the child and all its descendants have exited.
 	_ = outW.Close()
 	_ = errW.Close()
-
-	exited, tracked := liveGroups.add(cmd.Process.Pid)
-	if !tracked {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		_ = cmd.Wait()
-		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, ErrStopping)
-	}
 
 	copied := make(chan struct{})
 	go func() {
@@ -196,6 +187,9 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	waitCh := make(chan error, 1)
 	go func() {
 		err := cmd.Wait()
+		// The leader is gone; anything left in its group would outlive the call
+		// with nothing tracking it. A pgid cannot be reused while it has members.
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		liveGroups.remove(pgid, exited)
 		waitCh <- err
 	}()
@@ -260,28 +254,28 @@ type groupSet struct {
 
 var liveGroups = groupSet{live: map[int]chan struct{}{}}
 
-// add registers a started group. It refuses once stopping has begun, and the
-// check and the insert share one lock, so StopAll cannot miss a group.
-func (g *groupSet) add(pgid int) (chan struct{}, bool) {
+// start starts cmd and registers its group. The stopping check, the fork and
+// the insert share one lock, so StopAll can neither miss a group nor let one
+// start after it has begun.
+func (g *groupSet) start(cmd *exec.Cmd) (chan struct{}, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.stopping {
-		return nil, false
+		return nil, ErrStopping
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
 	}
 	exited := make(chan struct{})
-	g.live[pgid] = exited
-	return exited, true
-}
-
-func (g *groupSet) isStopping() bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.stopping
+	g.live[cmd.Process.Pid] = exited
+	return exited, nil
 }
 
 func (g *groupSet) remove(pgid int, exited chan struct{}) {
 	g.mu.Lock()
-	delete(g.live, pgid)
+	if g.live[pgid] == exited {
+		delete(g.live, pgid)
+	}
 	g.mu.Unlock()
 	close(exited)
 }

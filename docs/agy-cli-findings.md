@@ -119,8 +119,8 @@ clean.
 
 ### `--print-timeout` (task 708)
 
-`agy --print-timeout` defaults to **5m**, exactly दूतसभा's default per-call
-`--timeout` — and when it fires, agy reports an ordinary ERROR envelope with
+`agy --print-timeout` defaults to **5m**, a third of दूतसभा's default per-call
+`--timeout` (15m) — and when it fires, agy reports an ordinary ERROR envelope with
 exit 1:
 
 ```json

@@ -188,7 +188,7 @@ fi
 |------|---------|
 | `--json` | JSON output (always use this from agents) |
 | `--quiet` | Suppress progress output |
-| `--timeout 5m` | Budget for one agent call — each call gets its own window |
-| `--session-timeout 30m` | Ceiling for the whole pipeline (0 = unbounded) |
+| `--timeout` | Budget for one agent call — each call gets its own window (default 15m) |
+| `--session-timeout` | Ceiling for the whole pipeline (default 75m; 0 = unbounded) |
 | `-v` / `-vv` / `-vvv` | Verbosity (info / debug / debug+source) |
 | `--config path` | Custom config file |

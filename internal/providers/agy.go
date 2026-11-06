@@ -35,8 +35,8 @@ const agyMinVersion = "1.1.8"
 
 // agyPrintTimeoutMargin pads the window दूतसभा forwards to `--print-timeout`.
 //
-// agy's own print timeout defaults to 5m — exactly दूतसभा's default `--timeout` —
-// and when it fires agy emits an ordinary ERROR envelope with exit 1,
+// agy's own print timeout defaults to 5m — a third of दूतसभा's default `--timeout`
+// — and when it fires agy emits an ordinary ERROR envelope with exit 1,
 // indistinguishable from any other failure. दूतसभा would then charge the caller
 // exit 3 ("nothing usable, try another agent") for what is really exit 4
 // ("raise the timeout"). Forwarding the step's remaining window plus a margin

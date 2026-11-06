@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -94,8 +96,6 @@ func TestStopAllKillsAGroupThatIgnoresSIGTERM(t *testing.T) {
 	}
 }
 
-// Once dootsabha is stopping, a pipeline's next stage must not start an agent
-// that nothing would stop.
 func TestRunRefusesToStartOnceStopping(t *testing.T) {
 	resetLiveGroups(t)
 	StopAll(0)
@@ -107,5 +107,40 @@ func TestRunRefusesToStartOnceStopping(t *testing.T) {
 	}
 	if _, statErr := os.Stat(marker); statErr == nil {
 		t.Error("the agent ran after StopAll")
+	}
+}
+
+// What an agent leaves in its group when it exits is killed with it, whether it
+// exited on its own or on the timeout reaper's SIGTERM — otherwise it escapes
+// the registry, and StopAll, the moment the leader is reaped.
+func TestRunKillsWhatTheLeaderLeavesInItsGroup(t *testing.T) {
+	for name, tc := range map[string]struct {
+		script  string
+		timeout time.Duration
+	}{
+		"leader exits on its own":           {`sleep 300 & echo $! > "$1"; exit 0`, 0},
+		"leader exits on the reaper's TERM": {`(trap "" TERM; exec sleep 300) & echo $! > "$1"; wait`, 300 * time.Millisecond},
+	} {
+		t.Run(name, func(t *testing.T) {
+			resetLiveGroups(t)
+			childFile := filepath.Join(t.TempDir(), "child")
+			ctx := context.Background()
+			if tc.timeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tc.timeout)
+				defer cancel()
+			}
+			_, _ = (&SubprocessRunner{}).Run(ctx, "bash", []string{"-c", tc.script, "agent", childFile},
+				WithGracePeriod(time.Second))
+			raw, err := os.ReadFile(childFile)
+			if err != nil {
+				t.Fatalf("agent never recorded its child: %v", err)
+			}
+			child, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
+			if syscall.Kill(child, 0) == nil {
+				_ = syscall.Kill(child, syscall.SIGKILL)
+				t.Errorf("child %d outlived its agent's call", child)
+			}
+		})
 	}
 }

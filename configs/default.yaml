@@ -69,8 +69,8 @@ council:
 
 # Per-invocation timeout — the budget for ONE agent call. Every call in a
 # pipeline gets its own window, so a slow author does not starve the reviewer.
-# Formats: 30s, 5m, 1h. Set to 0 to fall back to the 5m built-in default.
-timeout: 5m
+# Formats: 30s, 5m, 1h. Set to 0 to fall back to the 15m built-in default.
+timeout: 15m
 
 # Session timeout — the ceiling for a WHOLE pipeline (review, refine, council),
 # across every agent call it makes. It always wins over `timeout`: a call is cut
@@ -80,4 +80,4 @@ timeout: 5m
 # it is killed, so a run can finish a few seconds past the ceiling — bounded by
 # that one grace period, not by the number of calls.
 # Formats: 30m, 1h, 2h. Set to 0 to disable the ceiling.
-session_timeout: 30m
+session_timeout: 75m

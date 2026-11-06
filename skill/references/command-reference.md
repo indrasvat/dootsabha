@@ -46,7 +46,7 @@ Notes when using it:
   findings.
 - `grok-4.5` is still selectable: pin `providers.grok.model: grok-4.5`. दूतसभा
   never rewrites an explicitly configured model.
-- A real review takes ~105 s (p50), comfortably inside the 5 m default timeout.
+- A real review takes ~105 s (p50), comfortably inside the 15 m default timeout.
 - dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
   `$HOME`, so it cannot write files and does not inherit the caller's Claude Code
   skills, hooks, MCP servers, or `CLAUDE.md`.

@@ -187,7 +187,7 @@ func TestBudgetWarning(t *testing.T) {
 		{"ceiling disabled", 40 * time.Minute, 0, 5},
 		{"exactly equal", 30 * time.Minute, 30 * time.Minute, 1},
 		{"N calls exactly fit", 6 * time.Minute, 30 * time.Minute, 5},
-		{"refine with two reviewers fits the defaults", 5 * time.Minute, 30 * time.Minute, 5},
+		{"refine with two reviewers at 5m fits 30m", 5 * time.Minute, 30 * time.Minute, 5},
 		{"single call, no multiplication", 20 * time.Minute, 30 * time.Minute, 1},
 	} {
 		if w := budgetWarning(tc.perInvoke, tc.sessn, tc.steps); w != "" {

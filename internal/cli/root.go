@@ -121,6 +121,9 @@ func Execute() {
 		return &ExitError{Code: core.ExitUsage, Message: err.Error()}
 	})
 	if err := rootCmd.Execute(); err != nil {
+		if interrupted.Load() {
+			exit(core.ExitError) // the signal handler owns the exit; it reports what it stopped
+		}
 		var exitErr *ExitError
 		if errors.As(err, &exitErr) {
 			// Only emit the generic error envelope when the command has not
