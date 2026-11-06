@@ -32,6 +32,12 @@ func resetLiveGroups(t *testing.T) {
 func startTracked(t *testing.T, script string) (int, <-chan error) {
 	t.Helper()
 	ready := filepath.Join(t.TempDir(), "ready")
+	liveGroups.mu.Lock()
+	before := make(map[int]bool, len(liveGroups.live))
+	for pgid := range liveGroups.live {
+		before[pgid] = true
+	}
+	liveGroups.mu.Unlock()
 	done := make(chan error, 1)
 	go func() {
 		_, err := (&SubprocessRunner{}).Run(context.Background(), "bash", []string{"-c", script, "agent", ready})
@@ -43,8 +49,10 @@ func startTracked(t *testing.T, script string) (int, <-chan error) {
 		}
 		liveGroups.mu.Lock()
 		for pgid := range liveGroups.live {
-			liveGroups.mu.Unlock()
-			return pgid, done
+			if !before[pgid] {
+				liveGroups.mu.Unlock()
+				return pgid, done
+			}
 		}
 		liveGroups.mu.Unlock()
 	}
@@ -67,7 +75,7 @@ func TestStopAllEndsTheWholeGroup(t *testing.T) {
 	resetLiveGroups(t)
 	pgid, done := startTracked(t, `sleep 300 & touch "$1"; wait`)
 
-	if n := StopAll(2 * time.Second); n != 1 {
+	if n := StopAll(2*time.Second, nil); n != 1 {
 		t.Errorf("StopAll signalled %d groups, want 1", n)
 	}
 	select {
@@ -87,7 +95,7 @@ func TestStopAllKillsAGroupThatIgnoresSIGTERM(t *testing.T) {
 	pgid, _ := startTracked(t, `trap "" TERM; sleep 300 & touch "$1"; wait`)
 
 	start := time.Now()
-	StopAll(300 * time.Millisecond)
+	StopAll(300*time.Millisecond, nil)
 	if took := time.Since(start); took < 300*time.Millisecond || took > 2*time.Second {
 		t.Errorf("StopAll took %s with a 300ms grace; SIGTERM was not ignored, or the grace was not bounded", took)
 	}
@@ -96,9 +104,39 @@ func TestStopAllKillsAGroupThatIgnoresSIGTERM(t *testing.T) {
 	}
 }
 
+// Hurrying cuts the grace short but still kills the whole snapshot — including a
+// group whose leader exited on SIGTERM and was reaped mid-grace, leaving a child
+// that ignores SIGTERM. A second, fresh sweep would no longer see that group.
+func TestStopAllHurriedStillKillsAReapedLeadersChild(t *testing.T) {
+	resetLiveGroups(t)
+	childFile := filepath.Join(t.TempDir(), "child")
+	_, _ = startTracked(t, `(trap "" TERM; exec sleep 300) & echo $! > `+childFile+`; touch "$1"; wait`)
+	_, _ = startTracked(t, `trap "" TERM; sleep 300 & touch "$1"; wait`) // holds the grace open
+
+	hurry := make(chan struct{})
+	time.AfterFunc(300*time.Millisecond, func() { close(hurry) })
+	start := time.Now()
+	StopAll(10*time.Second, hurry)
+	if took := time.Since(start); took > 2*time.Second {
+		t.Errorf("hurried StopAll took %s", took)
+	}
+	raw, err := os.ReadFile(childFile)
+	if err != nil {
+		t.Fatalf("read child pid: %v", err)
+	}
+	child, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
+	for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		if syscall.Kill(child, 0) != nil {
+			return
+		}
+	}
+	_ = syscall.Kill(child, syscall.SIGKILL)
+	t.Errorf("child %d of a reaped leader survived a hurried StopAll", child)
+}
+
 func TestRunRefusesToStartOnceStopping(t *testing.T) {
 	resetLiveGroups(t)
-	StopAll(0)
+	StopAll(0, nil)
 
 	marker := filepath.Join(t.TempDir(), "ran")
 	_, err := (&SubprocessRunner{}).Run(context.Background(), "touch", []string{marker})

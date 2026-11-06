@@ -991,6 +991,10 @@ expect_signal_case "a broken stderr pipe mid-run (SIGPIPE) stops the agents too"
   "r['started'] == 1 and $STOPPED" --signals= --stderr break-after-start \
   --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
   -- -v council --agents claude,codex --chair codex "hi"
+expect_signal_case "a signal during an exit's own cleanup skips the grace" \
+  "r['started'] == 1 and r['elapsed'] < 3 and $STOPPED" --ignore-term --signals TERM@2 --stderr break-after-start \
+  --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
+  -- -v council --agents claude,codex --chair codex "hi"
 
 # A shell starts background jobs with SIGINT ignored. dootsabha must not
 # un-ignore it: such a run keeps going, as it always has.

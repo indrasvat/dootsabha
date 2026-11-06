@@ -22,8 +22,10 @@ const (
 )
 
 var (
-	// signals receives every trapped signal; nil when none is trapped.
-	signals chan os.Signal
+	// hurry is closed when the first trapped signal arrives. An exit already
+	// stopping agents then skips the grace instead of making the caller wait.
+	hurry     = make(chan struct{})
+	hurryOnce sync.Once
 	// shutdown runs once per process, whichever path gets there first: a
 	// signal, a normal or error exit, or SIGPIPE. Each stops every agent
 	// before the process ends, and a second caller blocks until it does.
@@ -54,13 +56,16 @@ func setupInterrupt() {
 	if len(sigs) == 0 {
 		return
 	}
-	signals = make(chan os.Signal, 2)
+	signals := make(chan os.Signal, 2)
 	signal.Notify(signals, sigs...)
 	go func() {
 		sig := (<-signals).(syscall.Signal)
 		interrupted.Store(true)
+		hurryOnce.Do(func() { close(hurry) })
 		shutdown.Do(func() {
-			n := stopAgents()
+			again := make(chan struct{})
+			go func() { <-signals; close(again) }()
+			n := core.StopAll(agentStopGrace, again)
 			if !quiet {
 				notice(fmt.Sprintf("dootsabha: %s — stopped %d agent process group(s)\n", sig, n))
 			}
@@ -72,19 +77,6 @@ func setupInterrupt() {
 			os.Exit(128 + int(sig))
 		})
 	}()
-}
-
-// stopAgents stops every agent, skipping the grace if a signal arrives
-// meanwhile — on the signal path that is the second one.
-func stopAgents() int {
-	stopped := make(chan int, 1)
-	go func() { stopped <- core.StopAll(agentStopGrace) }()
-	select {
-	case n := <-stopped:
-		return n
-	case <-signals:
-		return core.StopAll(0)
-	}
 }
 
 // notice writes msg to stderr without waiting on a reader that has stopped.
@@ -104,7 +96,7 @@ func notice(msg string) {
 // signal got to shutdown first, it blocks until that handler ends the process.
 func exit(code int) {
 	shutdown.Do(func() {
-		stopAgents()
+		core.StopAll(agentStopGrace, hurry)
 		os.Exit(code)
 	})
 }

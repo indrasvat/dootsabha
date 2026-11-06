@@ -281,9 +281,11 @@ func (g *groupSet) remove(pgid int, exited chan struct{}) {
 
 // StopAll stops every agent process group Run has started: SIGTERM, up to grace
 // for the leaders to exit, then SIGKILL to each group so a descendant that
-// ignored SIGTERM goes too. From the first call on, Run refuses to start
-// anything. It returns how many groups it signalled.
-func StopAll(grace time.Duration) int {
+// ignored SIGTERM goes too. Closing hurry ends the grace early; the SIGKILL
+// still reaches every group in the snapshot, including one whose leader has
+// already been reaped. From the first call on, Run refuses to start anything.
+// It returns how many groups it signalled.
+func StopAll(grace time.Duration, hurry <-chan struct{}) int {
 	g := &liveGroups
 	g.mu.Lock()
 	g.stopping = true
@@ -304,6 +306,8 @@ wait:
 		select {
 		case <-exited:
 		case <-deadline:
+			break wait
+		case <-hurry:
 			break wait
 		}
 	}

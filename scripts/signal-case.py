@@ -34,7 +34,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True)
     ap.add_argument("--want", type=int, default=1, help="agents to wait for before signalling")
-    ap.add_argument("--signals", default="TERM", help="e.g. TERM or INT,TERM@0.05 (seconds after the first); empty sends none")
+    ap.add_argument("--signals", default="TERM", help="e.g. TERM or INT,TERM@0.05 (seconds after the agents start); empty sends none")
     ap.add_argument("--ignore-term", action="store_true", help="agents ignore SIGTERM, children too")
     ap.add_argument("--stderr", choices=["pipe", "stalled", "break-after-start"], default="pipe")
     ap.add_argument("--env", action="append", default=[], help="KEY=VAL, applied after the agent defaults")
@@ -76,9 +76,9 @@ def main():
         os.close(err_r)
 
     t0 = time.time()
-    for i, spec in enumerate(filter(None, a.signals.split(","))):
+    for spec in filter(None, a.signals.split(",")):
         name, _, at = spec.partition("@")
-        if i and at:
+        if at:
             time.sleep(max(0.0, t0 + float(at) - time.time()))
         if p.poll() is None:
             p.send_signal(getattr(signal, "SIG" + name))
