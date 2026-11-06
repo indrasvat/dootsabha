@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -58,6 +59,18 @@ func startTracked(t *testing.T, script string) (int, <-chan error) {
 	}
 	t.Fatal("agent never became ready")
 	return 0, nil
+}
+
+// running reports whether pid is a live process. A killed process whose parent
+// is gone waits as a zombie until init reaps it — on a CI runner that can take a
+// while — and kill(pid, 0) still succeeds on it; it has stopped all the same.
+func running(pid int) bool {
+	if syscall.Kill(pid, 0) != nil {
+		return false
+	}
+	out, _ := exec.Command("ps", "-o", "stat=", "-p", strconv.Itoa(pid)).Output()
+	stat := strings.TrimSpace(string(out))
+	return stat != "" && !strings.HasPrefix(stat, "Z")
 }
 
 func groupGone(pgid int, within time.Duration) bool {
@@ -126,7 +139,7 @@ func TestStopAllHurriedStillKillsAReapedLeadersChild(t *testing.T) {
 	}
 	child, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
 	for deadline := time.Now().Add(time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if syscall.Kill(child, 0) != nil {
+		if !running(child) {
 			return
 		}
 	}
@@ -176,7 +189,10 @@ func TestRunKillsWhatACutShortCallLeavesBehind(t *testing.T) {
 				t.Fatalf("agent never recorded its child: %v", err)
 			}
 			child, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
-			alive := syscall.Kill(child, 0) == nil
+			alive := running(child)
+			for deadline := time.Now().Add(time.Second); alive && tc.killed && time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+				alive = running(child)
+			}
 			_ = syscall.Kill(child, syscall.SIGKILL)
 			if alive == tc.killed {
 				t.Errorf("child %d alive=%v after the call, want alive=%v", child, alive, !tc.killed)
