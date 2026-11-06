@@ -70,8 +70,8 @@ func newBudget(cmd *cobra.Command, cfg *core.Config, steps int) *core.Budget {
 // the pipeline has been cut short. Two shapes are caught:
 //
 //   - one call cannot fit: `--timeout 40m --session-timeout 30m`
-//   - the calls cannot fit together: `refine --reviewers a,b` is 5 calls, so
-//     the default 5m × 5 overruns the default 30m ceiling
+//   - the calls cannot fit together: `refine --reviewers a,b,c` is 7 calls, so
+//     the default 15m × 7 overruns the default 75m ceiling
 func budgetWarning(perInvoke, session time.Duration, steps int) string {
 	if session <= 0 {
 		return ""

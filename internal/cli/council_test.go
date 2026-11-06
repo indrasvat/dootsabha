@@ -63,8 +63,8 @@ func TestCouncilCommandFlags(t *testing.T) {
 // "this pipeline may be cut short" warning must count the longest CHAIN of
 // calls, not the total number of calls. Dispatch and peer review run their
 // agents concurrently by default — counting invocations made every council run
-// on the shipped defaults (3 agents, 5m timeout, 30m ceiling) warn that it
-// might be cut short when 15m of the 30m is all it can possibly use.
+// on the shipped defaults (3 agents, 15m timeout, 75m ceiling) warn that it
+// might be cut short when 45m of the 75m is all it can possibly use.
 func TestCouncilStepsCountsWallClockNotInvocations(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -101,7 +101,7 @@ func TestShippedDefaultsDoNotWarn(t *testing.T) {
 
 	cases := map[string]int{
 		"review (author + reviewer)":       2,
-		"refine (v1 + 2 reviewers)":        5,
+		"refine (v1 + default reviewers)":  1 + 2*len(splitAgentList(newRefineCmd().Flags().Lookup("reviewers").DefValue)),
 		"council (3 agents, parallel)":     councilSteps(cfg, []string{"claude", "codex", "agy"}),
 		"council (2 agents inside Claude)": councilSteps(cfg, []string{"codex", "agy"}),
 	}

@@ -46,7 +46,7 @@ Notes when using it:
   findings.
 - `grok-4.5` is still selectable: pin `providers.grok.model: grok-4.5`. दूतसभा
   never rewrites an explicitly configured model.
-- A real review takes ~105 s (p50), comfortably inside the 5 m default timeout.
+- A real review takes ~105 s (p50), comfortably inside the 15 m default timeout.
 - dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
   `$HOME`, so it cannot write files and does not inherit the caller's Claude Code
   skills, hooks, MCP servers, or `CLAUDE.md`.
@@ -62,8 +62,8 @@ Notes when using it:
 | `--json` | | `false` | Output as structured JSON |
 | `--verbose` | `-v` | `0` | Verbosity level (-v=info, -vv=debug, -vvv=debug+source) |
 | `--quiet` | `-q` | `false` | Suppress non-essential output |
-| `--timeout` | | `5m` | Budget for ONE agent call — each call in a pipeline gets its own window |
-| `--session-timeout` | | `30m` | Ceiling for the whole pipeline, across every call (0 = unbounded) |
+| `--timeout` | | `15m` | Budget for ONE agent call — each call in a pipeline gets its own window |
+| `--session-timeout` | | `75m` | Ceiling for the whole pipeline, across every call (0 = unbounded) |
 | `--config` | | auto-detected | Path to config file (YAML) |
 
 `--timeout` and `--session-timeout` are independent budgets. `review --timeout 8m

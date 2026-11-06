@@ -952,6 +952,66 @@ else
   fail "SIGPIPE exit code: $RC (expected 0)"
 fi
 
+# ── Workflow 11: a signal to dootsabha stops its agents (GitHub issue #33) ───
+#
+# Each agent runs in its own process group, so a signal sent to dootsabha never
+# reaches it. Before #33 dootsabha died at once and real `claude`/`grok` agents
+# kept running, reparented to PID 1. scripts/signal-case.py drives each case.
+
+echo ""
+echo "--- Signals stop agents ---"
+
+# expect_signal_case <label> <python check on r> <signal-case.py args...>
+# r is the JSON the driver prints; see scripts/signal-case.py for its fields.
+expect_signal_case() {
+  local label=$1 check=$2 out
+  shift 2
+  out=$(python3 scripts/signal-case.py --binary "$BINARY" "$@")
+  if python3 -c "import json,sys; r=json.loads(sys.argv[1]); sys.exit(0 if ($check) else 1)" "$out"; then
+    pass "$label"
+  else
+    fail "$label: $out"
+  fi
+}
+
+STOPPED='r["survivors"] == 0 and r["started_late"] == 0 and r["stdout_ok"]'
+expect_signal_case "SIGTERM stops a consult's agent, then dies by SIGTERM" \
+  "r['started'] == 1 and r['returncode'] == -15 and $STOPPED" -- consult --agent claude --json "hi"
+expect_signal_case "SIGINT stops a consult's agent, then dies by SIGINT" \
+  "r['started'] == 1 and r['returncode'] == -2 and $STOPPED" --signals INT -- consult --agent claude "hi"
+expect_signal_case "SIGHUP stops a consult's agent, then dies by SIGHUP" \
+  "r['started'] == 1 and r['returncode'] == -1 and $STOPPED" --signals HUP -- consult --agent claude "hi"
+expect_signal_case "SIGTERM stops every council agent; no later stage starts" \
+  "r['started'] == 2 and r['returncode'] == -15 and $STOPPED" --want 2 -- council --agents claude,codex --chair claude --json "hi"
+expect_signal_case "a second signal skips the grace: SIGTERM-ignoring agents are killed at once" \
+  "r['returncode'] == -15 and r['elapsed'] < 3 and $STOPPED" --ignore-term --signals TERM,TERM@0.3 -- consult --agent claude "hi"
+expect_signal_case "a stderr nobody reads cannot stop dootsabha from dying" \
+  "r['returncode'] == -15 and r['elapsed'] is not None and $STOPPED" --stderr stalled -- consult --agent claude "hi"
+expect_signal_case "a broken stderr pipe mid-run (SIGPIPE) stops the agents too" \
+  "r['started'] == 1 and $STOPPED" --signals= --stderr break-after-start \
+  --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
+  -- -v council --agents claude,codex --chair codex "hi"
+expect_signal_case "a signal during an exit's own cleanup skips the grace" \
+  "r['started'] == 1 and r['elapsed'] < 3 and $STOPPED" --ignore-term --signals TERM@2 --stderr break-after-start \
+  --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
+  -- -v council --agents claude,codex --chair codex "hi"
+
+# A shell starts background jobs with SIGINT ignored. dootsabha must not
+# un-ignore it: such a run keeps going, as it always has.
+IGN_OUT=$(mktemp -t dootsabha-ign)
+env MOCK_CLAUDE_DELAY=2 "$BINARY" consult --agent claude "hi" >"$IGN_OUT" 2>&1 &
+IGN_PID=$!
+sleep 0.5
+kill -s INT "$IGN_PID"
+RC=0
+wait "$IGN_PID" || RC=$?
+if [ "$RC" -eq 0 ] && grep -q "Mock" "$IGN_OUT"; then
+  pass "an ignored SIGINT stays ignored: the run completes"
+else
+  fail "an ignored SIGINT stopped the run: exit $RC, output: $(head -c 200 "$IGN_OUT")"
+fi
+rm -f "$IGN_OUT"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"

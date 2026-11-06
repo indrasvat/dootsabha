@@ -59,7 +59,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 				timeout = cfg.Timeout
 			}
 			if timeout == 0 {
-				timeout = 5 * 60 * 1_000_000_000 // 5 minutes in nanoseconds
+				timeout = core.DefaultInvokeTimeout
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)

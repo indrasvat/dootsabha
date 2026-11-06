@@ -29,6 +29,12 @@ back; 5 means you have an answer with gaps.
 > chair, unknown command — exits **2**. `1` means an unexpected internal failure,
 > so seeing it is worth reporting rather than retrying.
 
+**Stopping a run.** SIGTERM, SIGINT or SIGHUP stops every agent the run started
+(SIGTERM, then SIGKILL after 5s) before दूतसभा exits, so `timeout`, Ctrl-C or a
+killed background task leaves nothing running. The run then dies by that same
+signal — status `143`, `130` or `129` — so these are never mistaken for one of
+the codes above. A second signal ends it at once.
+
 ## Per-Command Exit Codes
 
 | Command | 0 | 2 | 3 | 4 | 5 | 6 |

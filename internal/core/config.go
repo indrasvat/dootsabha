@@ -31,7 +31,7 @@ var ConfigComments = map[string]string{
 	"council.chair":           "Agent that synthesizes final output (fallback: first healthy non-chair)",
 	"council.parallel":        "Run dispatch phase in parallel (false = sequential)",
 	"council.rounds":          "Number of deliberation rounds (max 5)",
-	"timeout":                 "Budget for one agent call; each call in a pipeline gets its own window (e.g. 30s, 5m, 1h; 0 = use the 5m default)",
+	"timeout":                 "Budget for one agent call; each call in a pipeline gets its own window (e.g. 30s, 5m, 1h; 0 = use the 15m default)",
 	"session_timeout":         "Ceiling for a whole pipeline across every agent call (e.g. 30m, 1h; 0 = unbounded)",
 }
 
@@ -256,8 +256,11 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("council.chair", "claude")
 	v.SetDefault("council.parallel", true)
 	v.SetDefault("council.rounds", 1)
-	v.SetDefault("timeout", "5m")
-	v.SetDefault("session_timeout", "30m")
+	// Sized from real runs (#33): 15m covers 144 of 145 observed agent calls, and
+	// 75m lets the longest default pipeline — refine's v1 plus two reviewers, 5
+	// calls back to back — run at 15m each without a session warning.
+	v.SetDefault("timeout", "15m")
+	v.SetDefault("session_timeout", "75m")
 }
 
 // defaultProviderNames are the built-in AI providers. Membership here makes a

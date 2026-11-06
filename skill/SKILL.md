@@ -65,8 +65,8 @@ dootsabha <command> --json "<prompt>"
 ```
 
 Stdout is always **exactly one JSON document**, including on failure. Other global
-flags: `--quiet`, `-v`/`-vv` (stderr only), and the two budgets — `--timeout 5m`
-bounds **one agent call**, `--session-timeout 30m` bounds the **whole pipeline**.
+flags: `--quiet`, `-v`/`-vv` (stderr only), and the two budgets — `--timeout` (default 15m)
+bounds **one agent call**, `--session-timeout` (default 75m) bounds the **whole pipeline**.
 
 ## Commands
 

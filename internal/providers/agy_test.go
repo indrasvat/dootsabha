@@ -580,7 +580,7 @@ func TestAgyProviderHealthCheckRejectsPreJSONVersions(t *testing.T) {
 	}
 }
 
-// agy's own --print-timeout defaults to 5m, exactly दूतसभा's default --timeout.
+// agy's own --print-timeout defaults to 5m, a third of दूतसभा's default --timeout.
 // When it fires, agy reports a plain ERROR envelope with exit 1 — so a timeout
 // arrives looking like any other provider failure and the caller gets exit 3
 // ("try another agent") instead of exit 4 ("raise the timeout"). दूतसभा forwards

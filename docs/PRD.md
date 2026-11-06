@@ -328,8 +328,8 @@ dootsabha/
 - `--json` — Structured JSON output (stdout=data, stderr=logs)
 - `--verbose` / `-v` — Increase log verbosity (-v, -vv, -vvv)
 - `--quiet` / `-q` — Suppress non-error output
-- `--timeout` / `--kaalseema` — Max time per individual agent invocation [default: 5m]
-- `--session-timeout` / `--satra-seema` — Max total session time across all stages [default: 30m]
+- `--timeout` / `--kaalseema` — Max time per individual agent invocation [default: 15m]
+- `--session-timeout` / `--satra-seema` — Max total session time across all stages [default: 75m]
 - `--watch` / `--nireekshana` — Stream output in real-time (Phase 4+ — see Q8 in §12)
 - `--config` — Config file path [default: ~/.dootsabha/config.yaml]
 

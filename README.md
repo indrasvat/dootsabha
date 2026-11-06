@@ -261,8 +261,8 @@ council:
   parallel: true      # Run dispatch phase in parallel
   rounds: 1           # Number of deliberation rounds (max 5)
 
-timeout: 5m           # Budget for ONE agent call — each call gets its own window
-session_timeout: 30m  # Ceiling for a whole pipeline (0 = unbounded)
+timeout: 15m          # Budget for ONE agent call — each call gets its own window
+session_timeout: 75m  # Ceiling for a whole pipeline (0 = unbounded)
 ```
 
 ### Two timeouts, two jobs

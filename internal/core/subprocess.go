@@ -144,7 +144,8 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 
 	slog.Debug("subprocess starting", "binary", binary, "args", args)
 	start := time.Now()
-	if err := cmd.Start(); err != nil {
+	exited, err := liveGroups.start(cmd)
+	if err != nil {
 		_ = outR.Close()
 		_ = outW.Close()
 		_ = errR.Close()
@@ -184,7 +185,11 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	// Buffered channel (capacity 1) prevents goroutine leak if the ctx.Done() branch
 	// returns before the goroutine sends — the send completes without a receiver.
 	waitCh := make(chan error, 1)
-	go func() { waitCh <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		liveGroups.remove(pgid, exited)
+		waitCh <- err
+	}()
 
 	select {
 	case err := <-waitCh:
@@ -207,7 +212,9 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 		_ = syscall.Kill(-pgid, syscall.SIGTERM)
 		select {
 		case <-waitCh:
-			// Process exited cleanly within grace period.
+			// The leader exited within the grace; a member that ignored SIGTERM
+			// would outlive the call. A pgid is not reused while it has members.
+			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		case <-time.After(cfg.gracePeriod):
 			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 			// Bounded. SIGKILL cannot reach a descendant that left the process
@@ -229,6 +236,85 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 			Duration: elapsed,
 		}, fmt.Errorf("subprocess %q: %w", binary, ctx.Err())
 	}
+}
+
+// ErrStopping is returned by Run once StopAll has begun: dootsabha is exiting,
+// so a pipeline's next stage must not start an agent that nothing would stop.
+var ErrStopping = errors.New("dootsabha is stopping")
+
+// groupSet tracks the process group of every agent Run has started and not yet
+// reaped, so a signal to dootsabha itself can stop them. Setpgid keeps agents
+// out of dootsabha's own group, which is why they never see that signal.
+type groupSet struct {
+	mu       sync.Mutex
+	live     map[int]chan struct{} // pgid → closed once the leader is reaped
+	stopping bool
+}
+
+var liveGroups = groupSet{live: map[int]chan struct{}{}}
+
+// start starts cmd and registers its group. The stopping check, the fork and
+// the insert share one lock, so StopAll can neither miss a group nor let one
+// start after it has begun.
+func (g *groupSet) start(cmd *exec.Cmd) (chan struct{}, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.stopping {
+		return nil, ErrStopping
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	exited := make(chan struct{})
+	g.live[cmd.Process.Pid] = exited
+	return exited, nil
+}
+
+func (g *groupSet) remove(pgid int, exited chan struct{}) {
+	g.mu.Lock()
+	if g.live[pgid] == exited {
+		delete(g.live, pgid)
+	}
+	g.mu.Unlock()
+	close(exited)
+}
+
+// StopAll stops every agent process group Run has started: SIGTERM, up to grace
+// for the leaders to exit, then SIGKILL to each group so a descendant that
+// ignored SIGTERM goes too. Closing hurry ends the grace early; the SIGKILL
+// still reaches every group in the snapshot, including one whose leader has
+// already been reaped. From the first call on, Run refuses to start anything.
+// It returns how many groups it signalled.
+func StopAll(grace time.Duration, hurry <-chan struct{}) int {
+	g := &liveGroups
+	g.mu.Lock()
+	g.stopping = true
+	pgids := make([]int, 0, len(g.live))
+	waits := make([]chan struct{}, 0, len(g.live))
+	for pgid, exited := range g.live {
+		pgids = append(pgids, pgid)
+		waits = append(waits, exited)
+	}
+	g.mu.Unlock()
+
+	for _, pgid := range pgids {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	}
+	deadline := time.After(grace)
+wait:
+	for _, exited := range waits {
+		select {
+		case <-exited:
+		case <-deadline:
+			break wait
+		case <-hurry:
+			break wait
+		}
+	}
+	for _, pgid := range pgids {
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	}
+	return len(pgids)
 }
 
 // syncBuffer is a bytes.Buffer safe for one writer goroutine and a reader that

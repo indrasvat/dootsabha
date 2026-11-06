@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/viper"
+
 	"github.com/indrasvat/dootsabha/internal/core"
 )
 
@@ -37,11 +39,11 @@ func TestConfigDefaults(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 
-	if cfg.Timeout != 5*time.Minute {
-		t.Errorf("Timeout: got %v, want 5m", cfg.Timeout)
+	if cfg.Timeout != 15*time.Minute {
+		t.Errorf("Timeout: got %v, want 15m", cfg.Timeout)
 	}
-	if cfg.SessionTimeout != 30*time.Minute {
-		t.Errorf("SessionTimeout: got %v, want 30m", cfg.SessionTimeout)
+	if cfg.SessionTimeout != 75*time.Minute {
+		t.Errorf("SessionTimeout: got %v, want 75m", cfg.SessionTimeout)
 	}
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
@@ -155,6 +157,29 @@ providers:
 	}
 }
 
+// The skeleton users copy is not loaded at runtime, so a default change that
+// skips it ships the old budgets to everyone who copied it (#33 did, at first).
+func TestShippedSkeletonBudgetsMatchTheBuiltins(t *testing.T) {
+	isolateHome(t)
+	builtin, err := core.LoadConfig(os.DevNull)
+	if err != nil {
+		t.Fatalf("LoadConfig: %v", err)
+	}
+	v := viper.New() // the file alone: LoadConfig would fill a missing key
+	v.SetConfigFile(filepath.Join("..", "..", "configs", "default.yaml"))
+	if err := v.ReadInConfig(); err != nil {
+		t.Fatalf("parse skeleton: %v", err)
+	}
+	for key, want := range map[string]time.Duration{
+		"timeout":         builtin.Timeout,
+		"session_timeout": builtin.SessionTimeout,
+	} {
+		if got := v.GetDuration(key); got != want {
+			t.Errorf("configs/default.yaml %s = %s, built-in default is %s", key, got, want)
+		}
+	}
+}
+
 func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
 	isolateHome(t)
 
@@ -163,8 +188,8 @@ func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 
-	if cfg.Timeout != 5*time.Minute {
-		t.Errorf("Timeout: got %v, want built-in 5m", cfg.Timeout)
+	if cfg.Timeout != 15*time.Minute {
+		t.Errorf("Timeout: got %v, want built-in 15m", cfg.Timeout)
 	}
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
