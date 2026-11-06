@@ -78,7 +78,7 @@ untouched. Contract: `skill/references/progress-file.md`.
 
 ## Review
 
-Four rounds. Both councils ran this branch's own binary with `--progress-file`
+Four rounds, then the PR bot. Both councils ran this branch's own binary with `--progress-file`
 against real codex and grok, and were watched from the file.
 
 | Round | Reviewers | Outcome |
@@ -87,6 +87,7 @@ against real codex and grok, and were watched from the file.
 | 2 | the 3 agents re-running their own repros, codex + grok council (43m) | all closed except one signal race (4/260) and the default config; argv scan disagreed with pflag; `--help` wrote a success record; a chair deadline + fallback failure took the wrong scope — `3395a85`, `12fd8fc` |
 | 3 | codex, takshaka | `--config ""` left the default config unprotected (both found it); `--help=false` wrote no file — `09cd4d5` |
 | 4 | codex, fix commit only | both CLOSED, nothing broken — SHIP |
+| PR bot | codex review bot on #37 | a config path that does not exist yet was created (poisoning the default config); SIGPIPE recorded a cut-short call as `error` (3/3) — both fixed red-first in `4316a63` |
 
 ## Found, not fixed
 
@@ -126,5 +127,5 @@ Every frame was read back; videos pass `check_video.sh` (H.264 High@4.2, 15 fps)
 | SIGTERM mid-review | `$?` 143, a 59-byte stderr notice | both open review calls `interrupted`, `run_finished exit_code=143 SIGTERM` |
 
 Also dogfooded: both review councils of this branch (23m and 43m, grok's dispatch
-15m and 22m) were watched from their progress files. L5 274/274 (Workflow 12, 27
+15m and 22m) were watched from their progress files. L5 275/275 (Workflow 12, 28
 cases), `make check` 0 issues, L3 40/40.
