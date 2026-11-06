@@ -23,13 +23,13 @@ allowed-tools: Bash(dootsabha:*), Bash(./bin/dootsabha:*)
 |---|---|---|
 | One agent's view | `dootsabha consult --agent codex --json "…"` | `.data.Content` |
 | Several views, cross-reviewed, merged | `dootsabha council --agents codex,grok --chair codex --json "…"` | `.synthesis.content` |
-| Which agents work right now | `dootsabha status --json` | `.data[] \| select(.Healthy) \| .Name` |
+| Which agents work right now | `dootsabha status --json` | `.data[]`, each with `.Name` and `.Healthy` |
 | A reviewed draft: A writes, B critiques | `dootsabha review --author codex --reviewer grok --json "…"` | `.review.content` (draft: `.author.content`) |
 | A draft revised through each reviewer in turn | `dootsabha refine --author codex --reviewers grok,agy --json "…"` | `.final.content` |
 
 Always `--json`: stdout is exactly one JSON document, on failure too.
 
-**Name the agents.** Without `--agents`, a council runs the config's default
+**Name the agents.** Without `--agents`, a council runs the built-in default
 (`codex,agy` inside Claude Code), and `grok` joins only when named. When a run
 exits 5 because an agent failed on quota or auth (`.meta.providers` says
 `error`; `.dispatch[].error` says why), **drop it from the next run's
@@ -45,8 +45,7 @@ jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' 
 ```
 
 A council's parts: `.dispatch[]` (`provider`, `content`, `error`) is each agent's
-own answer; `.reviews[]` (`reviewer`, `reviewed`, `content`) is the peer review;
-`.meta` holds `providers`, durations, tokens and `total_cost_usd`.
+own answer; `.reviews[]` (`reviewer`, `reviewed`, `content`) is the peer review.
 
 **Need a flag or field not shown here** (`--model`, `--rounds`, `--parallel=false`,
 `--anonymous=false`, refine's `.versions[]`)? Open
@@ -55,28 +54,38 @@ that command's section from its table of contents — don't read it whole.
 
 ## 2. Run it from Claude Code
 
-A council takes minutes — a 30 KB review prompt has taken grok 15–22 minutes per
-call — and prints nothing until it ends. The Bash tool stops at 10 minutes.
+A council takes minutes and prints nothing until it ends. A foreground Bash call is killed at 2
+minutes by default, and at most 10 with `timeout: 600000`.
 
-- **Run `council`, `refine`, and anything with grok in the background**
-  (`run_in_background: true`), redirecting stdout to a file, with
-  `--progress-file`. Foreground is fine only for a `consult`/`review` whose
-  `--timeout` is under 10m — past that the Bash tool kills it (exit 143) and the
-  answer is lost.
+- **Run `review`, `refine` and `council` in the background**
+  (`run_in_background: true`), stdout redirected to a file, with
+  `--progress-file`. `--timeout` bounds each call, and `review`, `refine` and
+  `council` make several, so their total can pass 10 minutes; then the Bash tool
+  kills the run (exit 143) and the answer is lost. Foreground only a `consult`
+  with `--timeout 9m` and the Bash call's `timeout: 600000` — `--timeout`
+  defaults to 15m, so a plain `consult` belongs in the background too.
 - **Watch the progress file, not `ps`.** One JSON line per call start and finish
   (`stage`, `agent`, `status`, `duration_ms`); the last line of a finished run is
-  `run_finished`, whose `exit_code` is the process's exit code.
+  `run_finished`, whose `exit_code` is the process's exit code. The background
+  task's completion notice is the end signal; the file says what is in flight.
   ```bash
   dootsabha council --agents codex,grok --chair codex --timeout 25m --json \
     --progress-file run.ndjson "$(cat prompt.md)" > result.json
-  # Monitor: tail -n +1 -F run.ndjson | grep --line-buffered -E '"(call_finished|run_finished)"'
   ```
-  Never sleep-poll, and never `ps | grep` for liveness: the agents' argv carries
+  To see each call finish, run this with Monitor. It stops at `run_finished`,
+  or when the dootsabha pid from `run_started` is gone (`tail -F` never stops):
+  ```bash
+  n=0; while :; do [ -f run.ndjson ] || { sleep 2; continue; }; m=$(wc -l < run.ndjson); [ "$m" -gt "$n" ] && sed -n "$((n+1)),${m}p" run.ndjson | grep -E '"(call_finished|run_finished)"'; n=$m
+    grep -q '"run_finished"' run.ndjson && exit 0
+    p=$(jq -r 'select(.event=="run_started") | .pid' run.ndjson); [ -n "$p" ] && ! kill -0 "$p" 2>/dev/null && exit 1; sleep 5; done
+  ```
+  Never `ps | grep` for liveness: the agents' argv carries
   your prompt, so a substring match finds the wrong process. Open
   [references/progress-file.md](references/progress-file.md) only to parse other
   event fields, or when the process is gone and the file has no `run_finished`.
 - **Budgets:** `--timeout` (default 15m) is per agent call; `--session-timeout`
-  (default 75m) is the whole run. With grok and a large prompt, use `--timeout 25m`.
+  (default 75m) is the whole run. With grok and a large prompt (30 KB has taken
+  it 15–22 minutes per call), use `--timeout 25m`.
 - **To cancel**, send SIGTERM to the dootsabha pid you started (`kill $pid`): it
   stops its agents, exits 143, and the progress file records it. Never
   `pkill -f "dootsabha …"` — that kills every other council running too.
@@ -105,8 +114,8 @@ call — and prints nothing until it ends. The Bash tool stops at 10 minutes.
 | 6 | config missing or invalid | fix the config |
 | 1 | internal bug | report it |
 
-If several apply, the highest wins: `2 > 6 > 4 > 3 > 5 > 1 > 0`. Writing a
-script that branches on them: [references/exit-codes.md](references/exit-codes.md).
+Writing a script that branches on them (and on which wins when several apply):
+[references/exit-codes.md](references/exit-codes.md).
 
 ## 5. Agents
 
@@ -116,17 +125,15 @@ script that branches on them: [references/exit-codes.md](references/exit-codes.m
   every key with its meaning and value; any key can be set for one run as
   `DOOTSABHA_<KEY>` (dots → underscores, e.g. `DOOTSABHA_PROVIDERS_GROK_MODEL`).
 - **`status` proves the CLI starts, not that it has quota.** A healthy agent can
-  still fail mid-call on a rate limit — agy most often. Exit 3 or 5 names it;
-  swap the agent.
-- **grok:** opt-in, read-only, and the slowest: plan for it in budgets. If it
-  fails with `sandbox could not be applied`, update dootsabha rather than
-  calling `grok -p` directly — that bypasses the read-only sandbox.
+  still fail mid-call on a rate limit — agy most often.
+- **grok:** if it fails with `sandbox could not be applied`, update dootsabha
+  rather than calling `grok -p` directly — that bypasses the read-only sandbox.
 
 ## 6. Review loops
 
 Re-review **only the fix commits** ("did each fix close its finding, what did
-it break?"), never the whole diff again, and stop after a few rounds: a council
-asked to find bugs always finds more.
+it break?"), never the whole diff again, and stop at 5 rounds in total: a
+council asked to find bugs always finds more.
 
 ## References — open only when the step above sends you there
 

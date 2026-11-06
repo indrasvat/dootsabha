@@ -23,8 +23,8 @@ Each command section lists: flags, pipeline, JSON output schema, exit codes.
 | `agy` | `agy` | ✅ | — | ✅ | yes | ✅ |
 | `grok` | `grok` | ✅ | ✅ | ✅ | no (read-only) | ❌ **opt-in only** |
 
-Models are not listed here on purpose: they change. `dootsabha config show --json`
-shows the ones in effect, and `status --json` shows each agent's.
+`dootsabha config show --json` shows the models in effect, and `status --json`
+shows each agent's.
 
 **`agy`** is driven with `--output-format json`, so `tokens_in`, `tokens_out` and
 `session_id` (its conversation id) are populated. `cost_usd` stays `0` — the
@@ -314,15 +314,15 @@ Written directly (no envelope wrapper). All fields snake_case.
 }
 ```
 
-> **Note on `agy`:** As a reviewer or author, `agy` (Antigravity CLI) runs in
-> plain-text mode, so its per-version `cost_usd` / `tokens_in` / `tokens_out`
-> are always `0` and it does not contribute to the cost or token totals.
+> **Note on `agy`:** its `tokens_in` / `tokens_out` are reported like any other
+> agent's; its `cost_usd` is always `0` — the Antigravity CLI reports no cost.
 
 ### Exit Codes
 
 Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 
-`5` if any reviewer fails or times out; the versions produced so far are in the payload.
+`5` if a reviewer fails; `4` if one times out (a deadline outranks a partial
+result). Either way the versions produced so far are in the payload.
 
 ## status (sthiti / स्थिति)
 
@@ -366,7 +366,7 @@ the two reasons a provider can be unhealthy:
 
 An **opt-in** provider (`grok`) that is not installed does not fail the command —
 `status` still exits 0. A required provider that is absent, or any provider that is
-installed but broken, exits 3.
+installed but broken, exits 5 while another is healthy, and 3 when none is.
 
 ### Exit Codes
 
@@ -389,8 +389,7 @@ dootsabha config show [flags]
 | `--commented` | `false` | Include field descriptions as YAML comments |
 
 Every key, its meaning and its value in effect: `dootsabha config show --commented`.
-That output is the key list — this reference does not repeat it, so it cannot go
-stale. Any key can be overridden for one run from the environment as
+Any key can be overridden for one run from the environment as
 `DOOTSABHA_` + the key in upper case with dots as underscores:
 
 ```bash

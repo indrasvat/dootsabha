@@ -2,12 +2,20 @@
 
 दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy), xAI Grok CLI (grok)) through council-mode deliberation, peer review, and synthesis. `grok` is opt-in — select it with `--agent grok` / `--agents …,grok` / `--chair grok`. Use it when you need multi-perspective answers from multiple AI agents.
 
+How to run it well from Claude Code — which command, where the answer is, running
+long councils in the background, writing the prompt, exit codes — is in the
+`dootsabha` skill. This page is a quick shape reference.
+
 ## Quick Reference
 
 ### Get a multi-perspective answer (council)
 
+A council takes minutes: name the agents and run it in the background with a
+progress file (see the skill).
+
 ```bash
-dootsabha council --json "What's the best way to implement a rate limiter in Go?"
+dootsabha council --agents codex,grok --chair codex --json \
+  --progress-file run.ndjson "What's the best way to implement a rate limiter in Go?" > result.json
 ```
 
 Output structure:
@@ -26,7 +34,8 @@ Output structure:
 }
 ```
 
-Extract synthesis: `dootsabha council --json "question" | jq -r '.synthesis.content'`
+Extract synthesis (falling back to the agents' own answers if synthesis failed):
+`jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json`
 
 ### Query a single agent (consult)
 
@@ -152,12 +161,13 @@ dootsabha config migrate --json     # structured result for agent consumption
 
 ### Get best answer for a hard question
 ```bash
-dootsabha council --json "question" | jq -r '.synthesis.content'
+# in the background, with --progress-file (see the skill); then:
+jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json
 ```
 
 ### Compare agent perspectives
 ```bash
-dootsabha council --json "question" | jq -r '.dispatch[] | "\(.provider): \(.content[:200])"'
+jq -r '.dispatch[] | "\(.provider): \(.content[:200])"' result.json
 ```
 
 ### Use specific agents only
