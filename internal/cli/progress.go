@@ -325,17 +325,18 @@ func (p *progressLog) call(stage, agent, scope string, invoke func() error) erro
 }
 
 // callStatus classifies a call's error the way Outcome.Exit does: a deadline is
-// a timeout, anything else a failure. A call that ended after a terminating
-// signal was stopped on purpose, and saying so keeps a reader from hunting for
-// a broken agent.
+// a timeout, anything else a failure. A call that failed otherwise after a
+// terminating signal was stopped on purpose, and saying so keeps a reader from
+// hunting for a broken agent. A deadline still wins: stopping an agent does not
+// expire its context, so that call had timed out on its own.
 func callStatus(err error, scope string) (status, timeoutScope string) {
 	switch {
 	case err == nil:
 		return "ok", ""
-	case interrupted.Load():
-		return "interrupted", ""
 	case errors.Is(err, context.DeadlineExceeded):
 		return "timeout", scope
+	case interrupted.Load():
+		return "interrupted", ""
 	default:
 		return "error", ""
 	}

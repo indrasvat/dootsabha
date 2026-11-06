@@ -121,9 +121,10 @@ exit `1`, and check stdout before trusting it.
 
 ## Guarantees
 
-- Each line is written with one `write(2)` to a file opened `O_APPEND`, so a
-  reader never sees half a line; a line the disk takes only part of is cut back.
-  Lines are visible to readers as they are written.
+- Each line is written with one `write(2)` to a file opened `O_APPEND`, and a
+  line the disk takes only part of is cut back. Lines are visible to readers as
+  they are written. Parse only lines that end in a newline: a reader that
+  catches a cut-back line mid-write sees a fragment without one.
 - Every `call_started` has exactly one `call_finished` in a file with
   `run_finished`.
 - No prompt, response or error text — names, stages, numbers and status only.

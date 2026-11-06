@@ -376,3 +376,20 @@ func TestProgressOpenRefusesAPathAnotherRunHolds(t *testing.T) {
 	}
 	again.finish(0, nil)
 }
+
+// A call that had already run out of time when a signal arrived timed out; the
+// signal did not stop it, and saying "interrupted" would hide the timeout.
+func TestProgressDeadlineBeatsALaterSignal(t *testing.T) {
+	p, path := newTestLog(t)
+	interrupted.Store(true)
+	defer interrupted.Store(false)
+	_ = p.call("dispatch", "grok", core.TimeoutScopeInvocation, func() error {
+		return fmt.Errorf("invoke grok: %w", context.DeadlineExceeded)
+	})
+	p.finish(143, syscall.SIGTERM)
+	for _, ev := range readEvents(t, path) {
+		if ev["event"] == "call_finished" && (ev["status"] != "timeout" || ev["scope"] != "invocation") {
+			t.Errorf("call_finished = %v, want timeout/invocation", ev)
+		}
+	}
+}
