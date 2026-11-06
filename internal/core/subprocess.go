@@ -187,9 +187,6 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	waitCh := make(chan error, 1)
 	go func() {
 		err := cmd.Wait()
-		// The leader is gone; anything left in its group would outlive the call
-		// with nothing tracking it. A pgid cannot be reused while it has members.
-		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		liveGroups.remove(pgid, exited)
 		waitCh <- err
 	}()
@@ -215,7 +212,9 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 		_ = syscall.Kill(-pgid, syscall.SIGTERM)
 		select {
 		case <-waitCh:
-			// Process exited cleanly within grace period.
+			// The leader exited within the grace; a member that ignored SIGTERM
+			// would outlive the call. A pgid is not reused while it has members.
+			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 		case <-time.After(cfg.gracePeriod):
 			_ = syscall.Kill(-pgid, syscall.SIGKILL)
 			// Bounded. SIGKILL cannot reach a descendant that left the process

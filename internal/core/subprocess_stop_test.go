@@ -110,16 +110,17 @@ func TestRunRefusesToStartOnceStopping(t *testing.T) {
 	}
 }
 
-// What an agent leaves in its group when it exits is killed with it, whether it
-// exited on its own or on the timeout reaper's SIGTERM — otherwise it escapes
-// the registry, and StopAll, the moment the leader is reaped.
-func TestRunKillsWhatTheLeaderLeavesInItsGroup(t *testing.T) {
+// A call cut short takes its whole group with it: a member that ignores the
+// reaper's SIGTERM must not outlive the leader. A call that finished on its own
+// leaves what it started alone — an agent may launch a server on purpose.
+func TestRunKillsWhatACutShortCallLeavesBehind(t *testing.T) {
 	for name, tc := range map[string]struct {
 		script  string
 		timeout time.Duration
+		killed  bool
 	}{
-		"leader exits on its own":           {`sleep 300 & echo $! > "$1"; exit 0`, 0},
-		"leader exits on the reaper's TERM": {`(trap "" TERM; exec sleep 300) & echo $! > "$1"; wait`, 300 * time.Millisecond},
+		"cut short: leader exits on the reaper's TERM": {`(trap "" TERM; exec sleep 300) & echo $! > "$1"; wait`, 300 * time.Millisecond, true},
+		"finished: the agent's background task stays":  {`sleep 300 & echo $! > "$1"; exit 0`, 0, false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			resetLiveGroups(t)
@@ -137,9 +138,10 @@ func TestRunKillsWhatTheLeaderLeavesInItsGroup(t *testing.T) {
 				t.Fatalf("agent never recorded its child: %v", err)
 			}
 			child, _ := strconv.Atoi(strings.TrimSpace(string(raw)))
-			if syscall.Kill(child, 0) == nil {
-				_ = syscall.Kill(child, syscall.SIGKILL)
-				t.Errorf("child %d outlived its agent's call", child)
+			alive := syscall.Kill(child, 0) == nil
+			_ = syscall.Kill(child, syscall.SIGKILL)
+			if alive == tc.killed {
+				t.Errorf("child %d alive=%v after the call, want alive=%v", child, alive, !tc.killed)
 			}
 		})
 	}
