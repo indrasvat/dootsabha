@@ -16,12 +16,15 @@ Each command section lists: flags, pipeline, JSON output schema, exit codes.
 
 ## Provider Matrix
 
-| Provider | Binary | Default model | Tokens | Cost | Session ID | In default council? |
+| Provider | Binary | Tokens | Cost | Session ID | Writes files? | In default council? |
 |---|---|---|---|---|---|---|
-| `claude` | `claude` | `claude-opus-4-8` | ✅ | ✅ | ✅ | ✅ (standalone only) |
-| `codex` | `codex` | `gpt-5.5` | ✅ | — | — | ✅ |
-| `agy` | `agy` | `Gemini 3.7 Flash (High)` | ✅ | — | ✅ | ✅ |
-| `grok` | `grok` | `grok-4.6` | ✅ | ✅ | ✅ | ❌ **opt-in only** |
+| `claude` | `claude` | ✅ | ✅ | ✅ | yes | ✅ (standalone only) |
+| `codex` | `codex` | ✅ | — | — | yes | ✅ |
+| `agy` | `agy` | ✅ | — | ✅ | yes | ✅ |
+| `grok` | `grok` | ✅ | ✅ | ✅ | no (read-only) | ❌ **opt-in only** |
+
+Models are not listed here on purpose: they change. `dootsabha config show --json`
+shows the ones in effect, and `status --json` shows each agent's.
 
 **`agy`** is driven with `--output-format json`, so `tokens_in`, `tokens_out` and
 `session_id` (its conversation id) are populated. `cost_usd` stays `0` — the
@@ -41,12 +44,11 @@ report as an ordinary provider failure.
 Notes when using it:
 
 - Reasoning effort defaults to `high`; override via `providers.grok.flags`
-  (`--reasoning-effort xhigh|high|medium|low` — `xhigh` is new in grok-4.6).
-  `high` runs ~1.6× slower than `low` for better prioritisation rather than more
-  findings.
-- `grok-4.5` is still selectable: pin `providers.grok.model: grok-4.5`. दूतसभा
-  never rewrites an explicitly configured model.
-- A real review takes ~105 s (p50), comfortably inside the 15 m default timeout.
+  (`--reasoning-effort xhigh|high|medium|low`). Its time goes into reasoning
+  output, so effort is the one lever on its speed.
+- दूतसभा never rewrites an explicitly configured `providers.grok.model`.
+- It is the slowest agent: a ~30 KB review prompt has taken 15–22 minutes per
+  call, past the 15m default. Give it `--timeout 25m` for large prompts.
 - dootsabha runs grok **read-only** (`--sandbox read-only`) and with an isolated
   `$HOME`, so it cannot write files and does not inherit the caller's Claude Code
   skills, hooks, MCP servers, or `CLAUDE.md`.
@@ -386,6 +388,15 @@ dootsabha config show [flags]
 | `--reveal` | `false` | Show sensitive values (tokens, keys) |
 | `--commented` | `false` | Include field descriptions as YAML comments |
 
+Every key, its meaning and its value in effect: `dootsabha config show --commented`.
+That output is the key list — this reference does not repeat it, so it cannot go
+stale. Any key can be overridden for one run from the environment as
+`DOOTSABHA_` + the key in upper case with dots as underscores:
+
+```bash
+DOOTSABHA_PROVIDERS_GROK_MODEL=<model> DOOTSABHA_TIMEOUT=25m dootsabha council …
+```
+
 ### Exit Codes
 
 Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
@@ -395,7 +406,7 @@ Canonical table: [exit-codes.md](exit-codes.md). Command-specific:
 ## config migrate
 
 Migrate a stale `gemini` provider block in your config to the new `agy`
-(Antigravity CLI) provider. The retired Gemini CLI was sunset 2026-06-18 and is
+(Antigravity CLI) provider. The Gemini CLI is retired and is
 replaced by `agy`. A timestamped backup is written to `<config>.bak` before any
 changes are made.
 

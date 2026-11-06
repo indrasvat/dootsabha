@@ -14,7 +14,7 @@ Output structure:
 ```json
 {
   "dispatch": [
-    { "provider": "claude", "model": "claude-opus-4-8", "content": "...", "duration_ms": 5000, "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 500 },
+    { "provider": "claude", "model": "<model>", "content": "...", "duration_ms": 5000, "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 500 },
     { "provider": "codex", "content": "..." },
     { "provider": "agy", "content": "...", "cost_usd": 0, "tokens_in": 0, "tokens_out": 0 }
   ],
@@ -40,7 +40,7 @@ Output structure (envelope format):
   "meta": { "schema_version": 1 },
   "data": {
     "Content": "...",
-    "Model": "claude-opus-4-8",
+    "Model": "<model>",
     "Duration": 3000000000,
     "CostUSD": 0.005,
     "TokensIn": 50,
@@ -63,8 +63,8 @@ dootsabha review --json "Write a retry function with exponential backoff" --auth
 Output structure:
 ```json
 {
-  "author": { "provider": "codex", "model": "gpt-5.5", "content": "...", "duration_ms": 4000 },
-  "review": { "provider": "claude", "model": "claude-opus-4-8", "content": "...", "duration_ms": 3000 },
+  "author": { "provider": "codex", "model": "<model>", "content": "...", "duration_ms": 4000 },
+  "review": { "provider": "claude", "model": "<model>", "content": "...", "duration_ms": 3000 },
   "meta": { "schema_version": 1, "strategy": "review", "duration_ms": 7000, "total_cost_usd": 0.02, "providers": { "codex": "ok", "claude": "ok" } }
 }
 ```
@@ -104,9 +104,9 @@ Output structure (envelope format):
 {
   "meta": { "schema_version": 1 },
   "data": [
-    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "Gemini 3.7 Flash (High)", "Reachable": "\u2713", "Installed": true },
-    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "claude-opus-4-8", "Reachable": "\u2713", "Installed": true },
-    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "gpt-5.5", "Reachable": "\u2713", "Installed": true },
+    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
+    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
+    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
     { "Name": "grok", "Healthy": false, "Version": "", "Model": "", "Reachable": "\u2014", "Error": "...", "Installed": false }
   ]
 }
@@ -167,7 +167,7 @@ dootsabha council --json "question" --agents claude,codex --chair claude
 
 ### Override model
 ```bash
-dootsabha consult --json --agent claude --model claude-opus-4-8 "question"
+dootsabha consult --json --agent claude --model <model> "question"   # see `config show` for names
 ```
 
 ### Set timeout

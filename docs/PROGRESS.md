@@ -217,6 +217,7 @@ All 4 items addressed in PRD v1.6.
 | 710 | Keep grok's read-only sandbox working under the isolated HOME (#31) | DONE | — |
 | 711 | Stop agents when dootsabha is signalled; per-call default 15m (#33) | DONE | — |
 | 712 | `--progress-file`: NDJSON stage events while a run is in flight (#34) | DONE | — |
+| 713 | Skill review: lead to the right call fast; no model names; examples cut | DONE | — |
 
 ### What Works End-to-End (712)
 
