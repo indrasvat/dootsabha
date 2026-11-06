@@ -2,19 +2,27 @@
 
 दूतसभा orchestrates multiple AI coding agents (Claude Code, Codex CLI, Antigravity CLI (agy), xAI Grok CLI (grok)) through council-mode deliberation, peer review, and synthesis. `grok` is opt-in — select it with `--agent grok` / `--agents …,grok` / `--chair grok`. Use it when you need multi-perspective answers from multiple AI agents.
 
+How to run it well from Claude Code — which command, where the answer is, running
+long councils in the background, writing the prompt, exit codes — is in the
+`dootsabha` skill. This page is a quick shape reference.
+
 ## Quick Reference
 
 ### Get a multi-perspective answer (council)
 
+A council takes minutes: name the agents and run it in the background with a
+progress file (see the skill).
+
 ```bash
-dootsabha council --json "What's the best way to implement a rate limiter in Go?"
+dootsabha council --agents codex,grok --chair codex --json \
+  --progress-file run.ndjson "What's the best way to implement a rate limiter in Go?" > result.json
 ```
 
 Output structure:
 ```json
 {
   "dispatch": [
-    { "provider": "claude", "model": "claude-opus-4-8", "content": "...", "duration_ms": 5000, "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 500 },
+    { "provider": "claude", "model": "<model>", "content": "...", "duration_ms": 5000, "cost_usd": 0.01, "tokens_in": 100, "tokens_out": 500 },
     { "provider": "codex", "content": "..." },
     { "provider": "agy", "content": "...", "cost_usd": 0, "tokens_in": 0, "tokens_out": 0 }
   ],
@@ -26,7 +34,8 @@ Output structure:
 }
 ```
 
-Extract synthesis: `dootsabha council --json "question" | jq -r '.synthesis.content'`
+Extract synthesis (falling back to the agents' own answers if synthesis failed):
+`jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json`
 
 ### Query a single agent (consult)
 
@@ -40,7 +49,7 @@ Output structure (envelope format):
   "meta": { "schema_version": 1 },
   "data": {
     "Content": "...",
-    "Model": "claude-opus-4-8",
+    "Model": "<model>",
     "Duration": 3000000000,
     "CostUSD": 0.005,
     "TokensIn": 50,
@@ -63,8 +72,8 @@ dootsabha review --json "Write a retry function with exponential backoff" --auth
 Output structure:
 ```json
 {
-  "author": { "provider": "codex", "model": "gpt-5.5", "content": "...", "duration_ms": 4000 },
-  "review": { "provider": "claude", "model": "claude-opus-4-8", "content": "...", "duration_ms": 3000 },
+  "author": { "provider": "codex", "model": "<model>", "content": "...", "duration_ms": 4000 },
+  "review": { "provider": "claude", "model": "<model>", "content": "...", "duration_ms": 3000 },
   "meta": { "schema_version": 1, "strategy": "review", "duration_ms": 7000, "total_cost_usd": 0.02, "providers": { "codex": "ok", "claude": "ok" } }
 }
 ```
@@ -104,9 +113,9 @@ Output structure (envelope format):
 {
   "meta": { "schema_version": 1 },
   "data": [
-    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "Gemini 3.7 Flash (High)", "Reachable": "\u2713", "Installed": true },
-    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "claude-opus-4-8", "Reachable": "\u2713", "Installed": true },
-    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "gpt-5.5", "Reachable": "\u2713", "Installed": true },
+    { "Name": "agy", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
+    { "Name": "claude", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
+    { "Name": "codex", "Healthy": true, "Version": "<version>", "Model": "<model>", "Reachable": "\u2713", "Installed": true },
     { "Name": "grok", "Healthy": false, "Version": "", "Model": "", "Reachable": "\u2014", "Error": "...", "Installed": false }
   ]
 }
@@ -152,12 +161,13 @@ dootsabha config migrate --json     # structured result for agent consumption
 
 ### Get best answer for a hard question
 ```bash
-dootsabha council --json "question" | jq -r '.synthesis.content'
+# in the background, with --progress-file (see the skill); then:
+jq -r '.synthesis.content // (.dispatch[] | select(.error == null) | .content)' result.json
 ```
 
 ### Compare agent perspectives
 ```bash
-dootsabha council --json "question" | jq -r '.dispatch[] | "\(.provider): \(.content[:200])"'
+jq -r '.dispatch[] | "\(.provider): \(.content[:200])"' result.json
 ```
 
 ### Use specific agents only
@@ -167,7 +177,7 @@ dootsabha council --json "question" --agents claude,codex --chair claude
 
 ### Override model
 ```bash
-dootsabha consult --json --agent claude --model claude-opus-4-8 "question"
+dootsabha consult --json --agent claude --model <model> "question"   # see `config show` for names
 ```
 
 ### Set timeout
