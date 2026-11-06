@@ -122,8 +122,11 @@ Writing a script that branches on them (and on which wins when several apply):
 - **Never assume model names.** `dootsabha config show --json` shows what is in
   effect; a response's `Model` is the backend's id and can differ from it.
   To change a model, flag or default: `dootsabha config show --commented` lists
-  every key with its meaning and value; any key can be set for one run as
-  `DOOTSABHA_<KEY>` (dots → underscores, e.g. `DOOTSABHA_PROVIDERS_GROK_MODEL`).
+  every key with its meaning and value. A string, duration or true/false key can
+  be set for one run as `DOOTSABHA_<KEY>` (dots → underscores, e.g.
+  `DOOTSABHA_PROVIDERS_GROK_MODEL`). Not `council.rounds` (exits 6; use
+  `--rounds`) or a list like `providers.*.flags` (silently becomes one string):
+  set those in the YAML file.
 - **`status` proves the CLI starts, not that it has quota.** A healthy agent can
   still fail mid-call on a rate limit — agy most often.
 - **grok:** if it fails with `sandbox could not be applied`, update dootsabha

@@ -389,12 +389,16 @@ dootsabha config show [flags]
 | `--commented` | `false` | Include field descriptions as YAML comments |
 
 Every key, its meaning and its value in effect: `dootsabha config show --commented`.
-Any key can be overridden for one run from the environment as
+A string, duration or true/false key can be overridden for one run from the environment as
 `DOOTSABHA_` + the key in upper case with dots as underscores:
 
 ```bash
 DOOTSABHA_PROVIDERS_GROK_MODEL=<model> DOOTSABHA_TIMEOUT=25m dootsabha council …
 ```
+
+Two kinds of key cannot be set this way, because the environment supplies a string:
+`council.rounds` fails validation (exit 6) — use `--rounds` or YAML; and a list
+such as `providers.<name>.flags` loads as one string, with no error — set it in YAML.
 
 ### Exit Codes
 
