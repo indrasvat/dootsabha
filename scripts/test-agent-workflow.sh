@@ -1096,10 +1096,42 @@ SIG_OUT=$(python3 scripts/signal-case.py --binary "$BINARY" --signals= --stderr 
   --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
   -- -v council --agents claude,codex --chair codex --progress-file "$PROG_DIR/pipe.ndjson" "PROGRESS-SECRET")
 if msg=$(python3 scripts/progress-check.py "$PROG_DIR/pipe.ndjson" 0 \
-  "ev[-1]['signal'] == 'SIGPIPE' and 'interrupted' in [e['status'] for e in $FINISHED]"); then
+  "ev[-1]['signal'] == 'SIGPIPE' and 'interrupted' in [e['status'] for e in $FINISHED] and all(e['status'] in ('ok', 'interrupted') for e in $FINISHED)"); then
   pass "SIGPIPE mid-run: run_finished says SIGPIPE, cut-short calls interrupted"
 else
   fail "SIGPIPE mid-run: $msg (driver: $SIG_OUT)"
+fi
+
+# The same, while one agent ignores SIGTERM and holds the stop in its grace: an
+# agent that exited promptly on the stop was cut short by dootsabha, not broken.
+STUBBORN="$PROG_DIR/stubborn"
+# shellcheck disable=SC2016  # expanded by the generated script, not here
+printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo 0; exit 0; }\ntrap "" TERM\nsleep 300 &\nwait\n' > "$STUBBORN"
+chmod +x "$STUBBORN"
+if python3 - "$BINARY" "$PWD/$MOCK_DIR" "$STUBBORN" "$PROG_DIR/pipe2.ndjson" <<'PY'
+import json, os, subprocess, sys, time
+binary, mocks, stubborn, pf = sys.argv[1:]
+env = dict(os.environ, DOOTSABHA_PROVIDERS_CLAUDE_BINARY=mocks + "/mock-claude", MOCK_CLAUDE_DELAY="30",
+           DOOTSABHA_PROVIDERS_CODEX_BINARY=stubborn,
+           DOOTSABHA_PROVIDERS_AGY_BINARY=mocks + "/mock-agy", MOCK_AGY_DELAY="1")
+p = subprocess.Popen([binary, "-v", "council", "--agents", "claude,codex,agy", "--chair", "claude",
+                      "--progress-file", pf, "PROGRESS-SECRET"], env=env,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+deadline = time.time() + 15
+while time.time() < deadline and p.poll() is None:
+    if os.path.exists(pf) and sum('"call_started"' in l for l in open(pf)) >= 3:
+        break
+    time.sleep(0.05)
+p.stderr.close()  # agy's success log line meets the closed pipe
+p.wait(timeout=60)
+ev = [json.loads(l) for l in open(pf)]
+st = {e["agent"]: e["status"] for e in ev if e["event"] == "call_finished"}
+sys.exit(0 if ev[-1].get("signal") == "SIGPIPE" and st.get("claude") == "interrupted" and st.get("codex") == "interrupted" else "statuses %s, last %s" % (st, ev[-1]))
+PY
+then
+  pass "SIGPIPE while an agent holds the stop: calls it cut short are interrupted, not errors"
+else
+  fail "SIGPIPE while an agent holds the stop mislabels a cut-short call"
 fi
 
 # The env form must not reach the agents: one that runs dootsabha itself would
@@ -1247,7 +1279,7 @@ else
 fi
 
 rm -f "$PROG_DIR"/*.ndjson "$PROG_DIR/env-probe" "$PROG_DIR/env-seen" "$PROG_DIR/fifo" \
-  "$PROG_DIR/cfg.yaml" "$PROG_DIR/same.json" "$PROG_DIR/victim.txt"
+  "$PROG_DIR/cfg.yaml" "$PROG_DIR/same.json" "$PROG_DIR/victim.txt" "$PROG_DIR/stubborn"
 rmdir "$PROG_DIR"
 
 # ── Summary ──────────────────────────────────────────────────────────────────

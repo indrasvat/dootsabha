@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"syscall"
@@ -47,6 +48,7 @@ type progressTarget struct {
 	path      string // "" = no file
 	source    string // the flag or variable that named it, for error messages
 	protected map[string]os.FileInfo
+	conflict  string // why the named path is refused before anything opens it
 }
 
 // resolveProgress decides the progress file before anything runs. The flags
@@ -95,8 +97,18 @@ func resolveProgress(args []string) progressTarget {
 	}
 	if info, err := os.Stat(cfg); err == nil {
 		t.protected["the config file"] = info
+	} else if samePath(cfg, t.path) {
+		// No inode to compare yet, but opening the progress file would create
+		// the config, and LoadConfig would read its events.
+		return progressTarget{conflict: fmt.Sprintf("progress file %q is also the config file (from %s)", t.path, t.source)}
 	}
 	return t
+}
+
+func samePath(a, b string) bool {
+	x, errA := filepath.Abs(a)
+	y, errB := filepath.Abs(b)
+	return errA == nil && errB == nil && x == y
 }
 
 // flagsOf parses args the way pflag will parse them for cmd, without touching
@@ -133,6 +145,9 @@ func startProgress(cmd *cobra.Command) error {
 	}
 	progressMu.Lock()
 	defer progressMu.Unlock()
+	if target.conflict != "" {
+		return &ExitError{Code: core.ExitUsage, Message: target.conflict}
+	}
 	if target.path == "" {
 		return nil
 	}

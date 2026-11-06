@@ -315,6 +315,21 @@ func TestResolveProgress(t *testing.T) {
 		}
 	})
 
+	// A config that does not exist yet has no inode to compare, but the
+	// progress file would create it — and LoadConfig would read events.
+	t.Run("a config that does not exist yet is protected by path", func(t *testing.T) {
+		missing := filepath.Join(t.TempDir(), "cfg.yaml")
+		for _, args := range [][]string{
+			{"consult", "--config", missing, "--progress-file", missing},
+			{"consult", "--config", missing, "--progress-file", filepath.Join(filepath.Dir(missing), ".", "cfg.yaml")},
+		} {
+			got := resolveProgress(args)
+			if got.path != "" || got.conflict == "" {
+				t.Errorf("resolveProgress(%q) = path %q, conflict %q; want a refusal and no path", args, got.path, got.conflict)
+			}
+		}
+	})
+
 	t.Run("both spellings: no target, so neither file is touched", func(t *testing.T) {
 		if got := resolveProgress([]string{"consult", "--progress-file", "a", "--pragati-patra", "b"}); got.path != "" {
 			t.Errorf("path = %q, want none", got.path)

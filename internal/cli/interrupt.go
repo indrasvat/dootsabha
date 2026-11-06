@@ -105,6 +105,11 @@ func exit(code int) { exitBecause(code, nil) }
 // the progress file can say why a run with exit code 0 did not finish.
 func exitBecause(code int, sig os.Signal) {
 	shutdown.Do(func() {
+		if sig != nil {
+			// Agents stopped from here were cut short, not broken: a call that
+			// returns during the grace must not be reported as an error.
+			interrupted.Store(true)
+		}
 		core.StopAll(agentStopGrace, hurry)
 		endProgress(code, sig)
 		os.Exit(code)
