@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -44,7 +45,7 @@ func readEvents(t *testing.T, path string) []map[string]any {
 func newTestLog(t *testing.T) (*progressLog, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "run.ndjson")
-	p, err := openProgressLog(path)
+	p, err := openProgressLog(path, nil)
 	if err != nil {
 		t.Fatalf("openProgressLog: %v", err)
 	}
@@ -169,10 +170,14 @@ func TestProgressCallEndingAfterASignalIsInterrupted(t *testing.T) {
 	defer interrupted.Store(false)
 	_ = p.call("dispatch", "claude", core.TimeoutScopeInvocation, func() error { return errors.New("signal: killed") })
 	p.finish(143, syscall.SIGTERM)
+	var statuses []any
 	for _, ev := range readEvents(t, path) {
-		if ev["event"] == "call_finished" && ev["status"] != "interrupted" {
-			t.Errorf("status %v, want interrupted", ev["status"])
+		if ev["event"] == "call_finished" {
+			statuses = append(statuses, ev["status"])
 		}
+	}
+	if len(statuses) != 1 || statuses[0] != "interrupted" {
+		t.Errorf("call_finished statuses %v, want exactly [interrupted]", statuses)
 	}
 }
 
@@ -212,7 +217,7 @@ func TestProgressOpenTruncates(t *testing.T) {
 	if err := os.WriteFile(path, []byte(`{"event":"run_finished","exit_code":0}`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	p, err := openProgressLog(path)
+	p, err := openProgressLog(path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +229,7 @@ func TestProgressOpenTruncates(t *testing.T) {
 }
 
 func TestProgressOpenRejectsAnUnwritablePath(t *testing.T) {
-	_, err := openProgressLog(t.TempDir()) // a directory
+	_, err := openProgressLog(t.TempDir(), nil) // a directory
 	if err == nil {
 		t.Fatal("opening a directory as the progress file succeeded")
 	}
@@ -239,16 +244,49 @@ func TestProgressNilLogStillRunsTheCall(t *testing.T) {
 	p.finish(0, nil) // must not panic
 }
 
-// An agent that runs dootsabha itself must not inherit the variable and
-// truncate its parent's file.
-func TestTakeProgressEnvUnsetsTheVariable(t *testing.T) {
-	t.Setenv(progressEnv, "/tmp/parent.ndjson")
-	if got := takeProgressEnv(); got != "/tmp/parent.ndjson" {
-		t.Errorf("takeProgressEnv() = %q", got)
+// The target is decided from argv before Cobra parses anything, because a
+// rejected command line is never parsed.
+func TestResolveProgress(t *testing.T) {
+	cfg := filepath.Join(t.TempDir(), "cfg.yaml")
+	if err := os.WriteFile(cfg, []byte("timeout: 7m\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if v, set := os.LookupEnv(progressEnv); set {
-		t.Errorf("%s still set to %q — children would inherit it", progressEnv, v)
+	tests := []struct {
+		name, env  string
+		args       []string
+		wantPath   string
+		wantSource string
+	}{
+		{"flag", "", []string{"consult", "--progress-file", "a.ndjson", "--timeout", "abc"}, "a.ndjson", "--progress-file"},
+		{"flag=value", "", []string{"council", "--progress-file=b.ndjson"}, "b.ndjson", "--progress-file"},
+		{"alias before the command", "", []string{"--pragati-patra", "c.ndjson", "review"}, "c.ndjson", "--pragati-patra"},
+		{"Devanagari command alias", "", []string{"सभा", "--progress-file", "d.ndjson"}, "d.ndjson", "--progress-file"},
+		{"env", "e.ndjson", []string{"refine", "x"}, "e.ndjson", progressEnv},
+		{"flag beats env", "e.ndjson", []string{"consult", "--progress-file", "f.ndjson"}, "f.ndjson", "--progress-file"},
+		{"empty flag opts out of env", "e.ndjson", []string{"consult", "--progress-file", ""}, "", ""},
+		{"after -- is a prompt", "", []string{"consult", "--", "--progress-file", "x"}, "", ""},
+		{"a command without the flag ignores env", "e.ndjson", []string{"status"}, "", ""},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(progressEnv, tt.env)
+			got := resolveProgress(tt.args)
+			if got.path != tt.wantPath || got.source != tt.wantSource {
+				t.Errorf("resolveProgress(%q) = %q from %q; want %q from %q", tt.args, got.path, got.source, tt.wantPath, tt.wantSource)
+			}
+			if v, set := os.LookupEnv(progressEnv); set {
+				t.Errorf("%s still set to %q — agents would inherit it", progressEnv, v)
+			}
+		})
+	}
+
+	t.Run("the --config file is protected", func(t *testing.T) {
+		got := resolveProgress([]string{"consult", "--config", cfg, "--progress-file", cfg})
+		info, _ := os.Stat(cfg)
+		if p, ok := got.protected["the --config file"]; !ok || !os.SameFile(p, info) {
+			t.Errorf("protected = %v, want the --config file", got.protected)
+		}
+	})
 }
 
 func TestProgressFlagOnEveryRunCommand(t *testing.T) {
@@ -273,16 +311,68 @@ func waitForEvents(t *testing.T, path string, n int) {
 	t.Helper()
 	for range 500 {
 		raw, _ := os.ReadFile(path)
-		lines := 0
-		for _, b := range raw {
-			if b == '\n' {
-				lines++
-			}
-		}
-		if lines >= n {
+		if bytes.Count(raw, []byte("\n")) >= n {
 			return
 		}
 		<-time.After(10 * time.Millisecond)
 	}
 	t.Fatalf("progress file never reached %d lines", n)
+}
+
+// Opening a FIFO for writing blocks until a reader appears, and no budget
+// exists yet to bound it: the run hung before any agent started.
+func TestProgressOpenRefusesAFIFOWithoutBlocking(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "fifo")
+	if err := syscall.Mkfifo(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { _, err := openProgressLog(path, nil); done <- err }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("a FIFO was accepted as the progress file")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("opening a FIFO with no reader blocked")
+	}
+}
+
+// The progress file is truncated when it opens. Pointing it at the file that
+// stdout is redirected to, or at the config, destroyed that file.
+func TestProgressOpenRefusesAProtectedFileAndLeavesItAlone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "result.json")
+	if err := os.WriteFile(path, []byte("keep me"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := openProgressLog(path, map[string]os.FileInfo{"stdout": info}); err == nil ||
+		!strings.Contains(err.Error(), "stdout") {
+		t.Fatalf("err = %v, want a refusal naming stdout", err)
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != "keep me" {
+		t.Errorf("protected file was changed to %q", raw)
+	}
+}
+
+// Two runs on one path: the second truncated the first's head and then the
+// first's run_finished told a reader the second was done.
+func TestProgressOpenRefusesAPathAnotherRunHolds(t *testing.T) {
+	first, path := newTestLog(t)
+	first.runStarted(run{command: "consult", agents: []string{"claude"}})
+	if _, err := openProgressLog(path, nil); err == nil {
+		t.Fatal("a second run opened a progress file the first still holds")
+	}
+	if events := readEvents(t, path); len(events) != 1 || events[0]["event"] != "run_started" {
+		t.Errorf("the first run's file was changed: %v", events)
+	}
+	first.finish(0, nil)
+	again, err := openProgressLog(path, nil)
+	if err != nil {
+		t.Fatalf("path not reusable once the first run finished: %v", err)
+	}
+	again.finish(0, nil)
 }

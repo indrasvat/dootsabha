@@ -66,11 +66,19 @@ func setupInterrupt() {
 			again := make(chan struct{})
 			go func() { <-signals; close(again) }()
 			n := core.StopAll(agentStopGrace, again)
-			progress.finish(128+int(sig), sig)
+			endProgress(128+int(sig), sig)
 			if !quiet {
 				notice(fmt.Sprintf("dootsabha: %s — stopped %d agent process group(s)\n", sig, n))
 			}
-			signal.Reset(sigs...)
+			// Die by the signal already reported: a different one arriving now
+			// would otherwise take its own default action first, and the
+			// progress file would name a death that did not happen.
+			for _, other := range sigs {
+				if other != sig {
+					signal.Ignore(other)
+				}
+			}
+			signal.Reset(sig)
 			_ = syscall.Kill(os.Getpid(), sig)
 			// A signal sent to the own pid can land on another thread while this
 			// one runs on; give it time to arrive rather than racing it.
@@ -95,10 +103,14 @@ func notice(msg string) {
 
 // exit stops any agent still running, then ends the process with code. If a
 // signal got to shutdown first, it blocks until that handler ends the process.
-func exit(code int) {
+func exit(code int) { exitBecause(code, nil) }
+
+// exitBecause is exit for a run that a signal ended without dying by it, so
+// the progress file can say why a run with exit code 0 did not finish.
+func exitBecause(code int, sig os.Signal) {
 	shutdown.Do(func() {
 		core.StopAll(agentStopGrace, hurry)
-		progress.finish(code, nil)
+		endProgress(code, sig)
 		os.Exit(code)
 	})
 }

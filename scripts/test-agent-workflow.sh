@@ -1090,6 +1090,18 @@ else
   fail "SIGTERM mid-council: $msg (driver: $SIG_OUT)"
 fi
 
+# A reader closing stderr mid-run ends it with SIGPIPE and exit 0, as before #34;
+# the file must say the run was cut short rather than look like a success.
+SIG_OUT=$(python3 scripts/signal-case.py --binary "$BINARY" --signals= --stderr break-after-start \
+  --env DOOTSABHA_PROVIDERS_CODEX_BINARY="$MOCK_DIR/mock-codex" --env MOCK_CODEX_DELAY=1 \
+  -- -v council --agents claude,codex --chair codex --progress-file "$PROG_DIR/pipe.ndjson" "PROGRESS-SECRET")
+if msg=$(python3 scripts/progress-check.py "$PROG_DIR/pipe.ndjson" 0 \
+  "ev[-1]['signal'] == 'SIGPIPE' and 'interrupted' in [e['status'] for e in $FINISHED]"); then
+  pass "SIGPIPE mid-run: run_finished says SIGPIPE, cut-short calls interrupted"
+else
+  fail "SIGPIPE mid-run: $msg (driver: $SIG_OUT)"
+fi
+
 # The env form must not reach the agents: one that runs dootsabha itself would
 # truncate this run's file.
 ENV_PROBE="$PROG_DIR/env-probe"
@@ -1105,7 +1117,94 @@ else
   fail "env form: agent saw '$(cat "$PROG_DIR/env-seen" 2>/dev/null)', file $(wc -c < "$PROG_DIR/env.ndjson" 2>/dev/null) bytes"
 fi
 
-rm -f "$PROG_DIR"/*.ndjson "$PROG_DIR/env-probe" "$PROG_DIR/env-seen"
+# Paths that would hang the run or destroy another file are refused with exit 2
+# before anything is written. Each was a real defect.
+expect_refused() {
+  local label=$1 rc=0
+  shift
+  timeout 10 "$@" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 2 ]; then pass "$label"; else fail "$label: exit $rc, want 2"; fi
+}
+mkfifo "$PROG_DIR/fifo"
+expect_refused "a FIFO is refused at once, not waited on" \
+  "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/fifo" "hi"
+
+printf 'timeout: 7m\n' > "$PROG_DIR/cfg.yaml"
+expect_refused "the --config file is refused" \
+  "$BINARY" consult --config "$PROG_DIR/cfg.yaml" --progress-file "$PROG_DIR/cfg.yaml" --agent claude --json "hi"
+if [ "$(cat "$PROG_DIR/cfg.yaml")" = "timeout: 7m" ]; then
+  pass "  ...and the config is left as it was"
+else
+  fail "  ...the config was changed: $(head -c 80 "$PROG_DIR/cfg.yaml")"
+fi
+
+RC=0
+# shellcheck disable=SC2094  # the same file on both sides is the case under test
+"$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/same.json" "hi" > "$PROG_DIR/same.json" 2>/dev/null || RC=$?
+if [ "$RC" -eq 2 ] && one_json < "$PROG_DIR/same.json"; then
+  pass "the file stdout goes to is refused; stdout stays one document"
+else
+  fail "progress file = stdout's file: exit $RC, stdout $(head -c 120 "$PROG_DIR/same.json")"
+fi
+
+MOCK_CLAUDE_DELAY=3 "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/shared.ndjson" "PROGRESS-SECRET" >/dev/null 2>&1 &
+FIRST=$!
+for _ in $(seq 1 50); do grep -q call_started "$PROG_DIR/shared.ndjson" 2>/dev/null && break; sleep 0.1; done
+expect_refused "a path another run holds is refused" \
+  "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/shared.ndjson" "hi"
+RC=0
+wait "$FIRST" || RC=$?
+if msg=$(python3 scripts/progress-check.py "$PROG_DIR/shared.ndjson" "$RC" "ev[0]['event'] == 'run_started'"); then
+  pass "  ...and the first run's file is intact"
+else
+  fail "  ...the first run's file: $msg"
+fi
+
+expect_refused "--progress-file and --pragati-patra together are refused" \
+  "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/a.ndjson" --pragati-patra "$PROG_DIR/b.ndjson" "hi"
+
+# Cobra rejects a bad flag value or a missing prompt before the command runs.
+# The file must then hold this run's exit 2, not the previous run's success.
+for bad in "--timeout abc" "--no-such-flag" ""; do
+  "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/stale.ndjson" "hi" >/dev/null 2>&1
+  RC=0
+  # shellcheck disable=SC2086  # $bad is deliberately split into its words
+  if [ -n "$bad" ]; then
+    "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/stale.ndjson" $bad "hi" >/dev/null 2>&1 || RC=$?
+  else
+    "$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/stale.ndjson" >/dev/null 2>&1 || RC=$?
+  fi
+  if msg=$(python3 scripts/progress-check.py "$PROG_DIR/stale.ndjson" "$RC" "[e['event'] for e in ev] == ['run_finished'] and ev[0]['exit_code'] == 2"); then
+    pass "rejected before it ran (${bad:-no prompt}): the file says exit 2, not the last run's 0"
+  else
+    fail "rejected before it ran (${bad:-no prompt}): $msg"
+  fi
+done
+
+# An empty flag opts out of an inherited variable.
+DOOTSABHA_PROGRESS_FILE="$PROG_DIR/inherited.ndjson" "$BINARY" consult --agent claude --json --progress-file "" "hi" >/dev/null 2>&1 || true
+if [ ! -e "$PROG_DIR/inherited.ndjson" ]; then
+  pass '--progress-file "" opts out of DOOTSABHA_PROGRESS_FILE'
+else
+  fail '--progress-file "" still wrote the file the environment named'
+fi
+
+# A disk that takes only part of a line (here: a 1 KiB file-size limit) must not
+# leave half an event for a reader to parse.
+( ulimit -f 1; "$BINARY" council --agents claude,codex --chair claude --json --progress-file "$PROG_DIR/full.ndjson" "hi" >/dev/null 2>&1 ) || true
+if python3 -c "
+import json,sys
+raw = open(sys.argv[1]).read()
+assert raw and raw.endswith('\n'), 'ends mid-line: %r' % raw[-40:]
+[json.loads(l) for l in raw.splitlines()]
+" "$PROG_DIR/full.ndjson"; then
+  pass "a write the disk only partly takes leaves whole lines only"
+else
+  fail "a partial write left a torn line"
+fi
+
+rm -f "$PROG_DIR"/*.ndjson "$PROG_DIR/env-probe" "$PROG_DIR/env-seen" "$PROG_DIR/fifo" \
+  "$PROG_DIR/cfg.yaml" "$PROG_DIR/same.json"
 rmdir "$PROG_DIR"
 
 # ── Summary ──────────────────────────────────────────────────────────────────

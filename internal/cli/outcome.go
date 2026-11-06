@@ -52,8 +52,7 @@ func newOutcome(b *core.Budget) *Outcome { return &Outcome{budget: b} }
 // rather than by asking the budget afterwards — a subprocess sitting in its
 // SIGTERM grace period can let a later session expiry rewrite the diagnosis.
 //
-// stage names the call in the progress file, which is written from the same
-// error recorded here.
+// stage names the call in the progress file.
 func (o *Outcome) Invoke(stage string, prov providers.Provider, name, prompt string, opts providers.InvokeOptions) (*providers.ProviderResult, error) {
 	ctx, cancel := o.budget.Step()
 	defer cancel()
@@ -74,6 +73,9 @@ func (o *Outcome) Invoke(stage string, prov providers.Provider, name, prompt str
 func (o *Outcome) Fail(provider string, err error) { o.record(provider, "", err) }
 
 func (o *Outcome) record(provider, scope string, err error) {
+	if se := (*scopedError)(nil); scope == "" && errors.As(err, &se) {
+		scope = se.scope
+	}
 	o.calls = append(o.calls, call{provider: provider, scope: scope, err: err})
 }
 
@@ -83,9 +85,9 @@ func (o *Outcome) record(provider, scope string, err error) {
 // out-of-process strategy plugin reach the same exit decision, since its gRPC
 // response converts to these same types.
 //
-// Scope is left empty: the engine owns the step contexts, so the budget is
-// asked at Exit time instead. Sequential commands, where the distinction is
-// most visible to a user, go through Invoke and get it exactly.
+// Scope arrives on the error: the in-process engine's adapter wraps it in a
+// scopedError measured at the call. An error without one (an out-of-process
+// strategy plugin) leaves the budget to be asked at Exit time.
 func (o *Outcome) AddDispatches(ds []core.DispatchResult) {
 	for _, d := range ds {
 		o.record(d.Provider, "", d.Error)

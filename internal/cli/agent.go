@@ -20,9 +20,6 @@ import (
 // SynthesisResult the engine returns — which council folds into the ledger with
 // Outcome.AddDispatches, AddReviews and AddSynthesis. Their completeness is what
 // TestOutcomeConsumesEveryResultError enforces.
-//
-// Each call is also reported to the progress file under the stage the engine
-// named on ctx, from the same error the engine puts on its result.
 type providerAgent struct {
 	prov   providers.Provider
 	budget *core.Budget
@@ -32,7 +29,8 @@ func (a *providerAgent) Name() string { return a.prov.Name() }
 
 func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.InvokeOptions) (*core.InvokeResult, error) {
 	var result *providers.ProviderResult
-	err := progress.call(core.StageOf(ctx), a.prov.Name(), a.budget.ScopeOf(ctx), func() (err error) {
+	scope := a.budget.ScopeOf(ctx)
+	err := progress.call(core.StageOf(ctx), a.prov.Name(), scope, func() (err error) {
 		result, err = a.prov.Invoke(ctx, prompt, providers.InvokeOptions{
 			Model:    opts.Model,
 			MaxTurns: opts.MaxTurns,
@@ -41,7 +39,7 @@ func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.Inv
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return nil, &scopedError{scope: scope, err: err}
 	}
 	return &core.InvokeResult{
 		Content:   result.Content,
@@ -52,3 +50,15 @@ func (a *providerAgent) Invoke(ctx context.Context, prompt string, opts core.Inv
 		TokensOut: result.TokensOut,
 	}, nil
 }
+
+// scopedError carries the budget that bounded an engine call back through the
+// engine's result types, so the exit message names the limit measured at the
+// call. Asked at exit time instead, the budget blames the session for a call
+// that hit --timeout whenever the ceiling has passed since.
+type scopedError struct {
+	scope string
+	err   error
+}
+
+func (e *scopedError) Error() string { return e.err.Error() }
+func (e *scopedError) Unwrap() error { return e.err }

@@ -21,11 +21,17 @@ jq -c 'select(.event=="call_started" or .event=="call_finished")' run.ndjson
 |---|---|
 | Commands | `consult`, `council`, `review`, `refine` |
 | Flag | `--progress-file <path>` (alias `--pragati-patra`) |
-| Env | `DOOTSABHA_PROGRESS_FILE=<path>`, used when the flag is absent |
+| Env | `DOOTSABHA_PROGRESS_FILE=<path>`, used when the flag is not given (`--progress-file ""` opts out) |
 
-stdout, stderr and the exit codes are exactly what they are without it. The file
-is truncated when the run starts: one file, one run. A path that cannot be opened
-exits `2` before any agent runs.
+A run's stdout and exit code are what they would be without it; stderr gains
+only a line if writing the file fails. The file is emptied when the run starts — one file, one run — so give each run its own
+path. A symlink is followed, and its target emptied.
+
+These exit `2` before any agent runs and leave the file untouched:
+
+- a path that cannot be opened, or is not a regular file (a FIFO, a device)
+- the file stdout or stderr is redirected to, or the `--config` file
+- a file another dootsabha run is still writing (it holds a lock until it exits)
 
 ## Events
 
@@ -77,19 +83,26 @@ one stage run in parallel, so their lines interleave.
 | `interrupted` | stopped because dootsabha was signalled, or still running when it exited |
 
 `scope` is present exactly when `status` is `timeout`. These are the same
-outcomes the exit code is computed from.
+outcomes the exit code is computed from. A call attempted after the session
+ceiling has passed still gets its pair — `timeout`, `session`, `duration_ms` near
+0 — because it was attempted, and counted.
 
 ### `run_finished` — last, exactly once
 
 ```json
-{"ts":"…","event":"run_finished","exit_code":5,"duration_ms":1210000}
-{"ts":"…","event":"run_finished","exit_code":143,"signal":"SIGTERM","duration_ms":61000}
+{"ts":"…","event":"run_finished","pid":4242,"exit_code":5,"duration_ms":1210000}
+{"ts":"…","event":"run_finished","pid":4242,"exit_code":143,"signal":"SIGTERM","duration_ms":61000}
 ```
 
 `exit_code` is the code the process exits with ([exit codes](exit-codes.md)). On
 SIGINT, SIGTERM or SIGHUP the agents are stopped first, every open call is closed
 as `interrupted`, and the line carries `signal` and `128 + N` — what a shell
 reports in `$?` (130, 143, 129).
+
+A reader that closes dootsabha's stdout or stderr ends the run with SIGPIPE, and
+dootsabha exits `0` as it always has. The line then says `"signal":"SIGPIPE"`
+with `exit_code` 0, and any call it cut short is `interrupted`: the run did not
+finish, whatever the code says.
 
 ## Reading a file whose run may have died
 
@@ -98,18 +111,24 @@ reports in `$?` (130, 143, 129).
 | `run_finished` | — | done; branch on `exit_code` |
 | anything else | alive (`kill -0 $pid`) | still running; the open calls say what it waits on |
 | anything else | gone | died without reporting: SIGKILL, a crash, power loss |
+| no file, or a `pid` that is not the process you started | gone | killed in its first milliseconds, before it could report — the file, if any, is an earlier run's; use `$?` |
 
-The third row is the only way to get a file without `run_finished`. Treat it like
+A file without `run_finished` whose process is gone means one of two things: the
+process died (SIGKILL, a crash, power loss), or writing the file failed partway —
+that run logged `progress file: write failed` on stderr and exited normally, so
+its real code is wherever you captured `$?`. If you have neither, treat it like
 exit `1`, and check stdout before trusting it.
 
 ## Guarantees
 
 - Each line is written with one `write(2)` to a file opened `O_APPEND`, so a
-  reader never sees half a line. Lines are visible to readers as they are written.
+  reader never sees half a line; a line the disk takes only part of is cut back.
+  Lines are visible to readers as they are written.
 - Every `call_started` has exactly one `call_finished` in a file with
   `run_finished`.
 - No prompt, response or error text — names, stages, numbers and status only.
 - The env variable is removed before agents start, so an agent that runs
   dootsabha itself does not write to its parent's file.
 - A write that fails mid-run (disk full) is logged once on stderr at Error level;
-  the run continues, and the file stops growing without `run_finished`.
+  the run continues, and the file stops growing without `run_finished` — read it
+  as the third row above once the process is gone.

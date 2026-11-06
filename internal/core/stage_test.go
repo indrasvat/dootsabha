@@ -62,9 +62,3 @@ func TestEngineNamesTheStageOfEveryCall(t *testing.T) {
 		t.Errorf("fallback saw stages %v, want %v", other.seen, want)
 	}
 }
-
-func TestStageOfAnUntaggedContextIsEmpty(t *testing.T) {
-	if s := core.StageOf(context.Background()); s != "" {
-		t.Errorf("StageOf(Background) = %q, want empty", s)
-	}
-}

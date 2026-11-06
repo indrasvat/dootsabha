@@ -37,6 +37,8 @@ def main():
         sys.exit("run_finished is not the last event: %r" % ev[-1:])
     if [e["event"] for e in ev].count("run_finished") != 1:
         sys.exit("more than one run_finished")
+    if any("pid" in e and e["pid"] != ev[-1]["pid"] for e in ev):
+        sys.exit("events from more than one process")
     if ev[-1]["exit_code"] != want_code:
         sys.exit("run_finished.exit_code %r, process exited %d" % (ev[-1]["exit_code"], want_code))
 
