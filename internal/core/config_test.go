@@ -37,11 +37,11 @@ func TestConfigDefaults(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 
-	if cfg.Timeout != 5*time.Minute {
-		t.Errorf("Timeout: got %v, want 5m", cfg.Timeout)
+	if cfg.Timeout != 15*time.Minute {
+		t.Errorf("Timeout: got %v, want 15m", cfg.Timeout)
 	}
-	if cfg.SessionTimeout != 30*time.Minute {
-		t.Errorf("SessionTimeout: got %v, want 30m", cfg.SessionTimeout)
+	if cfg.SessionTimeout != 75*time.Minute {
+		t.Errorf("SessionTimeout: got %v, want 75m", cfg.SessionTimeout)
 	}
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)
@@ -163,8 +163,8 @@ func TestConfigMissingDefaultUserFileFallsBackToBuiltins(t *testing.T) {
 		t.Fatalf("LoadConfig: %v", err)
 	}
 
-	if cfg.Timeout != 5*time.Minute {
-		t.Errorf("Timeout: got %v, want built-in 5m", cfg.Timeout)
+	if cfg.Timeout != 15*time.Minute {
+		t.Errorf("Timeout: got %v, want built-in 15m", cfg.Timeout)
 	}
 	if cfg.Source.Type != "built-in" || cfg.Source.Path != "" {
 		t.Errorf("Source: got %+v, want built-in with empty path", cfg.Source)

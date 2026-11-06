@@ -95,6 +95,7 @@ council-mode deliberation, peer review, and synthesis.
 // Execute runs the root command. Called from main().
 func Execute() {
 	setupSIGPIPE()
+	setupInterrupt()
 	// Always silence Cobra's built-in "Error: ..." stderr line — we handle
 	// error display ourselves. This prevents unstructured stderr in JSON mode
 	// while still showing errors to TTY users (GitHub issue #4, bug 3).
@@ -130,7 +131,7 @@ func Execute() {
 			} else {
 				fmt.Fprintf(os.Stderr, "Error: %s\n", exitErr.Message) //nolint:errcheck
 			}
-			os.Exit(exitErr.Code)
+			exit(exitErr.Code)
 		}
 		// Anything reaching here is NOT an ExitError, which means no code path
 		// classified it — genuinely unexpected. Usage errors are typed at their
@@ -141,8 +142,9 @@ func Execute() {
 		} else {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", err) //nolint:errcheck
 		}
-		os.Exit(core.ExitError)
+		exit(core.ExitError)
 	}
+	exit(core.ExitSuccess)
 }
 
 // warnIfNeedsMigration prints a one-line stderr nudge when the user's config still
@@ -204,7 +206,7 @@ func setupSIGPIPE() {
 	signal.Notify(sigpipeCh, syscall.SIGPIPE)
 	go func() {
 		<-sigpipeCh
-		os.Exit(0)
+		exit(0)
 	}()
 }
 

@@ -105,6 +105,9 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 		slog.Debug("subprocess skipped, budget already spent", "binary", binary, "error", err)
 		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, err)
 	}
+	if liveGroups.isStopping() {
+		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, ErrStopping)
+	}
 
 	cmd := exec.Command(binary, args...)
 	cmd.Env = cfg.env
@@ -156,6 +159,13 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	_ = outW.Close()
 	_ = errW.Close()
 
+	exited, tracked := liveGroups.add(cmd.Process.Pid)
+	if !tracked {
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		_ = cmd.Wait()
+		return &SubprocessResult{ExitCode: -1}, fmt.Errorf("subprocess %q: %w", binary, ErrStopping)
+	}
+
 	copied := make(chan struct{})
 	go func() {
 		var wg sync.WaitGroup
@@ -184,7 +194,11 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 	// Buffered channel (capacity 1) prevents goroutine leak if the ctx.Done() branch
 	// returns before the goroutine sends — the send completes without a receiver.
 	waitCh := make(chan error, 1)
-	go func() { waitCh <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		liveGroups.remove(pgid, exited)
+		waitCh <- err
+	}()
 
 	select {
 	case err := <-waitCh:
@@ -229,6 +243,81 @@ func (r *SubprocessRunner) Run(ctx context.Context, binary string, args []string
 			Duration: elapsed,
 		}, fmt.Errorf("subprocess %q: %w", binary, ctx.Err())
 	}
+}
+
+// ErrStopping is returned by Run once StopAll has begun: dootsabha is exiting,
+// so a pipeline's next stage must not start an agent that nothing would stop.
+var ErrStopping = errors.New("dootsabha is stopping")
+
+// groupSet tracks the process group of every agent Run has started and not yet
+// reaped, so a signal to dootsabha itself can stop them. Setpgid keeps agents
+// out of dootsabha's own group, which is why they never see that signal.
+type groupSet struct {
+	mu       sync.Mutex
+	live     map[int]chan struct{} // pgid → closed once the leader is reaped
+	stopping bool
+}
+
+var liveGroups = groupSet{live: map[int]chan struct{}{}}
+
+// add registers a started group. It refuses once stopping has begun, and the
+// check and the insert share one lock, so StopAll cannot miss a group.
+func (g *groupSet) add(pgid int) (chan struct{}, bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.stopping {
+		return nil, false
+	}
+	exited := make(chan struct{})
+	g.live[pgid] = exited
+	return exited, true
+}
+
+func (g *groupSet) isStopping() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.stopping
+}
+
+func (g *groupSet) remove(pgid int, exited chan struct{}) {
+	g.mu.Lock()
+	delete(g.live, pgid)
+	g.mu.Unlock()
+	close(exited)
+}
+
+// StopAll stops every agent process group Run has started: SIGTERM, up to grace
+// for the leaders to exit, then SIGKILL to each group so a descendant that
+// ignored SIGTERM goes too. From the first call on, Run refuses to start
+// anything. It returns how many groups it signalled.
+func StopAll(grace time.Duration) int {
+	g := &liveGroups
+	g.mu.Lock()
+	g.stopping = true
+	pgids := make([]int, 0, len(g.live))
+	waits := make([]chan struct{}, 0, len(g.live))
+	for pgid, exited := range g.live {
+		pgids = append(pgids, pgid)
+		waits = append(waits, exited)
+	}
+	g.mu.Unlock()
+
+	for _, pgid := range pgids {
+		_ = syscall.Kill(-pgid, syscall.SIGTERM)
+	}
+	deadline := time.After(grace)
+wait:
+	for _, exited := range waits {
+		select {
+		case <-exited:
+		case <-deadline:
+			break wait
+		}
+	}
+	for _, pgid := range pgids {
+		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+	}
+	return len(pgids)
 }
 
 // syncBuffer is a bytes.Buffer safe for one writer goroutine and a reader that

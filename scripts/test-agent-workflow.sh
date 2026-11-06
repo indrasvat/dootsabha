@@ -952,6 +952,95 @@ else
   fail "SIGPIPE exit code: $RC (expected 0)"
 fi
 
+# ── Workflow 11: a signal to dootsabha stops its agents (GitHub issue #33) ───
+#
+# Each agent runs in its own process group, so a signal sent to dootsabha never
+# reaches it. Before #33 dootsabha died at once and real `claude`/`grok` agents
+# kept running, reparented to PID 1. The agent below records its group and
+# holds a child, so a cleanup that stops only the leader still fails.
+
+echo ""
+echo "--- Signals stop agents ---"
+
+# Starts a run, waits for <want> agents to report in, sends <sig>, then checks:
+# the exit status is the signal's (unchanged contract), every agent group is
+# gone, no further agent started, and stdout is empty or one JSON document.
+signal_case() {
+  local label=$1 sig=$2 want=$3 status=$4
+  shift 4
+  local dir agent ds rc=0 n survivors=() pids=()
+  dir=$(mktemp -d -t dootsabha-sig)
+  agent="$dir/agent"
+  # shellcheck disable=SC2016  # $1 and $$ belong to the generated script
+  printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "0.0.0"; exit 0; }\necho $$ > %q/$$.pid\nsleep 300 &\nwait\n' "$dir" > "$agent"
+  chmod +x "$agent"
+  # Job control gives the run its own group with SIGINT not ignored, as an
+  # interactive shell would.
+  set -m
+  env DOOTSABHA_PROVIDERS_CLAUDE_BINARY="$agent" DOOTSABHA_PROVIDERS_CODEX_BINARY="$agent" \
+    "$BINARY" "$@" >"$dir/stdout" 2>"$dir/stderr" &
+  ds=$!
+  set +m
+  for _ in $(seq 1 100); do
+    n=$(find "$dir" -name '*.pid' | wc -l | tr -d ' ')
+    [ "$n" -ge "$want" ] && break
+    sleep 0.1
+  done
+  pids=()
+  while IFS= read -r f; do pids+=("$(cat "$f")"); done < <(find "$dir" -name '*.pid')
+  kill -s "$sig" "$ds"
+  { wait "$ds"; } 2>/dev/null || rc=$?
+  for _ in $(seq 1 30); do
+    survivors=()
+    for p in "${pids[@]}"; do
+      if kill -0 -- "-$p" 2>/dev/null; then survivors+=("$p"); fi
+    done
+    [ "${#survivors[@]}" -eq 0 ] && break
+    sleep 0.2
+  done
+  n=$(find "$dir" -name '*.pid' | wc -l | tr -d ' ')
+  if [ "${#pids[@]}" -ne "$want" ]; then
+    fail "$label: only ${#pids[@]} of $want agents started"
+  elif [ "${#survivors[@]}" -ne 0 ]; then
+    fail "$label: ${#survivors[@]} agent group(s) outlived dootsabha"
+  elif [ "$rc" -ne "$status" ]; then
+    fail "$label: exit $rc (want $status) — stderr: $(head -c 300 "$dir/stderr")"
+  elif [ "$n" -ne "$want" ]; then
+    fail "$label: $((n - want)) agent(s) started after the signal"
+  elif [ -s "$dir/stdout" ] && ! python3 -m json.tool "$dir/stdout" >/dev/null 2>&1; then
+    fail "$label: stdout is not one JSON document"
+  else
+    pass "$label"
+  fi
+  for p in "${survivors[@]}"; do kill -KILL -- "-$p" 2>/dev/null || true; done
+  rm -rf "$dir"
+}
+
+signal_case "SIGTERM stops a consult's agent and exits 143" TERM 1 143 \
+  consult --agent claude --json "hi"
+signal_case "SIGINT stops a consult's agent and exits 130" INT 1 130 \
+  consult --agent claude "hi"
+signal_case "SIGHUP stops a consult's agent and exits 129" HUP 1 129 \
+  consult --agent claude "hi"
+signal_case "SIGTERM stops every council agent, no later stage starts" TERM 2 143 \
+  council --agents claude,codex --chair claude --json "hi"
+
+# A shell starts background jobs with SIGINT ignored. dootsabha must not
+# un-ignore it: such a run keeps going, as it always has.
+IGN_OUT=$(mktemp -t dootsabha-ign)
+env MOCK_CLAUDE_DELAY=2 "$BINARY" consult --agent claude "hi" >"$IGN_OUT" 2>&1 &
+IGN_PID=$!
+sleep 0.5
+kill -s INT "$IGN_PID"
+RC=0
+wait "$IGN_PID" || RC=$?
+if [ "$RC" -eq 0 ] && grep -q "Mock" "$IGN_OUT"; then
+  pass "an ignored SIGINT stays ignored: the run completes"
+else
+  fail "an ignored SIGINT stopped the run: exit $RC, output: $(head -c 200 "$IGN_OUT")"
+fi
+rm -f "$IGN_OUT"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 printf "\nResults: %d passed, %d failed\n" "$PASS" "$FAIL"

@@ -166,7 +166,7 @@ func TestBudgetWarning(t *testing.T) {
 		t.Errorf("warning %q should name the flag to raise", w)
 	}
 	// The calls cannot fit TOGETHER — `refine --reviewers a,b,c` is 7 calls, so
-	// the shipped defaults (5m each, 30m ceiling) overrun by 5 minutes. This is
+	// 5m each overruns a 30m ceiling by 5 minutes. This is
 	// the shape that would otherwise truncate a pipeline halfway with no notice.
 	if w := budgetWarning(5*time.Minute, 30*time.Minute, 7); w == "" {
 		t.Error("no warning when N calls of --timeout exceed --session-timeout")
