@@ -65,6 +65,11 @@ func resolveProgress(args []string) progressTarget {
 		return progressTarget{}
 	}
 	t := progressTarget{path: env, source: progressEnv}
+	_, _, long := flagFromArgs(args, "--progress-file")
+	_, _, alias := flagFromArgs(args, "--pragati-patra")
+	if long && alias {
+		return progressTarget{} // ambiguous: startProgress refuses it, and neither file is touched
+	}
 	if path, name, given := flagFromArgs(args, "--progress-file", "--pragati-patra"); given {
 		t.path, t.source = path, name
 	}
@@ -77,10 +82,12 @@ func resolveProgress(args []string) progressTarget {
 			t.protected[name] = info
 		}
 	}
-	if cfg, _, given := flagFromArgs(args, "--config"); given {
-		if info, err := os.Stat(cfg); err == nil {
-			t.protected["the --config file"] = info
-		}
+	cfg, _, given := flagFromArgs(args, "--config")
+	if !given {
+		cfg, _ = core.UserConfigPath() // read when no --config is given
+	}
+	if info, err := os.Stat(cfg); err == nil {
+		t.protected["the config file"] = info
 	}
 	return t
 }

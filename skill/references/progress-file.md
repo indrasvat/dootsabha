@@ -29,8 +29,10 @@ path. A symlink is followed, and its target emptied.
 
 These exit `2` before any agent runs and leave the file untouched:
 
-- a path that cannot be opened, or is not a regular file (a FIFO, a device)
-- the file stdout or stderr is redirected to, or the `--config` file
+- a path that cannot be opened, or is not a regular file (a FIFO, a device,
+  `/dev/null` — to turn the file off, pass `--progress-file ""`)
+- the file stdout or stderr is redirected to, or the config file (`--config`, or
+  `~/.config/dootsabha/config.yaml` without it)
 - a file another dootsabha run is still writing (it holds a lock until it exits)
 
 ## Events

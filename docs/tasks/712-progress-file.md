@@ -33,20 +33,33 @@ untouched. Contract: `skill/references/progress-file.md`.
   "current stage" variable.
 - **`run_finished` is written by `exit`**, the single exit path, after agents are
   stopped and with the code passed to `os.Exit` — it cannot disagree with `$?`.
+- **One target, two possible owners.** The path is resolved from argv in
+  `Execute`, before any signal handler exists — Cobra never parses a command line
+  it rejects. `progressMu` decides who opens it: the command at the start of
+  `RunE`, or `exit`/the signal handler if `RunE` never got there. The end of the
+  run keeps the lock, so nothing opens the file after its `run_finished`. A
+  rejected command line therefore reports its own exit 2 instead of leaving the
+  previous run's success.
 - **A signal is reported, not a gap.** The signal handler, after stopping the
   agents, closes every open call as `interrupted` and writes `run_finished` with
-  `exit_code` 128+N and `signal`. Only SIGKILL, a crash or power loss leave a file
-  without `run_finished`; `run_started.pid` lets a reader tell that apart from a
-  run still going.
+  `exit_code` 128+N and `signal`, then ignores the other signals so it dies by
+  the one it reported. Only SIGKILL, a crash, power loss, or a signal in the
+  first milliseconds leave no `run_finished`; `pid` tells a stale file apart.
+- **Status follows the ledger.** A deadline is `timeout`, even after a signal;
+  council's engine calls carry the scope measured at the call (`scopedError`),
+  so its exit message and the file name the same limit.
 - **Every `call_started` gets a `call_finished`** in any file that has
   `run_finished`: calls still open at exit are closed as `interrupted`.
 - **No text from the run.** Names, stages, durations, status — never prompt,
   response or error text (an error can quote a response).
 - **The env form is not inherited.** The variable is unset at startup, so an
   agent that itself runs dootsabha does not truncate its parent's file.
-- **A bad path is a bad command** (exit 2), checked before any agent runs. A write
-  that fails mid-run is reported once at Error level and the run continues —
-  aborting a 30-minute council over its progress log would lose the result.
+- **A bad path is a bad command** (exit 2), checked before any agent runs and
+  before the file is emptied: not a regular file (opening a FIFO blocked
+  forever), the file stdout/stderr goes to, the `--config` file, or a file another
+  run holds (`flock`). A write that fails mid-run is cut back to the last whole
+  line, reported once at Error level, and the run continues — aborting a
+  30-minute council over its progress log would lose the result.
 
 ## Files
 

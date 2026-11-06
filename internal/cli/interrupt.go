@@ -70,14 +70,10 @@ func setupInterrupt() {
 			if !quiet {
 				notice(fmt.Sprintf("dootsabha: %s — stopped %d agent process group(s)\n", sig, n))
 			}
-			// Die by the signal already reported: a different one arriving now
-			// would otherwise take its own default action first, and the
-			// progress file would name a death that did not happen.
-			for _, other := range sigs {
-				if other != sig {
-					signal.Ignore(other)
-				}
-			}
+			// Restore only the signal already reported: the others stay trapped,
+			// so one arriving now is dropped instead of taking its own default
+			// action first, and the process dies the death the progress file
+			// names. (signal.Ignore on them has its own window where it does not.)
 			signal.Reset(sig)
 			_ = syscall.Kill(os.Getpid(), sig)
 			// A signal sent to the own pid can land on another thread while this

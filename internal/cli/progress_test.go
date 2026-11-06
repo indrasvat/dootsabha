@@ -283,8 +283,31 @@ func TestResolveProgress(t *testing.T) {
 	t.Run("the --config file is protected", func(t *testing.T) {
 		got := resolveProgress([]string{"consult", "--config", cfg, "--progress-file", cfg})
 		info, _ := os.Stat(cfg)
-		if p, ok := got.protected["the --config file"]; !ok || !os.SameFile(p, info) {
+		if p, ok := got.protected["the config file"]; !ok || !os.SameFile(p, info) {
 			t.Errorf("protected = %v, want the --config file", got.protected)
+		}
+	})
+
+	t.Run("the default config is protected without --config", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		def := filepath.Join(home, ".config", "dootsabha", "config.yaml")
+		if err := os.MkdirAll(filepath.Dir(def), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(def, []byte("timeout: 7m\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		got := resolveProgress([]string{"consult", "--progress-file", def})
+		info, _ := os.Stat(def)
+		if p, ok := got.protected["the config file"]; !ok || !os.SameFile(p, info) {
+			t.Errorf("protected = %v, want the default config", got.protected)
+		}
+	})
+
+	t.Run("both spellings: no target, so neither file is touched", func(t *testing.T) {
+		if got := resolveProgress([]string{"consult", "--progress-file", "a", "--pragati-patra", "b"}); got.path != "" {
+			t.Errorf("path = %q, want none", got.path)
 		}
 	})
 }
