@@ -1,6 +1,6 @@
 # Task 712: A progress file for runs nobody is watching
 
-## Status: IN PROGRESS
+## Status: DONE
 
 ## Depends On
 705 (`cli.Outcome`, per-call budget), 711 (signal shutdown). Closes #34.
@@ -71,18 +71,60 @@ untouched. Contract: `skill/references/progress-file.md`.
 | `internal/core/engine.go`, `review.go`, `synthesis.go` | stage on the context |
 | `internal/cli/{consult,council,review,refine}.go` | flag, `run_started` |
 | `internal/cli/interrupt.go` | `run_finished` on exit and on a signal |
+| `internal/cli/root.go` | resolve the target from argv before any handler |
 | `skill/references/progress-file.md` | the versioned contract |
+| `scripts/test-agent-workflow.sh`, `scripts/progress-check.py` | L5 Workflow 12: every case against the contract |
+| `.shux/scripts/issue-34-evidence.sh` | L4 capture, real codex + grok, before/after |
+
+## Review
+
+Four rounds. Both councils ran this branch's own binary with `--progress-file`
+against real codex and grok, and were watched from the file.
+
+| Round | Reviewers | Outcome |
+|---|---|---|
+| 1 | codex + grok council (23m), takshaka, 3 adversarial agents (exit/signal path, file path surface, events vs outcome) | 14 reproduced defects fixed in `d184808`, `0347336`: FIFO hang, config/stdout clobber, two runs on one path, stale file after a rejected command line, missing `run_finished` after an early signal, wrong-signal death, torn last line, empty flag not opting out, council blaming the session for an invocation timeout, a real timeout relabelled `interrupted`, SIGPIPE looking like success |
+| 2 | the 3 agents re-running their own repros, codex + grok council (43m) | all closed except one signal race (4/260) and the default config; argv scan disagreed with pflag; `--help` wrote a success record; a chair deadline + fallback failure took the wrong scope — `3395a85`, `12fd8fc` |
+| 3 | codex, takshaka | `--config ""` left the default config unprotected (both found it); `--help=false` wrote no file — `09cd4d5` |
+| 4 | codex, fix commit only | both CLOSED, nothing broken — SHIP |
+
+## Found, not fixed
+
+- SIGPIPE racing a normal exit: `run_finished` has the true exit code but may
+  lack `"signal":"SIGPIPE"`.
+- A signal in the first milliseconds, before the handler is installed, leaves
+  no file (or the previous run's; `pid` tells them apart). Documented.
+- The `--json` result explains less than the file (`meta.providers` says
+  `error` for a timeout and covers dispatch only; a failed reviewer or
+  incorporate has no `error`; `--rounds` keeps only the last synthesis). #35.
+- A write blocked by a hung filesystem would hold the log's lock at shutdown.
+  FIFOs are refused, so only a stalled mount can do it. Not reproduced.
 
 ## Done Criteria
 
-- [ ] `--progress-file` on consult, council, review, refine; NDJSON, one write per line
-- [ ] every call: `call_started` + `call_finished` (`ok`/`error`/`timeout`+`scope`/`interrupted`)
-- [ ] `run_finished.exit_code` equals the process exit code, signals included
-- [ ] events come from the same error the ledger records
-- [ ] no prompt or response text in the file
-- [ ] contract documented in `skill/references/`
-- [ ] L1+L2+L3+L5 green; L4 real agents in shux
+- [x] `--progress-file` on consult, council, review, refine; NDJSON, one write per line
+- [x] every call: `call_started` + `call_finished` (`ok`/`error`/`timeout`+`scope`/`interrupted`)
+- [x] `run_finished.exit_code` equals the process exit code, signals included
+- [x] events come from the same error the ledger records
+- [x] no prompt or response text in the file
+- [x] contract documented in `skill/references/`
+- [x] L1+L2+L3+L5 green; L4 real agents in shux
 
 ## Visual Test Results
 
-_Pending._
+Captured with `.shux/scripts/issue-34-evidence.sh` — real `codex` and `grok`, a
+real `council --json` put in the background as a caller would. BEFORE is the
+published v0.11.0, AFTER is `09cd4d5`. Each run is one shux window: the caller
+above, an independent observer below (pr-evidence's `observe.sh`: a clock, the
+bytes on stderr, the progress file, and the run's agent processes from `ps`).
+Every frame was read back; videos pass `check_video.sh` (H.264 High@4.2, 15 fps).
+
+| Scenario | before (v0.11.0) | after (this PR) |
+|---|---|---|
+| +52s into a council | stderr 0 bytes, no file; `ps`: codex and grok alive, stage unknown | file: both dispatches `ok` (9s, 11s), codex's review `ok` 34s, grok's review open |
+| run ends | `$?` 0, nothing else | `run_finished exit_code=0` after 100s, matching `$?` |
+| SIGTERM mid-review | `$?` 143, a 59-byte stderr notice | both open review calls `interrupted`, `run_finished exit_code=143 SIGTERM` |
+
+Also dogfooded: both review councils of this branch (23m and 43m, grok's dispatch
+15m and 22m) were watched from their progress files. L5 274/274 (Workflow 12, 27
+cases), `make check` 0 issues, L3 40/40.

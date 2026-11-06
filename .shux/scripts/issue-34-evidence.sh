@@ -44,7 +44,7 @@ G=$'\e[32m' R=$'\e[31m' Y=$'\e[33m' D=$'\e[2m' B=$'\e[1m' X=$'\e[0m'
 if [ -e "$1/no-flag" ]; then printf '%snone — this build has no --progress-file%s\n' "$R" "$X"; exit 0; fi
 if [ ! -s "$f" ]; then printf '%s(not written yet)%s\n' "$D" "$X"; exit 0; fi
 jq -r 'select(.event != "run_started") |
-  [.ts[11:19], .event, (.stage // ""), (.agent // ""), (.status // ""),
+  [(.ts | sub("\\.[0-9]+Z$"; "Z") | fromdate | strflocaltime("%H:%M:%S")), .event, (.stage // ""), (.agent // ""), (.status // ""),
    (if .duration_ms then "\(.duration_ms / 1000 | floor)s" else "" end),
    (if .exit_code != null then "exit_code=\(.exit_code)" else "" end), (.signal // "")] | @tsv' "$f" |
 while IFS=$'\t' read -r ts ev st ag stat dur code sig; do
@@ -55,12 +55,22 @@ while IFS=$'\t' read -r ts ev st ag stat dur code sig; do
 done
 EOF
 
-# Probe 3: what ps says about the agents of THIS run (needle in the prompt).
+# Probe 1: bytes on stderr, once the redirect has created the file.
+cat >"$WORK/stderr-probe.sh" <<'EOF'
+#!/usr/bin/env bash
+if [ -e "$1/err" ]; then printf '%s bytes\n' "$(wc -c < "$1/err" | tr -d ' ')"; else echo "0 bytes"; fi
+EOF
+
+# Probe 3: the agents of THIS run — the children of its dootsabha process. A
+# prompt needle would miss them after dispatch: review and synthesis prompts
+# do not carry it.
 cat >"$WORK/ps-probe.sh" <<'EOF'
 #!/usr/bin/env bash
-n="$1" Y=$'\e[33m' D=$'\e[2m' X=$'\e[0m' any=0
-for a in codex grok; do
-  if pgrep -f "$a.*$n" >/dev/null 2>&1; then printf '%s%s is running%s %s— which stage? how long left? ps cannot say%s\n' "$Y" "$a" "$X" "$D" "$X"; any=1; fi
+Y=$'\e[33m' D=$'\e[2m' X=$'\e[0m' any=0
+for p in $(pgrep -f "dootsabha-$1 council --agents"); do
+  for c in $(pgrep -P "$p"); do
+    printf '%s%s is running%s %s— which stage? how long left? ps cannot say%s\n' "$Y" "$(basename "$(ps -o comm= -p "$c")")" "$X" "$D" "$X"; any=1
+  done
 done
 [ "$any" = 0 ] && printf '%sno agent process%s\n' "$D" "$X"
 exit 0
@@ -88,7 +98,7 @@ else
 fi
 pid=$!
 if [ "$SCENARIO" = term ]; then
-  for _ in $(seq 1 240); do [ "$(pgrep -f "(codex|grok).*$N" | wc -l)" -ge 2 ] && break; sleep 0.25; done
+  for _ in $(seq 1 240); do [ "$(pgrep -P "$pid" | wc -l)" -ge 2 ] && break; sleep 0.25; done
   sleep 8
   step "The caller gives up: SIGTERM to dootsabha"
   cmd "kill -TERM $pid"; kill -TERM "$pid"
@@ -114,16 +124,17 @@ record() {
   SESSIONS+=("$s")
   pane=$(shux --format json session create "$s" -d --cwd "$dir" -- bash -l | jq -r .pane_id)
   shux pane split -s "$s" -p "$pane" -d horizontal -- bash "$SKILL/observe.sh" -u "$stop" -i 1 -- \
-    "1. stderr::printf '%s bytes\n' \"\$(wc -c < $dir/err 2>/dev/null | tr -d ' ' || echo 0)\"" \
+    "1. stderr::bash $WORK/stderr-probe.sh $dir" \
     "2. progress file::bash $WORK/progress-probe.sh $dir" \
-    "3. ps::bash $WORK/ps-probe.sh $n" >/dev/null
-  shux pane set-size -s "$s" -p "$pane" --cols 140 --rows 16 >/dev/null
+    "3. ps::bash $WORK/ps-probe.sh $label" >/dev/null
+  shux pane set-size -s "$s" -p "$pane" --cols 140 --rows 13 >/dev/null
   shux pane wait-for -s "$s" -p "$pane" --text "$label" --timeout-ms 30000 >/dev/null
   shux pane send-keys -s "$s" -p "$pane" --text "clear; bash $WORK/drive.sh $WORK/dootsabha-$label $dir $stop $flag $n $SCENARIO" >/dev/null
   shux pane send-keys -s "$s" -p "$pane" --data Cg== >/dev/null
   # Film from the driver's first heading on, so no frame shows the prompt.
   shux pane wait-for -s "$s" -p "$pane" --text "Build under test" --timeout-ms 30000 >/dev/null
-  "$SKILL/record.sh" -s "$s" -c 140x38 -o "$OUT/$SCENARIO-$label.mp4" -u "$stop" -t 2400 -f 1 -x 8 \
+  # record.sh reads $SHUX as the shux binary; inside a shux pane it is "1".
+  SHUX=shux "$SKILL/record.sh" -s "$s" -c 140x44 -o "$OUT/$SCENARIO-$label.mp4" -u "$stop" -t 2400 -f 1 -x 8 \
     -k "$WORK/$SCENARIO-$label-frames"
   shux session kill "$s" >/dev/null
   echo "$SCENARIO-$label -> $OUT/$SCENARIO-$label.mp4"

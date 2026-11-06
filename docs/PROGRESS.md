@@ -216,7 +216,7 @@ All 4 items addressed in PRD v1.6.
 | 708 | Forward the per-call budget to `agy --print-timeout` | DONE | — |
 | 710 | Keep grok's read-only sandbox working under the isolated HOME (#31) | DONE | — |
 | 711 | Stop agents when dootsabha is signalled; per-call default 15m (#33) | DONE | — |
-| 712 | `--progress-file`: NDJSON stage events while a run is in flight (#34) | IN PROGRESS | — |
+| 712 | `--progress-file`: NDJSON stage events while a run is in flight (#34) | DONE | — |
 
 ### What Works End-to-End (712)
 
