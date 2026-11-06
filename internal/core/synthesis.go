@@ -26,6 +26,7 @@ type SynthesisResult struct {
 // Synthesize invokes the chair agent with all dispatch outputs and reviews.
 // On chair failure, re-invokes the first healthy non-chair agent.
 func (e *Engine) Synthesize(ctx context.Context, dispatches []DispatchResult, reviews []ReviewResult, opts InvokeOptions) (*SynthesisResult, error) {
+	ctx = withStage(ctx, StageSynthesis)
 	prompt := buildSynthesisPrompt(dispatches, reviews)
 	var chairErr error
 

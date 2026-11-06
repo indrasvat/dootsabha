@@ -71,6 +71,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := startProgress(cmd); err != nil {
+				return err
+			}
 			// Resolve bilingual flag aliases.
 			if kartaa, _ := cmd.Flags().GetString("kartaa"); kartaa != "" && author == "" {
 				author = kartaa
@@ -126,6 +129,11 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				fmt.Fprintln(os.Stdout)                                           //nolint:errcheck
 			}
 
+			progress.runStarted(run{
+				command: "refine", agents: append([]string{author}, reviewerNames...), author: author,
+				timeout: budget.PerInvoke(), sessionTimeout: budget.SessionLimit(),
+			})
+
 			totalStart := time.Now()
 			providerStatus := map[string]string{author: "ok"}
 			var versions []refineVersionJSON
@@ -137,7 +145,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 			if rc.IsTTY && !rc.IsJSON() {
 				stderrRefineStep(rc, author, "v1", true)
 			}
-			v1Result, err := outcome.Invoke(authorProv, author, prompt, invokeOpts)
+			v1Result, err := outcome.Invoke("author", authorProv, author, prompt, invokeOpts)
 			if err != nil {
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, author, "v1", false)
@@ -183,7 +191,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 				if rc.IsTTY && !rc.IsJSON() {
 					stderrRefineStep(rc, revName, fmt.Sprintf("reviewing v%d", currentVersion), true)
 				}
-				reviewResult, revErr := outcome.Invoke(revProv, revName, reviewPrompt, invokeOpts)
+				reviewResult, revErr := outcome.Invoke("review", revProv, revName, reviewPrompt, invokeOpts)
 				if revErr != nil {
 					providerStatus[revName] = "error"
 					if rc.IsTTY && !rc.IsJSON() {
@@ -214,7 +222,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 					nextVersion := currentVersion + 1
 					stderrRefineStep(rc, author, fmt.Sprintf("incorporating → v%d", nextVersion), true)
 				}
-				incResult, incErr := outcome.Invoke(authorProv, author, incorporatePrompt, invokeOpts)
+				incResult, incErr := outcome.Invoke("incorporate", authorProv, author, incorporatePrompt, invokeOpts)
 				if incErr != nil {
 					// Author failed to incorporate — keep current version.
 					if rc.IsTTY && !rc.IsJSON() {
@@ -287,6 +295,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 5 partial re
 	f.Bool("gupt", true, "Alias for --anonymous (गुप्त)")
 	_ = f.MarkHidden("gupt")
 	f.StringVar(&model, "model", "", "Override model for all agents")
+	addProgressFlag(cmd)
 
 	return cmd
 }

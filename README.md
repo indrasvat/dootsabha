@@ -282,6 +282,21 @@ SIGTERM gets a 5s grace period before it is killed — so a run can finish a few
 seconds past the ceiling. That overshoot is bounded by the one grace period; it
 does not grow with the length of the pipeline.
 
+### Watching a long run
+
+A council can take half an hour, and with `--json` (or with no terminal) it is
+silent until it ends. Give it a progress file and read that instead of `ps`:
+
+```bash
+dootsabha council --json --progress-file run.ndjson "…" > result.json &
+tail -n1 run.ndjson
+# {"ts":"…","event":"call_finished","call":2,"stage":"dispatch","agent":"codex","status":"ok","duration_ms":161000}
+```
+
+One line per call start and finish; the last line of a finished run is
+`run_finished` with the exit code. Also `DOOTSABHA_PROGRESS_FILE`. Contract:
+[skill/references/progress-file.md](skill/references/progress-file.md).
+
 ### Config merge order
 
 **built-in defaults → auto-loaded `~/.config/dootsabha/config.yaml` or explicit `--config` file → env vars → CLI flags**

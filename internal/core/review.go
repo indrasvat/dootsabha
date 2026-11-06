@@ -28,6 +28,7 @@ type ReviewResult struct {
 // PeerReview runs cross-reviews: each agent reviews all OTHER agents' outputs.
 // Skips if fewer than 2 successful dispatch results.
 func (e *Engine) PeerReview(ctx context.Context, dispatches []DispatchResult, opts InvokeOptions) ([]ReviewResult, error) {
+	ctx = withStage(ctx, StageReview)
 	// Filter to successful dispatches only.
 	var good []DispatchResult
 	for _, d := range dispatches {

@@ -35,6 +35,9 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 		Args:         usageArgs(cobra.ExactArgs(1)),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := startProgress(cmd); err != nil {
+				return err
+			}
 			// Resolve bilingual flag aliases (Spike 0.6 Finding 6).
 			if doota, _ := cmd.Flags().GetString("doota"); doota != "" && agent == "" {
 				agent = doota
@@ -74,10 +77,16 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 			rc := output.NewRenderContext(os.Stdout, jsonOutput)
 
 			slog.Info("consult starting", "agent", agent, "model", model, "prompt_len", len(prompt))
-			result, err := prov.Invoke(ctx, prompt, providers.InvokeOptions{
-				Model:    model,
-				MaxTurns: maxTurns,
-				Timeout:  timeout,
+			progress.runStarted(run{command: "consult", agents: []string{agent}, timeout: timeout})
+			var result *providers.ProviderResult
+			// consult has no session ceiling, so its one deadline is the call's own.
+			err = progress.call("consult", agent, core.TimeoutScopeInvocation, func() (err error) {
+				result, err = prov.Invoke(ctx, prompt, providers.InvokeOptions{
+					Model:    model,
+					MaxTurns: maxTurns,
+					Timeout:  timeout,
+				})
+				return err
 			})
 			if err != nil {
 				exitCode := core.ExitProvider
@@ -110,6 +119,7 @@ Exit codes: 0 success, 2 bad command, 3 provider failed, 4 timeout, 6 config err
 	f.String("pratyaya", "", "Alias for --model (प्रत्यय)")
 	_ = cmd.Flags().MarkHidden("pratyaya")
 	f.IntVar(&maxTurns, "max-turns", 0, "Maximum agent turns (0 = no limit)")
+	addProgressFlag(cmd)
 
 	return cmd
 }

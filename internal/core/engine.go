@@ -102,6 +102,7 @@ func (e *Engine) Dispatch(ctx context.Context, prompt string, opts InvokeOptions
 		return nil, fmt.Errorf("dispatch: %d agents exceeds maximum of %d", n, MaxAgents)
 	}
 
+	ctx = withStage(ctx, StageDispatch)
 	results := make([]DispatchResult, n)
 
 	mode := "parallel"

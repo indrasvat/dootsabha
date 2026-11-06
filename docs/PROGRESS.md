@@ -216,6 +216,21 @@ All 4 items addressed in PRD v1.6.
 | 708 | Forward the per-call budget to `agy --print-timeout` | DONE | — |
 | 710 | Keep grok's read-only sandbox working under the isolated HOME (#31) | DONE | — |
 | 711 | Stop agents when dootsabha is signalled; per-call default 15m (#33) | DONE | — |
+| 712 | `--progress-file`: NDJSON stage events while a run is in flight (#34) | DONE | — |
+
+### What Works End-to-End (712)
+
+- `consult`, `council`, `review` and `refine` take `--progress-file <path>` (alias
+  `--pragati-patra`, env `DOOTSABHA_PROGRESS_FILE`): `run_started`, a
+  `call_started`/`call_finished` pair per provider call with stage, agent, status
+  (`ok`/`error`/`timeout`+`scope`/`interrupted`) and duration, then `run_finished`
+  with the exit code the process returns — including after a signal (`128+N`,
+  `signal`) and a rejected command line. Contract: `skill/references/progress-file.md`.
+- No prompt, response or error text; stdout and exit codes unchanged.
+- Refused with exit 2, untouched: non-regular files, the file stdout/stderr goes
+  to, the `--config` file, a file another run holds.
+- council's exit message now names the limit measured at the call (it blamed the
+  session for an invocation timeout once the ceiling had passed).
 
 ### What Works End-to-End (705)
 

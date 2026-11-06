@@ -94,6 +94,7 @@ council-mode deliberation, peer review, and synthesis.
 
 // Execute runs the root command. Called from main().
 func Execute() {
+	target = resolveProgress(os.Args[1:])
 	setupSIGPIPE()
 	setupInterrupt()
 	// Always silence Cobra's built-in "Error: ..." stderr line — we handle
@@ -209,7 +210,7 @@ func setupSIGPIPE() {
 	signal.Notify(sigpipeCh, syscall.SIGPIPE)
 	go func() {
 		<-sigpipeCh
-		exit(0)
+		exitBecause(0, syscall.SIGPIPE)
 	}()
 }
 
