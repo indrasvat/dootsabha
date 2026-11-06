@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 
 	"github.com/indrasvat/dootsabha/internal/core"
 	"github.com/indrasvat/dootsabha/internal/providers"
@@ -62,3 +63,27 @@ type scopedError struct {
 
 func (e *scopedError) Error() string { return e.err.Error() }
 func (e *scopedError) Unwrap() error { return e.err }
+
+// deadlineScope finds the scope of the call whose error IS the deadline. An
+// error can join several calls — a chair that timed out and a fallback that
+// failed otherwise — and errors.As would return whichever comes first.
+func deadlineScope(err error) string {
+	switch e := err.(type) { //nolint:errorlint // node by node on purpose: errors.As stops at the first scopedError, which may not hold the deadline
+	case nil:
+		return ""
+	case *scopedError:
+		if errors.Is(e.err, context.DeadlineExceeded) {
+			return e.scope
+		}
+		return ""
+	case interface{ Unwrap() []error }:
+		for _, inner := range e.Unwrap() {
+			if s := deadlineScope(inner); s != "" {
+				return s
+			}
+		}
+		return ""
+	default:
+		return deadlineScope(errors.Unwrap(err))
+	}
+}

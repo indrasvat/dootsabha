@@ -43,3 +43,19 @@ func TestEngineCallKeepsTheScopeMeasuredAtTheCall(t *testing.T) {
 		t.Errorf("exit message %q blames the wrong limit; the call hit --timeout", msg)
 	}
 }
+
+// A chair that hit --timeout followed by a fallback that failed otherwise: the
+// deadline and its scope must come from the same call.
+func TestScopeComesFromTheCallThatTimedOut(t *testing.T) {
+	b := core.NewBudget(time.Minute, time.Hour)
+	t.Cleanup(b.Close)
+	chair := &scopedError{scope: core.TimeoutScopeInvocation, err: fmt.Errorf("claude invoke: %w", context.DeadlineExceeded)}
+	fallback := &scopedError{scope: core.TimeoutScopeSession, err: fmt.Errorf("codex: exit status 1")}
+	err := fmt.Errorf("synthesize fallback codex: %w (after chair claude: %w)", fallback, chair)
+
+	o := newOutcome(b)
+	o.Fail("claude", err)
+	if msg := o.Exit("x").Error(); !strings.HasPrefix(msg, core.TimeoutScopeInvocation+" timeout") {
+		t.Errorf("exit message %q: the deadline was the chair's, an invocation timeout", msg)
+	}
+}

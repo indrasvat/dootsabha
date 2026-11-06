@@ -1181,6 +1181,25 @@ for bad in "--timeout abc" "--no-such-flag" ""; do
   fi
 done
 
+# Nothing runs under --help, so nothing is reported: the last run's file stays.
+"$BINARY" consult --agent claude --json --progress-file "$PROG_DIR/help.ndjson" "hi" >/dev/null 2>&1
+BEFORE_HELP=$(cat "$PROG_DIR/help.ndjson")
+"$BINARY" consult --help --progress-file "$PROG_DIR/help.ndjson" >/dev/null 2>&1 || true
+if [ "$(cat "$PROG_DIR/help.ndjson")" = "$BEFORE_HELP" ]; then
+  pass "--help leaves the last run's file alone"
+else
+  fail "--help rewrote the progress file"
+fi
+
+# Read argv the way pflag does: here --progress-file is the value of --model.
+printf 'keep\n' > "$PROG_DIR/victim.txt"
+"$BINARY" consult --agent claude --json --model --progress-file "$PROG_DIR/victim.txt" >/dev/null 2>&1 || true
+if [ "$(cat "$PROG_DIR/victim.txt")" = "keep" ]; then
+  pass "a flag value that looks like --progress-file is not taken for it"
+else
+  fail "a file named only as another flag's value was overwritten"
+fi
+
 # An empty flag opts out of an inherited variable.
 DOOTSABHA_PROGRESS_FILE="$PROG_DIR/inherited.ndjson" "$BINARY" consult --agent claude --json --progress-file "" "hi" >/dev/null 2>&1 || true
 if [ ! -e "$PROG_DIR/inherited.ndjson" ]; then
@@ -1204,7 +1223,7 @@ else
 fi
 
 rm -f "$PROG_DIR"/*.ndjson "$PROG_DIR/env-probe" "$PROG_DIR/env-seen" "$PROG_DIR/fifo" \
-  "$PROG_DIR/cfg.yaml" "$PROG_DIR/same.json"
+  "$PROG_DIR/cfg.yaml" "$PROG_DIR/same.json" "$PROG_DIR/victim.txt"
 rmdir "$PROG_DIR"
 
 # ── Summary ──────────────────────────────────────────────────────────────────

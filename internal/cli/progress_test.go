@@ -266,6 +266,11 @@ func TestResolveProgress(t *testing.T) {
 		{"empty flag opts out of env", "e.ndjson", []string{"consult", "--progress-file", ""}, "", ""},
 		{"after -- is a prompt", "", []string{"consult", "--", "--progress-file", "x"}, "", ""},
 		{"a command without the flag ignores env", "e.ndjson", []string{"status"}, "", ""},
+		// pflag's reading, not a token scan: here --progress-file is the model.
+		{"a flag value that looks like the flag", "", []string{"consult", "--model", "--progress-file", "x.ndjson"}, "", ""},
+		{"shorthand flags before it", "", []string{"consult", "-a", "claude", "-v", "--progress-file", "g.ndjson", "hi"}, "g.ndjson", "--progress-file"},
+		{"--help runs nothing", "", []string{"consult", "--help", "--progress-file", "h.ndjson"}, "", ""},
+		{"-h runs nothing, env either", "e.ndjson", []string{"council", "-h"}, "", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -5,15 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/indrasvat/dootsabha/internal/core"
 )
@@ -51,27 +52,33 @@ type progressTarget struct {
 
 // resolveProgress decides the progress file before anything runs. The flags
 // have not been parsed yet — and when Cobra rejects the command line they never
-// are — so the path is read from argv, the way Execute already finds --json.
-// A flag that is given wins over the environment even when empty, so a caller
-// can opt out of an inherited DOOTSABHA_PROGRESS_FILE with --progress-file "".
+// are — so argv is read by pflag itself, through flagsOf. A flag that is given
+// wins over the environment even when empty, so a caller can opt out of an
+// inherited DOOTSABHA_PROGRESS_FILE with --progress-file "". --help runs nothing,
+// so it reports nothing.
 //
 // The variable is unset whatever the command, so an agent that itself runs
 // dootsabha does not inherit it and truncate this run's file.
 func resolveProgress(args []string) progressTarget {
 	env := os.Getenv(progressEnv)
 	_ = os.Unsetenv(progressEnv)
-	cmd, _, err := rootCmd.Find(args)
+	cmd, rest, err := rootCmd.Find(args)
 	if err != nil || cmd.Flags().Lookup("progress-file") == nil {
 		return progressTarget{}
 	}
-	t := progressTarget{path: env, source: progressEnv}
-	_, _, long := flagFromArgs(args, "--progress-file")
-	_, _, alias := flagFromArgs(args, "--pragati-patra")
-	if long && alias {
-		return progressTarget{} // ambiguous: startProgress refuses it, and neither file is touched
+	fs := flagsOf(cmd, rest)
+	long, alias := fs.Changed("progress-file"), fs.Changed("pragati-patra")
+	if fs.Changed("help") || (long && alias) { // both: startProgress refuses it, touching neither file
+		return progressTarget{}
 	}
-	if path, name, given := flagFromArgs(args, "--progress-file", "--pragati-patra"); given {
-		t.path, t.source = path, name
+	t := progressTarget{path: env, source: progressEnv}
+	switch {
+	case long:
+		t.path, _ = fs.GetString("progress-file")
+		t.source = "--progress-file"
+	case alias:
+		t.path, _ = fs.GetString("pragati-patra")
+		t.source = "--pragati-patra"
 	}
 	if t.path == "" {
 		return progressTarget{}
@@ -82,8 +89,8 @@ func resolveProgress(args []string) progressTarget {
 			t.protected[name] = info
 		}
 	}
-	cfg, _, given := flagFromArgs(args, "--config")
-	if !given {
+	cfg, _ := fs.GetString("config")
+	if !fs.Changed("config") {
 		cfg, _ = core.UserConfigPath() // read when no --config is given
 	}
 	if info, err := os.Stat(cfg); err == nil {
@@ -92,25 +99,30 @@ func resolveProgress(args []string) progressTarget {
 	return t
 }
 
-// flagFromArgs finds the last of names in argv, as "--flag value" or
-// "--flag=value" — the last one wins, as it does for pflag.
-func flagFromArgs(args []string, names ...string) (value, name string, given bool) {
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		if a == "--" {
-			break
+// flagsOf parses args the way pflag will parse them for cmd, without touching
+// cmd's own flags: a shadow set with each flag's name, shorthand and no-value
+// behaviour, so `--model --progress-file x` reads --progress-file as the model,
+// as Cobra will. Every value is a string, so a bad value (--timeout abc) cannot
+// stop the parse, and unknown flags are skipped; what is read before any other
+// error stands.
+func flagsOf(cmd *cobra.Command, args []string) *pflag.FlagSet {
+	fs := pflag.NewFlagSet("progress", pflag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.ParseErrorsAllowlist.UnknownFlags = true
+	shadow := func(f *pflag.Flag) {
+		if fs.Lookup(f.Name) != nil {
+			return
 		}
-		for _, n := range names {
-			switch {
-			case a == n && i+1 < len(args):
-				value, name, given = args[i+1], n, true
-				i++
-			case strings.HasPrefix(a, n+"="):
-				value, name, given = strings.TrimPrefix(a, n+"="), n, true
-			}
-		}
+		fs.StringP(f.Name, f.Shorthand, "", "")
+		fs.Lookup(f.Name).NoOptDefVal = f.NoOptDefVal
 	}
-	return value, name, given
+	cmd.Flags().VisitAll(shadow)
+	cmd.InheritedFlags().VisitAll(shadow)
+	if fs.Lookup("help") == nil { // Cobra adds it only when the command runs
+		fs.BoolP("help", "h", false, "")
+	}
+	_ = fs.Parse(args)
+	return fs
 }
 
 // startProgress opens the run's file at the start of RunE. A path that cannot

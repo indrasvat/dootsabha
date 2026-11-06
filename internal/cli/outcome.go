@@ -73,8 +73,8 @@ func (o *Outcome) Invoke(stage string, prov providers.Provider, name, prompt str
 func (o *Outcome) Fail(provider string, err error) { o.record(provider, "", err) }
 
 func (o *Outcome) record(provider, scope string, err error) {
-	if se := (*scopedError)(nil); scope == "" && errors.As(err, &se) {
-		scope = se.scope
+	if scope == "" {
+		scope = deadlineScope(err)
 	}
 	o.calls = append(o.calls, call{provider: provider, scope: scope, err: err})
 }

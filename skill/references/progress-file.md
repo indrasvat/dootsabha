@@ -104,7 +104,8 @@ reports in `$?` (130, 143, 129).
 A reader that closes dootsabha's stdout or stderr ends the run with SIGPIPE, and
 dootsabha exits `0` as it always has. The line then says `"signal":"SIGPIPE"`
 with `exit_code` 0, and any call it cut short is `interrupted`: the run did not
-finish, whatever the code says.
+finish, whatever the code says. The `signal` field is best effort here: if the
+run was already exiting when the pipe broke, the line has the exit code alone.
 
 ## Reading a file whose run may have died
 
