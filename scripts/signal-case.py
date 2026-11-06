@@ -30,6 +30,19 @@ wait
 """
 
 
+def group_running(pg):
+    """A member of group pg that is not a zombie. Where PID 1 does not reap
+    orphans (some CI containers), a killed agent lingers as a zombie and
+    killpg(pg, 0) still succeeds on it, although it has stopped."""
+    try:
+        os.killpg(pg, 0)
+    except ProcessLookupError:
+        return False
+    rows = subprocess.run(["ps", "-A", "-o", "pgid=,stat="], capture_output=True, text=True, check=True).stdout
+    return any(f[0] == str(pg) and not f[1].startswith("Z")
+               for f in (line.split() for line in rows.splitlines()) if len(f) == 2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--binary", required=True)
@@ -92,9 +105,7 @@ def main():
     survivors = []
     for pg in started:
         for _ in range(25):
-            try:
-                os.killpg(pg, 0)
-            except ProcessLookupError:
+            if not group_running(pg):
                 break
             time.sleep(0.1)
         else:

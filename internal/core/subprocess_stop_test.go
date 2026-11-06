@@ -73,9 +73,25 @@ func running(pid int) bool {
 	return stat != "" && !strings.HasPrefix(stat, "Z")
 }
 
+// groupGone reports whether every member of the process group has stopped
+// within the deadline. Zombies count as stopped, for the reason given at running.
 func groupGone(pgid int, within time.Duration) bool {
 	for deadline := time.Now().Add(within); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		if errors.Is(syscall.Kill(-pgid, 0), syscall.ESRCH) {
+		if errors.Is(syscall.Kill(-pgid, 0), syscall.ESRCH) || !groupRunning(pgid) {
+			return true
+		}
+	}
+	return false
+}
+
+func groupRunning(pgid int) bool {
+	out, err := exec.Command("ps", "-A", "-o", "pgid=,stat=").Output()
+	if err != nil {
+		return true // cannot tell; let the kill(-pgid, 0) answer stand
+	}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) == 2 && f[0] == strconv.Itoa(pgid) && !strings.HasPrefix(f[1], "Z") {
 			return true
 		}
 	}
