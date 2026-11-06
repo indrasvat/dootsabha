@@ -113,6 +113,9 @@ record() {
   shux pane wait-for -s "$s" -p "$pane" --text "ev711" --timeout-ms 30000 >/dev/null
   shux pane send-keys -s "$s" -p "$pane" --text "clear; bash $WORK/drive.sh $WORK/dootsabha-$label $n $stop" >/dev/null
   shux pane send-keys -s "$s" -p "$pane" --data Cg== >/dev/null
+  # Start filming once the driver has cleared the screen: the prompt shows the
+  # user's name and path, and the first frame becomes the player's poster.
+  shux pane wait-for -s "$s" -p "$pane" --text "Build under test" --timeout-ms 30000 >/dev/null
   local start=$SECONDS
   while [[ ! -e "$stop" && $((SECONDS - start)) -lt 150 ]]; do
     shux window snapshot -s "$s" --cols 132 --rows 40 -o "$(printf '%s/%05d.png' "$frames" "$i")" >/dev/null
@@ -122,7 +125,8 @@ record() {
   local fps
   fps=$(awk -v n="$i" -v t="$((SECONDS - start))" 'BEGIN { printf "%.2f", (t > 0 ? n / t : 4) }')
   ffmpeg -v error -y -framerate "$fps" -i "$frames/%05d.png" -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2" \
-    -c:v libx264 -preset slow -crf 16 -pix_fmt yuv420p -movflags +faststart "$OUT/$label.mp4"
+    -c:v libx264 -profile:v high -level:v 4.2 -preset slow -crf 16 -pix_fmt yuv420p \
+    -movflags +faststart "$OUT/$label.mp4" # iOS will not decode above level 5.x
   cp "$(printf '%s/%05d.png' "$frames" "$((i - 1))")" "$OUT/$label-end.png"
   shux session kill "$s" >/dev/null
   # Stop whatever the build left running, now that it is on film.
