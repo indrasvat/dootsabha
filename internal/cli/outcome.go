@@ -85,9 +85,8 @@ func (o *Outcome) record(provider, scope string, err error) {
 // out-of-process strategy plugin reach the same exit decision, since its gRPC
 // response converts to these same types.
 //
-// Scope arrives on the error: the in-process engine's adapter wraps it in a
-// scopedError measured at the call. An error without one (an out-of-process
-// strategy plugin) leaves the budget to be asked at Exit time.
+// An error without a scopedError (an out-of-process strategy plugin) leaves
+// the budget to be asked at Exit time.
 func (o *Outcome) AddDispatches(ds []core.DispatchResult) {
 	for _, d := range ds {
 		o.record(d.Provider, "", d.Error)

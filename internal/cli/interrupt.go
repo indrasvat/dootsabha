@@ -73,7 +73,7 @@ func setupInterrupt() {
 			// Restore only the signal already reported: the others stay trapped,
 			// so one arriving now is dropped instead of taking its own default
 			// action first, and the process dies the death the progress file
-			// names. (signal.Ignore on them has its own window where it does not.)
+			// names.
 			signal.Reset(sig)
 			_ = syscall.Kill(os.Getpid(), sig)
 			// A signal sent to the own pid can land on another thread while this

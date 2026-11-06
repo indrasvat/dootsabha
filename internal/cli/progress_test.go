@@ -244,8 +244,6 @@ func TestProgressNilLogStillRunsTheCall(t *testing.T) {
 	p.finish(0, nil) // must not panic
 }
 
-// The target is decided from argv before Cobra parses anything, because a
-// rejected command line is never parsed.
 func TestResolveProgress(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "cfg.yaml")
 	if err := os.WriteFile(cfg, []byte("timeout: 7m\n"), 0o600); err != nil {
@@ -271,6 +269,7 @@ func TestResolveProgress(t *testing.T) {
 		{"shorthand flags before it", "", []string{"consult", "-a", "claude", "-v", "--progress-file", "g.ndjson", "hi"}, "g.ndjson", "--progress-file"},
 		{"--help runs nothing", "", []string{"consult", "--help", "--progress-file", "h.ndjson"}, "", ""},
 		{"-h runs nothing, env either", "e.ndjson", []string{"council", "-h"}, "", ""},
+		{"--help=false runs the command", "", []string{"consult", "--help=false", "--progress-file", "i.ndjson"}, "i.ndjson", "--progress-file"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -303,10 +302,16 @@ func TestResolveProgress(t *testing.T) {
 		if err := os.WriteFile(def, []byte("timeout: 7m\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		got := resolveProgress([]string{"consult", "--progress-file", def})
 		info, _ := os.Stat(def)
-		if p, ok := got.protected["the config file"]; !ok || !os.SameFile(p, info) {
-			t.Errorf("protected = %v, want the default config", got.protected)
+		// --config "" is no --config: LoadConfig reads the default either way.
+		for _, args := range [][]string{
+			{"consult", "--progress-file", def},
+			{"consult", "--config", "", "--progress-file", def},
+		} {
+			got := resolveProgress(args)
+			if p, ok := got.protected["the config file"]; !ok || !os.SameFile(p, info) {
+				t.Errorf("resolveProgress(%q): protected = %v, want the default config", args, got.protected)
+			}
 		}
 	})
 
@@ -415,9 +420,13 @@ func TestProgressDeadlineBeatsALaterSignal(t *testing.T) {
 		return fmt.Errorf("invoke grok: %w", context.DeadlineExceeded)
 	})
 	p.finish(143, syscall.SIGTERM)
+	var finished []map[string]any
 	for _, ev := range readEvents(t, path) {
-		if ev["event"] == "call_finished" && (ev["status"] != "timeout" || ev["scope"] != "invocation") {
-			t.Errorf("call_finished = %v, want timeout/invocation", ev)
+		if ev["event"] == "call_finished" {
+			finished = append(finished, ev)
 		}
+	}
+	if len(finished) != 1 || finished[0]["status"] != "timeout" || finished[0]["scope"] != "invocation" {
+		t.Errorf("call_finished = %v, want exactly one timeout/invocation", finished)
 	}
 }

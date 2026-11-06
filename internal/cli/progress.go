@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -32,9 +33,7 @@ const progressEnv = "DOOTSABHA_PROGRESS_FILE"
 // run — exit or the signal handler, which runs on its own goroutine and can
 // arrive before the command has opened the file, or while it does. So the
 // target is resolved once, before any handler is installed, and progressMu
-// decides who opens it: the command, at the start of RunE, or the end of the
-// run, if the command never got that far. Once the run has ended the lock is
-// never released, so nothing opens the file after its run_finished.
+// decides who opens it (startProgress, endProgress).
 var (
 	progressMu sync.Mutex
 	// progress is this run's log, or nil. Set only by the command, under
@@ -68,7 +67,8 @@ func resolveProgress(args []string) progressTarget {
 	}
 	fs := flagsOf(cmd, rest)
 	long, alias := fs.Changed("progress-file"), fs.Changed("pragati-patra")
-	if fs.Changed("help") || (long && alias) { // both: startProgress refuses it, touching neither file
+	help, _ := strconv.ParseBool(fs.Lookup("help").Value.String())
+	if help || (long && alias) { // both: startProgress refuses it, touching neither file
 		return progressTarget{}
 	}
 	t := progressTarget{path: env, source: progressEnv}
@@ -90,8 +90,8 @@ func resolveProgress(args []string) progressTarget {
 		}
 	}
 	cfg, _ := fs.GetString("config")
-	if !fs.Changed("config") {
-		cfg, _ = core.UserConfigPath() // read when no --config is given
+	if cfg == "" {
+		cfg, _ = core.UserConfigPath() // LoadConfig reads this when --config is empty
 	}
 	if info, err := os.Stat(cfg); err == nil {
 		t.protected["the config file"] = info

@@ -1191,6 +1191,30 @@ else
   fail "--help rewrote the progress file"
 fi
 
+# --help=false is not help: the run happens, so it is reported.
+RC=0
+"$BINARY" consult --agent claude --json --help=false --progress-file "$PROG_DIR/nohelp.ndjson" "PROGRESS-SECRET" >/dev/null 2>&1 || RC=$?
+if msg=$(python3 scripts/progress-check.py "$PROG_DIR/nohelp.ndjson" "$RC" "ev[0]['event'] == 'run_started'"); then
+  pass "--help=false runs and is reported"
+else
+  fail "--help=false: $msg"
+fi
+
+# --config "" still reads the default config, so that file is protected too.
+FAKE_HOME="$PROG_DIR/home"
+mkdir -p "$FAKE_HOME/.config/dootsabha"
+printf 'timeout: 7m\n' > "$FAKE_HOME/.config/dootsabha/config.yaml"
+expect_refused 'the default config is refused, with --config "" too' \
+  env HOME="$FAKE_HOME" "$BINARY" consult --config "" --agent claude --json \
+  --progress-file "$FAKE_HOME/.config/dootsabha/config.yaml" "hi"
+if [ "$(cat "$FAKE_HOME/.config/dootsabha/config.yaml")" = "timeout: 7m" ]; then
+  pass "  ...and the default config is left as it was"
+else
+  fail "  ...the default config was changed"
+fi
+rm -f "$FAKE_HOME/.config/dootsabha/config.yaml"
+rmdir "$FAKE_HOME/.config/dootsabha" "$FAKE_HOME/.config" "$FAKE_HOME"
+
 # Read argv the way pflag does: here --progress-file is the value of --model.
 printf 'keep\n' > "$PROG_DIR/victim.txt"
 "$BINARY" consult --agent claude --json --model --progress-file "$PROG_DIR/victim.txt" >/dev/null 2>&1 || true
