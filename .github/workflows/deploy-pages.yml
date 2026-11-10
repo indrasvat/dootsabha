@@ -1,0 +1,47 @@
+name: Deploy Pages
+
+# Serves pages/ plus the repo-root install.sh, so
+# `curl -fsSL https://dootsabha.pages.dev/install.sh | sh` runs the installer
+# the README documents.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pages/**'
+      - 'install.sh'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # A manual run from any other branch must not publish it.
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          path: src
+          persist-credentials: false
+
+      - name: Stage site and installer
+        # Staged outside the checkout, and wrangler runs from there: npx would
+        # otherwise resolve a node_modules/wrangler committed in the tree.
+        run: |
+          mkdir "$RUNNER_TEMP/deploy"
+          cp -R src/pages/. "$RUNNER_TEMP/deploy/"
+          cp src/install.sh "$RUNNER_TEMP/deploy/install.sh"
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: ${{ runner.temp }}
+        run: npx --yes wrangler@4.153.0 pages deploy deploy --project-name=dootsabha --branch=production

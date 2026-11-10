@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>dootsabha · make your coding agent prove it</title>
+<meta name="description" content="dootsabha puts your agent's work in front of codex, grok, agy and claude, has them review each other, and hands back one JSON verdict and one exit code. No API keys: it runs the CLIs you already pay for.">
+<link rel="canonical" href="https://dootsabha.pages.dev/">
+<meta name="theme-color" content="#F7F4EC">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://dootsabha.pages.dev/">
+<meta property="og:title" content="dootsabha · Your agent pushed this as done. Spot the bug.">
+<meta property="og:description" content="A council of coding agents that review each other and hand back one verdict. No API keys: your existing CLI logins.">
+<meta property="og:image" content="https://dootsabha.pages.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>document.documentElement.classList.add('js')</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{margin:0;background:#F7F4EC;color:#1D1B26;font-size:15px;line-height:1.5;overflow-x:clip}
+a{color:inherit}
+svg{max-width:100%}
+:focus-visible{outline:2px solid #D2402F;outline-offset:3px;border-radius:4px}
+/* Without JS nothing adds .go, so show every scroll-in block in its end state. */
+html:not(.js) [data-anim],html:not(.js) [data-anim] *{opacity:1!important;transform:none!important}
+html:not(.js) .vB .bar .tr i{width:var(--w)}
+html:not(.js) .vB .tui s{display:none}
+.wrap{max-width:1140px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.copy-btn{appearance:none;border:0;cursor:pointer;font:inherit;flex:none}
+.copy-btn:active{transform:scale(.96)}
+.cite{font-size:.62em;vertical-align:super;line-height:0;text-decoration:none;padding:0 1px;white-space:nowrap;font-weight:600}
+.cite:hover{text-decoration:underline}
+.refs{margin:0;padding:12px 0 0;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 14px;font-size:11px;line-height:1.6}
+.refs::before{content:"Sources";font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.refs li{scroll-margin-top:24px;white-space:nowrap}
+.refs li span{margin-right:4px}
+.refs a{text-decoration:none}
+.refs a:hover,.refs li:target a{text-decoration:underline}
+.made a{white-space:nowrap;color:inherit;text-decoration:none;font-weight:600;border-bottom:1px solid currentColor}
+.made a:hover{border-bottom-width:2px}
+.squig{text-decoration:underline wavy #D2402F;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}
+.hrt{width:.95em;height:.85em;vertical-align:-.08em;margin:0 1px}
+
+.cfg{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:24px 56px;align-items:center}
+.cfg p.lead2{margin:0;max-width:34ch}
+.cfg .over{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.cfg .over code{font-family:var(--mono);font-size:12px;padding:4px 9px;border-radius:7px;background:var(--y-chip);color:var(--y-fg)}
+.yml{margin:0;min-width:0;border-radius:12px;overflow:hidden;background:var(--y-bg);border:1px solid var(--y-line)}
+.yml .tb{display:flex;align-items:center;gap:6px;padding:9px 14px;border-bottom:1px solid var(--y-line);font-family:var(--mono);font-size:11.5px;color:var(--y-c)}
+.yml .tb i{width:9px;height:9px;border-radius:50%;background:var(--y-line)}
+.yml .tb span{margin-left:8px;color:var(--y-fg)}
+.yml .tb small{margin-left:auto;font-size:11px}
+.cfg .yml pre{margin:0;padding:12px 0 14px;background:none;border-radius:0;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--y-fg);overflow-x:auto;counter-reset:ln;tab-size:2}
+.yml .l{display:block;white-space:pre;padding:0 16px 0 0}
+.yml .l::before{counter-increment:ln;content:counter(ln);display:inline-block;width:40px;padding-right:14px;text-align:right;color:var(--y-c);opacity:.6}
+.yml .l.hl{background:var(--y-hl);box-shadow:inset 2px 0 var(--y-k)}
+.yml .k{color:var(--y-k)} .yml .s{color:var(--y-s)} .yml .n{color:var(--y-n)} .yml .c{color:var(--y-c);font-style:italic} .yml .p{color:var(--y-c)}
+.yml[data-anim] .l{opacity:0;transform:translateX(-6px);transition:opacity .4s ease,transform .4s ease;transition-delay:calc(var(--i,0)*45ms)}
+.yml[data-anim].go .l{opacity:1;transform:none}
+@media (max-width:860px){.cfg{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:520px){.cfg .yml pre{font-size:10.5px}.yml .l{padding-right:8px}.yml .l::before{width:24px;padding-right:8px}.yml .c,.yml .tb small{display:none}}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* With animation off, show the end state of anything an animation would have revealed. */
+@media (prefers-reduced-motion: reduce){html .vB .tui .tl,html .vB .tui em u{opacity:1;transform:none}html .vB .tui s{display:none}html .vB .run .stamp{opacity:.92;transform:rotate(-14deg)}}
+
+.vB{--paper:#F7F4EC;--sheet:#FFFDF8;--ink:#1D1B26;--ink-2:#5C5866;--rule:#E4DFD2;--pen:#D2402F;--pen-soft:#FBE3DE;--codex:#0E7C86;--grok:#6B4FD8;--agy:#2F6BDB;--claude:#C8643B;--ok:#1E8A52;
+  --dsp:"Instrument Serif",Georgia,serif;--txt:"Figtree",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  background:var(--paper);color:var(--ink);font-family:var(--txt);color-scheme:light}
+.vB nav{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:18px}
+.vB .mark{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;text-decoration:none}
+.vB .mark i{width:12px;height:12px;border-radius:50%;background:var(--pen);box-shadow:16px 0 0 var(--codex),8px -11px 0 var(--grok);margin-right:18px;margin-top:8px}
+.vB nav a.gh{font-size:13px;font-weight:600;background:var(--ink);color:var(--paper);border-radius:8px;padding:8px 14px;text-decoration:none}
+.vB .hero{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:28px 52px;align-items:center;padding-block:40px 80px}
+.vB h1.big{font-family:var(--dsp);font-weight:400;font-size:clamp(48px,6.4vw,92px);line-height:.98;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.vB h1.big span{color:var(--pen)}
+.vB .lede{font-size:18px;color:var(--ink-2);max-width:30ch;margin:20px 0 26px;line-height:1.5}
+.vB .install{display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--paper);border-radius:10px;padding:7px 7px 7px 14px;font-family:var(--mono);font-size:13px;max-width:100%;width:fit-content}
+.vB .install code{white-space:nowrap;overflow-x:auto;min-width:0}
+.vB .install code i{font-style:normal;color:#F2B544}
+.vB .install .copy-btn{background:var(--paper);color:var(--ink);border-radius:7px;padding:7px 12px;font-weight:700;font-size:13px}
+.vB .chips{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.vB .chips span::before{content:"✓ ";color:var(--ok)}
+
+.vB .exam{background:var(--sheet);border-radius:18px;box-shadow:0 1px 0 var(--rule),0 30px 60px -36px rgba(29,27,38,.45);overflow:hidden;position:relative}
+.vB .exam header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.vB .exam header b{color:var(--ink);font-weight:600}
+.vB .code{position:relative;padding:12px 0;tab-size:4;font-family:var(--mono);font-size:13px;line-height:1.85;overflow-x:auto}
+.vB .cl{display:grid;grid-template-columns:40px 18px max-content;align-items:center;padding-right:16px;white-space:pre;position:relative}
+.vB .cl .no{color:#A9A39A;text-align:right;padding-right:10px;font-size:11.5px}
+.vB .cl .gut{display:flex;gap:2px}
+.vB .cl .gut i{width:7px;height:7px;border-radius:50%;opacity:0;transform:scale(0);transition:all .35s cubic-bezier(.3,1.6,.5,1)}
+.vB .cl.hit{transition:background .7s ease}
+.vB .run .cl.hit{background:var(--pen-soft)}
+.vB .run .cl.hit .gut i{opacity:1;transform:none}
+.vB .run .cl.hit.h1, .vB .run .cl.hit.h1 .gut i{transition-delay:1.6s}
+.vB .run .cl.hit.h2, .vB .run .cl.hit.h2 .gut i{transition-delay:2.2s}
+.vB .kw{color:#9B3D8F}.vB .fn{color:#1D5FA8}.vB .st{color:#2C7A44}.vB .cm{color:#9A958C;font-style:italic}.vB .bug{text-decoration:underline wavy transparent;text-underline-offset:4px;transition:text-decoration-color .3s}
+.vB .run .bug{text-decoration-color:var(--pen);transition-delay:1.6s}
+.vB .scan{position:absolute;left:0;right:0;top:12px;height:26px;background:linear-gradient(90deg,transparent,rgba(14,124,134,.16),rgba(107,79,216,.16),transparent);opacity:0;pointer-events:none}
+.vB .run .scan{animation:bScan 1.5s ease-in-out both}
+@keyframes bScan{0%{opacity:1;transform:translateY(0)}90%{opacity:1;transform:translateY(400px)}100%{opacity:0;transform:translateY(420px)}}
+.vB .act{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--rule);background:var(--paper)}
+.vB .act button{appearance:none;border:0;cursor:pointer;font:inherit;font-weight:700;font-size:14px;background:var(--pen);color:#fff;border-radius:10px;padding:10px 16px;display:inline-flex;gap:8px;align-items:center}
+.vB .act button:hover{filter:brightness(1.05)}
+.vB .seats{display:flex;gap:12px;font-family:var(--mono);font-size:12px}
+.vB .seats span{display:inline-flex;align-items:center;gap:6px}
+.vB .seats i{width:9px;height:9px;border-radius:50%}
+.vB .fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s ease}
+.vB .run .fold{grid-template-rows:1fr;transition:grid-template-rows 1.2s cubic-bezier(.22,1,.36,1) 1.6s}
+.vB .finds{display:grid;gap:8px;padding:0 16px;min-height:0;overflow:hidden}
+.vB .f{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:baseline;font-size:14px;line-height:1.4;opacity:0;transform:translateY(8px);transition:opacity .7s ease,transform .8s cubic-bezier(.22,1,.36,1)}
+.vB .f:first-child{margin-top:14px}
+.vB .run .f{opacity:1;transform:none}
+.vB .run .f:nth-child(1){transition-delay:2.1s}.vB .run .f:nth-child(2){transition-delay:2.45s}.vB .run .f:nth-child(3){transition-delay:2.8s}.vB .run .f:nth-child(4){transition-delay:3.15s}
+.vB .f .sev{font-family:var(--mono);font-size:11px;font-weight:600;border:1px solid currentColor;border-radius:4px;padding:0 5px;color:var(--pen)}
+.vB .f .sev.p2{color:#A86C00}
+.vB .f .by{display:flex;gap:3px}.vB .f .by i{width:8px;height:8px;border-radius:50%}
+.vB .f small{font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-left:4px}
+.vB .ruling{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:6px 0 14px;padding-top:12px;border-top:1px dashed var(--rule);font-family:var(--mono);font-size:12.5px;opacity:0;transition:opacity .7s ease 3.6s}
+.vB .run .ruling{opacity:1}
+.vB .ruling b{color:var(--pen);font-size:15px;letter-spacing:.04em}
+.vB .stamp{position:absolute;right:40px;top:236px;width:104px;height:104px;transform:rotate(-14deg) scale(1.25);opacity:0;pointer-events:none}
+.vB .run .stamp{animation:bStamp .7s cubic-bezier(.22,1,.36,1) 4s forwards}
+@keyframes bStamp{to{transform:rotate(-14deg) scale(1);opacity:.92}}
+
+.vB section.band{padding-block:92px}
+.vB section.white{background:var(--sheet)}
+.vB .k2{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase;margin:0 0 10px}
+.vB h3.sh{font-family:var(--dsp);font-weight:400;font-size:clamp(36px,4.6vw,62px);line-height:1;margin:0 0 30px;text-wrap:balance;max-width:16ch}
+.vB h3.sh span{color:var(--pen)}
+.vB .score{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:24px 64px;align-items:center}
+.vB .bars{display:grid;gap:18px}
+.vB .bar{display:grid;grid-template-columns:96px minmax(0,1fr) 54px;align-items:center;gap:14px;font-family:var(--mono);font-size:13.5px}
+.vB .bar .tr{height:22px;border-radius:6px;background:var(--rule);overflow:hidden;display:flex}
+.vB .bar .tr i{display:block;height:100%;width:0;transition:width 1.1s cubic-bezier(.3,.7,.3,1)}
+.vB .go .bar .tr i{width:var(--w)}
+.vB .bar .tr i + i{transition-delay:.2s}
+.vB .bar b{text-align:right;font-weight:600}
+.vB .bar.all{font-weight:700}
+.vB .sci p{margin:0 0 14px;font-family:var(--dsp);font-size:clamp(22px,2.3vw,28px);line-height:1.2}
+.vB .sci .cite{color:var(--pen);font-family:var(--mono);font-size:.5em}
+.vB .ledger{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
+.vB .ledger li{display:grid;grid-template-columns:44px minmax(0,1.25fr) minmax(0,1fr) 150px;gap:6px 28px;align-items:baseline;padding:22px 0 20px;border-bottom:1px solid var(--rule);opacity:0;transform:translateY(6px);transition:opacity .7s ease,transform .8s cubic-bezier(.22,1,.36,1)}
+.vB .ledger.go li{opacity:1;transform:none}
+.vB .ledger .n{font-family:var(--mono);font-size:12px;color:var(--pen)}
+.vB .ledger small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin-bottom:6px}
+.vB .ledger small b{font-weight:600;color:var(--pen)}
+.vB .ledger h4{margin:0;font-family:var(--dsp);font-weight:400;font-size:clamp(24px,2.3vw,30px);line-height:1.08}
+.vB .ledger h4 span{background-image:linear-gradient(var(--pen),var(--pen));background-repeat:no-repeat;background-position:0 96%;background-size:0 2px;transition:background-size .9s cubic-bezier(.22,1,.36,1);-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.vB .ledger.go h4 span{background-size:100% 2px}
+.vB .ledger p{margin:0;font-size:15px;line-height:1.5;color:var(--ink-2)}
+.vB .ledger .who{display:grid;justify-items:end;gap:4px;font-family:var(--mono);font-size:12px;color:var(--ink-2)}
+.vB .ledger .who span{display:inline-flex;align-items:center;gap:6px}
+.vB .ledger .who i{width:8px;height:8px;border-radius:50%}
+.vB .ledger .who a{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--rule)}
+.vB .ledger .who a:hover{border-color:var(--ink)}
+.vB .ledger .who .pv{font-style:italic}
+.vB .ledger.go li:nth-child(2),.vB .ledger.go li:nth-child(2) h4 span{transition-delay:.12s}
+.vB .ledger.go li:nth-child(3),.vB .ledger.go li:nth-child(3) h4 span{transition-delay:.24s}
+.vB .ledger.go li:nth-child(4),.vB .ledger.go li:nth-child(4) h4 span{transition-delay:.36s}
+.vB .ledger.go li:nth-child(5),.vB .ledger.go li:nth-child(5) h4 span{transition-delay:.48s}
+.vB .ledger.go li:nth-child(6),.vB .ledger.go li:nth-child(6) h4 span{transition-delay:.6s}
+@media (max-width:900px){.vB .ledger li{grid-template-columns:32px minmax(0,1fr);gap:8px 14px}.vB .ledger p,.vB .ledger .who{grid-column:2}.vB .ledger .who{justify-items:start;grid-auto-flow:column;justify-content:start;gap:14px}}
+.vB .live{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:28px 64px;align-items:center}
+.vB .live .lead2{margin:0;color:var(--ink-2);font-size:17px;max-width:34ch}
+.vB .live .lead2 code{font-family:var(--mono);font-size:.85em;background:var(--rule);padding:1px 5px;border-radius:4px}
+.vB .stages{display:flex;flex-wrap:wrap;gap:6px 18px;margin:18px 0 22px;font-family:var(--dsp);font-size:21px}
+.vB .stages small{font-family:var(--mono);font-size:11px;color:var(--ink-2);margin-left:4px}
+.vB .replay{appearance:none;cursor:pointer;font:inherit;font-weight:600;font-size:13px;background:var(--sheet);color:var(--ink);border:1px solid var(--rule);border-radius:9px;padding:7px 12px;margin-right:12px}
+.vB .replay:hover{border-color:var(--ink-2)}
+.vB .rt{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.vB .tui{background:#101118;color:#C9CBD6;border-radius:14px;padding:22px 20px 18px;font-family:var(--mono);font-size:12.5px;line-height:1.65;min-height:430px;box-shadow:0 30px 60px -36px rgba(29,27,38,.6)}
+.vB .tui .tl{opacity:0;transform:translateY(3px)}
+.vB .tui.go .tl{animation:tIn .45s cubic-bezier(.22,1,.36,1) forwards;animation-delay:var(--a,0s)}
+@keyframes tIn{to{opacity:1;transform:none}}
+.vB .tui .hd{border:1px solid #2AA7BD;border-radius:3px;padding:9px 12px 7px;position:relative;color:#8A8EA0;margin:6px 0 14px}
+.vB .tui .hd span{position:absolute;top:-.8em;left:10px;background:#101118;padding:0 6px;color:#3BB4C9;font-weight:600}
+.vB .tui .rule{display:flex;align-items:center;gap:8px;color:#6B6F80;margin-top:8px}
+.vB .tui .rule::before{content:"";width:16px;border-top:1px solid #3A3D4A}
+.vB .tui .rule::after{content:"";flex:1;border-top:1px solid #3A3D4A}
+.vB .tui .rule b{color:#3BB4C9;font-weight:600}
+.vB .tui .ag{padding-left:16px;display:flex;align-items:center;gap:8px}
+.vB .tui i{display:inline-block;width:8px;height:8px;border-radius:50%}
+.vB .tui em{display:inline-grid;place-items:center;font-style:normal}
+.vB .tui em>*{grid-area:1/1}
+.vB .tui s{width:10px;height:10px;border:1.5px solid #3BB4C9;border-right-color:transparent;border-radius:50%;text-decoration:none}
+.vB .tui u{text-decoration:none;color:#4ADE80}
+.vB .tui em u{opacity:0}
+.vB .tui.go .ag s{animation:tSpin .7s linear infinite,tOff .01s linear var(--d) forwards}
+.vB .tui.go .ag em u{animation:tOn .3s ease var(--d) forwards}
+@keyframes tSpin{to{transform:rotate(360deg)}}
+@keyframes tOff{to{opacity:0;visibility:hidden}}
+@keyframes tOn{to{opacity:1}}
+.vB .tui .out{margin:14px 0 12px;padding:12px 0;border-top:1px solid #2A2D38;border-bottom:1px solid #2A2D38;color:#E4E5EC}
+.vB .tui .out b{color:#fff}
+.vB .tui .ft{color:#6B6F80}
+.vB .tui .ft i{margin:0 5px 0 2px}
+.vB .pair .tile{background:var(--sheet);box-shadow:0 1px 0 var(--rule)}
+.vB .contract{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 32px;border-top:1.5px solid var(--ink)}
+.vB .contract div{padding:18px 0 20px;border-bottom:1px solid var(--rule);opacity:0;transform:translateY(6px);transition:opacity .6s ease,transform .7s cubic-bezier(.22,1,.36,1)}
+.vB .contract.go div{opacity:1;transform:none}
+.vB .contract.go div:nth-child(2){transition-delay:.06s}.vB .contract.go div:nth-child(3){transition-delay:.12s}.vB .contract.go div:nth-child(4){transition-delay:.18s}.vB .contract.go div:nth-child(5){transition-delay:.24s}.vB .contract.go div:nth-child(6){transition-delay:.3s}.vB .contract.go div:nth-child(7){transition-delay:.36s}.vB .contract.go div:nth-child(8){transition-delay:.42s}
+.vB .contract code{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--pen)}
+.vB .contract p{margin:8px 0 0;font-size:14px;line-height:1.4;color:var(--ink-2)}
+@media (max-width:900px){.vB .live{grid-template-columns:minmax(0,1fr)}.vB .contract{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.vB .tui{font-size:11px;padding:18px 12px 14px;min-height:0}.vB .contract{gap:0 18px}.vB .contract div{padding:14px 0 16px}.vB .contract p{font-size:13px}.vB .stages{font-size:18px}}
+.vB .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.vB .tile{border-radius:18px;padding:26px;display:grid;gap:16px;align-content:start;min-width:0}
+.vB .tile h4{font-family:var(--dsp);font-weight:400;font-size:clamp(28px,3vw,38px);line-height:1.05;margin:0}
+.vB .tile h4 span{color:var(--pen)}
+.vB .term{background:var(--ink);color:#CFCBD8;border-radius:12px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto}
+.vB .term i{font-style:normal;color:#F2B544}
+.vB .tbl{display:grid;gap:2px;margin-top:6px}
+.vB .tbl .r{display:grid;grid-template-columns:70px 64px minmax(0,1fr) 46px;gap:8px;align-items:center;white-space:nowrap}
+.vB .tbl .r.h{color:#8E8A9C;font-size:11px;letter-spacing:.04em}
+.vB .tbl .r span{overflow:hidden;text-overflow:ellipsis}
+.vB .tbl .r b{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.vB .tbl .r .ok{color:#7FD8A0}
+.vB .tbl .r .v{color:#8E8A9C}
+.vB .term[data-anim] .r:not(.h){opacity:0;transform:translateX(-6px);transition:opacity .5s ease,transform .6s cubic-bezier(.22,1,.36,1)}
+.vB .term[data-anim].go .r:not(.h){opacity:1;transform:none}
+.vB .term.go .r:nth-child(2){transition-delay:.25s}.vB .term.go .r:nth-child(3){transition-delay:.45s}.vB .term.go .r:nth-child(4){transition-delay:.65s}.vB .term.go .r:nth-child(5){transition-delay:.85s}
+.vB .keys{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:var(--mono);font-size:11.5px}
+.vB .keys small{width:100%;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin-bottom:2px}
+.vB .keys s{text-decoration:none;color:var(--ink-2);padding:3px 8px;border-radius:6px;background:var(--sheet);border:1px solid var(--rule);background-image:linear-gradient(var(--pen),var(--pen));background-repeat:no-repeat;background-position:8px 54%;background-size:0 1.5px;transition:background-size .6s cubic-bezier(.22,1,.36,1),color .6s}
+.vB .keys.go s{background-size:calc(100% - 16px) 1.5px;color:#A9A39A}
+.vB .keys.go s:nth-of-type(2){transition-delay:.15s}.vB .keys.go s:nth-of-type(3){transition-delay:.3s}.vB .keys.go s:nth-of-type(4){transition-delay:.45s}.vB .keys.go s:nth-of-type(5){transition-delay:.6s}
+.vB .tnote{margin:0;color:var(--ink-2);font-size:14.5px}
+.vB .zero{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:1px dashed var(--rule);padding-top:16px}
+.vB .zero div{font-size:12.5px;color:var(--ink-2);line-height:1.2}
+.vB .zero b{display:block;font-family:var(--dsp);font-weight:400;font-size:44px;line-height:1;color:var(--pen)}
+.vB .flow{display:grid;gap:8px;font-family:var(--mono);font-size:12px;position:relative;padding-left:14px}
+.vB .flow::before{content:"";position:absolute;left:3px;top:8px;bottom:12px;border-left:1.5px dashed var(--rule)}
+.vB .flow .sg{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:10px;position:relative;opacity:0;transform:translateY(4px);transition:opacity .6s ease,transform .7s cubic-bezier(.22,1,.36,1)}
+.vB .flow .sg::before{content:"";position:absolute;left:-14px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--paper);border:1.5px solid var(--ink-2)}
+.vB .flow.go .sg{opacity:1;transform:none}
+.vB .flow.go .sg:nth-child(2){transition-delay:.45s}.vB .flow.go .sg:nth-child(3){transition-delay:.9s}.vB .flow.go .sg:nth-child(4){transition-delay:1.4s}
+.vB .flow .sg>b{font-weight:500;color:var(--ink-2)}
+.vB .flow .sg>div{display:flex;flex-wrap:wrap;gap:6px}
+.vB .flow span{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--sheet);border:1px solid var(--rule)}
+.vB .flow span i{width:7px;height:7px;border-radius:50%}
+.vB .flow span em{font-style:normal;color:var(--ok)}
+.vB .flow .res::before{background:var(--pen);border-color:var(--pen)}
+.vB .flow .res span{font-weight:600}
+.vB .flow .x0{background:#E8F3EA;border-color:#C3DFC9;color:#1E6B3A}
+.vB .flow .bk{background:var(--pen);border-color:var(--pen);color:#fff}
+.vB .flow .res small{font-size:11px;color:var(--ink-2)}
+.vB .term .q{color:#C9A7FF}.vB .term .nn{color:#F2B544}.vB .term .fnn{color:#7FD8A0}.vB .term .c{color:#8E8A9C;font-style:italic}
+.vB pre{margin:0;background:var(--ink);color:#CFCBD8;border-radius:12px;padding:16px;font-family:var(--mono);font-size:12.5px;line-height:1.75;overflow-x:auto}
+.vB pre i{font-style:normal;color:#F2B544}
+
+.vB .end{background:var(--ink);color:var(--paper);border-radius:22px;padding:44px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:24px 48px;align-items:center}
+.vB .end h3{font-family:var(--dsp);font-weight:400;font-size:clamp(36px,4.4vw,56px);line-height:1;margin:0 0 16px}
+.vB .end h3 span{color:#F2B544}
+.vB .end ul{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.vB .end li{font-family:var(--mono);font-size:12.5px;padding:6px 11px;border:1px solid rgba(255,255,255,.18);border-radius:999px}
+.vB .end li em{font-family:var(--dsp);font-size:15px;color:#BDB8C8;margin-left:6px}
+.vB .end .lines{display:grid;gap:10px;min-width:0}
+.vB .end code{display:block;font-family:var(--mono);font-size:13px;background:rgba(255,255,255,.07);border-radius:10px;padding:12px 14px;overflow-x:auto;white-space:nowrap}
+.vB .end code i{font-style:normal;color:#F2B544}
+.vB .cfg{--y-bg:#FFFDF8;--y-line:#E4DED0;--y-fg:#1D1B26;--y-k:#0E7C86;--y-s:#6B4FD8;--y-n:#D2402F;--y-c:#8C8698;--y-hl:rgba(210,64,47,.07);--y-chip:#ECE6D8}
+.vB .cfg .yml{box-shadow:0 1px 0 #E4DED0,0 18px 40px -24px rgba(29,27,38,.35)}
+.vB .cfg p.lead2{color:var(--ink-2);font-size:17px}
+.vB .refs{color:var(--ink-2)} .vB .refs span{color:var(--pen);font-family:var(--mono);font-size:11px}
+.vB .foot{padding-block:22px 30px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12.5px;color:var(--ink-2)}
+@media (max-width:520px){.vB .tbl .r{grid-template-columns:62px minmax(0,1fr) 40px}.vB .tbl .v{display:none}.vB .pair .term{font-size:10.5px;padding:12px 10px}.vB .pair .tile{padding:16px}.vB .term .c{display:none}}
+@media (max-width:900px){
+  .vB .hero,.vB .score,.vB .pair,.vB .end{grid-template-columns:minmax(0,1fr)}
+  .vB .hero{padding-block:24px 64px}
+}
+@media (max-width:640px){
+  .vB section.band{padding-block:64px}
+  .vB .end{padding:28px 20px}
+  .vB .tile{padding:20px}
+  .vB .install{width:100%}
+  .vB .code{font-size:11.5px;tab-size:2}
+  .vB .cl{grid-template-columns:30px 16px max-content}
+  .vB .stamp{width:80px;height:80px;right:12px;top:auto;bottom:66px}
+  .vB .bar{grid-template-columns:70px minmax(0,1fr) 44px;gap:10px}
+}
+
+</style>
+</head>
+<body>
+<main class="vB">
+  <div class="wrap">
+    <nav><a class="mark" href="/"><i></i>dootsabha</a><a class="gh" href="https://github.com/indrasvat/dootsabha">GitHub</a></nav>
+    <div class="hero">
+      <div>
+        <h1 class="big">Your agent pushed this as done. <span>Spot the bug.</span></h1>
+        <p class="lede">Real code, real council. Take a look, then press convene.</p>
+        <div class="install"><code><i>$</i> curl -fsSL https://dootsabha.pages.dev/install.sh | sh</code><button class="copy-btn" data-copy="curl -fsSL https://dootsabha.pages.dev/install.sh | sh">Copy</button></div>
+        <div class="chips"><span>no API keys</span><span>your CLI logins</span><span>JSON + exit codes</span></div>
+      </div>
+      <div class="exam" id="exam">
+        <header><span><b>internal/cli/progress.go</b> · as first pushed</span><span>dootsabha #37</span></header>
+        <div class="code" aria-label="Go source of the progress file, as first pushed">
+          <div class="scan"></div>
+          <div class="cl"><span class="no">1</span><span class="gut"></span><span><span class="kw">func</span> <span class="fn">openProgressLog</span>(path <span class="kw">string</span>) (*progressLog, <span class="kw">error</span>) {</span></div>
+          <div class="cl"><span class="no">2</span><span class="gut"></span><span>	f, err := os.<span class="fn">OpenFile</span>(path,</span></div>
+          <div class="cl"><span class="no">3</span><span class="gut"></span><span>		os.O_WRONLY|os.O_CREATE|</span></div>
+          <div class="cl hit h1"><span class="no">4</span><span class="gut"><i style="background:var(--grok)"></i><i style="background:var(--codex)"></i></span><span>		<span class="bug">os.O_TRUNC</span>|<span class="bug">os.O_APPEND</span>, 0o644)</span></div>
+          <div class="cl"><span class="no">5</span><span class="gut"></span><span>	<span class="kw">if</span> err != <span class="kw">nil</span> {</span></div>
+          <div class="cl"><span class="no">6</span><span class="gut"></span><span>		<span class="kw">return</span> <span class="kw">nil</span>, fmt.<span class="fn">Errorf</span>(<span class="st">"progress file: %w"</span>, err)</span></div>
+          <div class="cl"><span class="no">7</span><span class="gut"></span><span>	}</span></div>
+          <div class="cl"><span class="no">8</span><span class="gut"></span><span>	<span class="kw">return</span> &amp;progressLog{f: f, start: time.<span class="fn">Now</span>()}, <span class="kw">nil</span></span></div>
+          <div class="cl"><span class="no">9</span><span class="gut"></span><span>}</span></div>
+          <div class="cl"><span class="no">10</span><span class="gut"></span><span> </span></div>
+          <div class="cl"><span class="no">11</span><span class="gut"></span><span><span class="cm">// Callers hold p.mu.</span></span></div>
+          <div class="cl"><span class="no">12</span><span class="gut"></span><span><span class="kw">func</span> (p *progressLog) <span class="fn">write</span>(ev <span class="kw">any</span>) {</span></div>
+          <div class="cl"><span class="no">13</span><span class="gut"></span><span>	line, err := json.<span class="fn">Marshal</span>(ev)</span></div>
+          <div class="cl"><span class="no">14</span><span class="gut"></span><span>	<span class="kw">if</span> err == <span class="kw">nil</span> {</span></div>
+          <div class="cl hit h2"><span class="no">15</span><span class="gut"><i style="background:var(--codex)"></i><i style="background:var(--grok)"></i></span><span>		_, err = <span class="bug">p.f.Write</span>(<span class="fn">append</span>(line, <span class="st">'\n'</span>))</span></div>
+          <div class="cl"><span class="no">16</span><span class="gut"></span><span>	}</span></div>
+          <div class="cl"><span class="no">17</span><span class="gut"></span><span>}</span></div>
+        </div>
+        <div class="fold"><div class="finds">
+          <div class="f"><span class="sev">P1</span><span>Point it at your config: <b>O_TRUNC</b> erases it, and the run still exits 0.<small>L4</small></span><span class="by"><i style="background:var(--grok)"></i></span></div>
+          <div class="f"><span class="sev">P1</span><span>A FIFO nobody reads blocks this write while the lock is held. Shutdown hangs.<small>L15</small></span><span class="by"><i style="background:var(--codex)"></i><i style="background:var(--grok)"></i></span></div>
+          <div class="f"><span class="sev p2">P2</span><span>Two runs on one path interleave and corrupt the stream.<small>L4</small></span><span class="by"><i style="background:var(--codex)"></i></span></div>
+          <div class="f"><span class="sev p2">P2</span><span>A short write leaves half a JSON line behind.<small>L15</small></span><span class="by"><i style="background:var(--codex)"></i><i style="background:var(--grok)"></i></span></div>
+          <div class="ruling"><span><b>BLOCK</b> · 4 of 9 findings shown</span><span><a href="https://github.com/indrasvat/dootsabha/pull/37">see the PR ↗</a></span></div>
+        </div></div>
+        <div class="act">
+          <span class="seats"><span><i style="background:var(--codex)"></i>codex</span><span><i style="background:var(--grok)"></i>grok</span></span>
+          <button type="button" id="convene">Convene the council ▶</button>
+        </div>
+        <svg class="stamp" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="55" fill="none" stroke="#D2402F" stroke-width="3"/><circle cx="60" cy="60" r="46" fill="none" stroke="#D2402F" stroke-width="1.2"/><text x="60" y="56" text-anchor="middle" font-family="Instrument Serif,serif" font-size="20" fill="#D2402F">sabhā</text><text x="60" y="77" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="14" font-weight="600" fill="#D2402F" letter-spacing="1">BLOCK</text></svg>
+      </div>
+    </div>
+  </div>
+
+  <section class="band"><div class="wrap">
+    <p class="k2">from real sittings</p>
+    <h3 class="sh">Not just this diff. <span>Six more it stopped.</span></h3>
+    <ol class="ledger" data-anim>
+      <li><span class="n">01</span><div class="hd"><small>security · <b>P1</b></small><h4><span>The health check passed an open firewall.</span></h4></div><p>A leftover rule let sandboxes reach host SSH. The check said healthy, and the work had been called done.</p><div class="who"><span><i style="background:var(--codex)"></i>codex</span><span class="pv">a private project</span></div></li>
+      <li><span class="n">02</span><div class="hd"><small>security · <b>design</b></small><h4><span>A reinstalled plugin would inherit every grant.</span></h4></div><p>Permissions were keyed on the plugin's name: same name, same powers. Caught before any code was written.</p><div class="who"><span><i style="background:var(--claude)"></i>claude</span><span><i style="background:var(--codex)"></i>codex</span><a href="https://github.com/indrasvat/shux/pull/33">shux #33 ↗</a></div></li>
+      <li><span class="n">03</span><div class="hd"><small>data loss · <b>P1</b></small><h4><span>A truncated recording, still marked lossless.</span></h4></div><p>Two names for one file, a case alias or a hard link, let a second pane overwrite a live recording.</p><div class="who"><span><i style="background:var(--codex)"></i>codex</span><a href="https://github.com/indrasvat/shux/pull/238">shux #238 ↗</a></div></li>
+      <li><span class="n">04</span><div class="hd"><small>process safety · <b>blocker</b></small><h4><span>The reaper could kill a stranger.</span></h4></div><p>It signalled a saved process group after the leader was gone; whoever reused the pid took the SIGKILL.</p><div class="who"><span><i style="background:var(--codex)"></i>codex</span><a href="https://github.com/indrasvat/shux/pull/258">shux #258 ↗</a></div></li>
+      <li><span class="n">05</span><div class="hd"><small>wrong result · <b>major</b></small><h4><span>A timed-out chair exited 0.</span></h4></div><p>The fallback chair hid the timeout, so callers read success. codex caught it; grok did not.</p><div class="who"><span><i style="background:var(--codex)"></i>codex</span><a href="https://github.com/indrasvat/dootsabha/pull/22">dootsabha #22 ↗</a></div></li>
+      <li><span class="n">06</span><div class="hd"><small>said done, wasn't · <b>overclaim</b></small><h4><span>“All four sites are guarded.” Two were.</span></h4></div><p>grok, reviewing the branch that made it the default, broke the config and watched zero tests fail.</p><div class="who"><span><i style="background:var(--grok)"></i>grok</span><a href="https://github.com/indrasvat/dootsabha/pull/26">dootsabha #26 ↗</a></div></li>
+    </ol>
+  </div></section>
+
+  <section class="band white"><div class="wrap score">
+    <div>
+      <p class="k2">why more than one</p>
+      <h3 class="sh">Neither model <span>found them all.</span></h3>
+      <div class="bars" data-anim>
+        <div class="bar"><span>codex</span><span class="tr"><i style="--w:88.9%;background:var(--codex)"></i></span><b>8 / 9</b></div>
+        <div class="bar"><span>grok</span><span class="tr"><i style="--w:66.7%;background:var(--grok)"></i></span><b>6 / 9</b></div>
+        <div class="bar all"><span>together</span><span class="tr"><i style="--w:55.6%;background:var(--ink)"></i><i style="--w:33.3%;background:var(--codex)"></i><i style="--w:11.1%;background:var(--grok)"></i></span><b>9 / 9</b></div>
+      </div>
+    </div>
+    <div class="sci">
+      <p>Self-review rarely fixes reasoning.<a class="cite" href="#ref-B-1">1</a></p>
+      <p>Judges favour their own answers.<a class="cite" href="#ref-B-2">2</a><a class="cite" href="#ref-B-3">3</a></p>
+      <p>A mixed panel judges better than one model.<a class="cite" href="#ref-B-4">4</a><a class="cite" href="#ref-B-5">5</a></p>
+    </div>
+  </div></section>
+
+  <section class="band"><div class="wrap live">
+    <div>
+      <p class="k2">for the human watching</p>
+      <h3 class="sh">Watch it <span>deliberate.</span></h3>
+      <p class="lead2">Each stage, each agent, live in your terminal. Your agent asks for <code>--json</code> and gets none of this.</p>
+      <div class="stages"><span>preṣaṇa <small>dispatch</small></span><span>samīkṣā <small>peer review</small></span><span>saṃśleṣaṇa <small>synthesis</small></span></div>
+      <button class="replay" type="button" id="replay">↻ Replay</button><small class="rt">a real run · 6 min 43 s, replayed at 60×</small>
+    </div>
+    <div class="tui" id="tui" data-anim role="img" aria-label="dootsabha council terminal output: dispatch to codex and grok, peer review, synthesis by codex, then the answer">
+      <div class="tl hd" style="--a:0s"><span>Council</span>agents: codex, grok · chair: codex</div>
+      <div class="tl rule" style="--a:.4s"><b>Dispatch</b>2 agents · parallel</div>
+      <div class="tl ag" style="--a:0.6s;--d:2.0s"><i style="background:#34C38F"></i>codex <em><s></s><u>✓</u></em></div>
+      <div class="tl ag" style="--a:0.6s;--d:2.8s"><i style="background:#A78BFA"></i>grok <em><s></s><u>✓</u></em></div>
+      <div class="tl rule" style="--a:3.1s"><b>Peer Review</b></div>
+      <div class="tl ag" style="--a:3.3s;--d:4.3s"><i style="background:#34C38F"></i>codex reviewing <em><s></s><u>✓</u></em></div>
+      <div class="tl ag" style="--a:3.3s;--d:4.9s"><i style="background:#A78BFA"></i>grok reviewing <em><s></s><u>✓</u></em></div>
+      <div class="tl rule" style="--a:5.2s"><b>Synthesis</b>chair: codex</div>
+      <div class="tl ag" style="--a:5.4s;--d:6.4s"><i style="background:#34C38F"></i>codex <em><s></s><u>✓</u></em></div>
+      <div class="tl out" style="--a:6.7s"><b>O_TRUNC | O_APPEND is a bug if existing log entries should survive reopening.</b> O_TRUNC empties the file at open; O_APPEND only moves later writes to the end. Append does not undo truncation.</div>
+      <div class="tl ft" style="--a:7.1s">402.8s │ 300,333 in · 20,829 out<br><i style="background:#34C38F"></i>codex <u>✓</u> · <i style="background:#A78BFA"></i>grok <u>✓</u></div>
+    </div>
+  </div></section>
+
+  <section class="band white"><div class="wrap">
+    <p class="k2">for the agent calling it</p>
+    <h3 class="sh">A contract, <span>not a chat.</span></h3>
+    <div class="contract" data-anim>
+      <div><code>--json</code><p>Exactly one document on stdout. Logs stay on stderr.</p></div>
+      <div><code>schema_version: 1</code><p>On every JSON document. Fields are added, never renamed.</p></div>
+      <div><code>exit 0 2 3 4 5 6</code><p>One code per caller action. Branch on it; never parse prose.</p></div>
+      <div><code>--progress-file</code><p>NDJSON to tail while it runs. The last line holds the exit code.</p></div>
+      <div><code>status --json</code><p>Which agents are installed and answering, before you plan.</p></div>
+      <div><code>--timeout</code><p>A budget per call, a ceiling per run. Both exit 4 and say which fired.</p></div>
+      <div><code>SIGTERM</code><p>Every agent stops first. The run still records how it ended.</p></div>
+      <div><code>npx skills add</code><p>A skill that tells your agent when to convene and how to read the result.</p></div>
+    </div>
+  </div></section>
+
+  <section class="band"><div class="wrap pair">
+    <div class="tile"><h4>No API keys. <span>Your subscriptions.</span></h4>
+      <div class="term" data-anim><i>$</i> dootsabha status
+        <div class="tbl">
+          <div class="r h"><span>PROVIDER</span><span class="v">VERSION</span><span>MODEL</span><span>STATUS</span></div>
+          <div class="r"><span><b style="background:var(--agy)"></b>agy</span><span class="v">1.5.1</span><span>Gemini 4 Argon</span><span class="ok">✓ OK</span></div>
+          <div class="r"><span><b style="background:var(--claude)"></b>claude</span><span class="v">2.1.322</span><span>claude-opus-5-5</span><span class="ok">✓ OK</span></div>
+          <div class="r"><span><b style="background:var(--codex)"></b>codex</span><span class="v">0.167.0</span><span>gpt-6.1-sol</span><span class="ok">✓ OK</span></div>
+          <div class="r"><span><b style="background:var(--grok)"></b>grok</span><span class="v">1.0.70</span><span>grok-4.7</span><span class="ok">✓ OK</span></div>
+        </div>
+      </div>
+      <div class="keys" data-anim><small>never exported</small><s>ANTHROPIC_API_KEY</s><s>OPENAI_API_KEY</s><s>GEMINI_API_KEY</s><s>XAI_API_KEY</s><s>OPENROUTER_API_KEY</s></div>
+      <p class="tnote">It runs the CLIs you already pay for, signed in as you.</p>
+      <div class="zero"><div><b>0</b>keys to rotate</div><div><b>0</b>gateways</div><div><b>0</b>new bills</div></div>
+    </div>
+    <div class="tile"><h4>Made for <span>agents</span>, not eyeballs.</h4>
+<pre class="term"><i>$</i> dootsabha sabha --agents codex,grok \
+--json --progress-file run.ndjson \
+"$(git diff main)" &gt; verdict.json</pre>
+      <div class="flow" data-anim>
+        <div class="sg"><b>dispatch</b><div><span><i style="background:var(--codex)"></i>codex <em>ok</em></span><span><i style="background:var(--grok)"></i>grok <em>ok</em></span></div></div>
+        <div class="sg"><b>review</b><div><span><i style="background:var(--codex)"></i>codex <em>ok</em></span><span><i style="background:var(--grok)"></i>grok <em>ok</em></span></div></div>
+        <div class="sg"><b>synthesis</b><div><span><i style="background:var(--codex)"></i>codex · chair <em>ok</em></span></div></div>
+        <div class="sg res"><b>finished</b><div><span class="x0">exit 0</span><span class="bk">BLOCK</span><small>the run worked; the diff didn't</small></div></div>
+      </div>
+<pre class="term"><span class="q">case</span> $? <span class="q">in</span>
+  <span class="nn">0|5</span>) jq .synthesis verdict.json ;;  <span class="c"># 5: one agent down</span>
+  <span class="nn">4</span>)   <span class="fnn">retry</span> --timeout 20m ;;
+  <span class="nn">3</span>)   dootsabha status ;;
+  <span class="nn">2|6</span>) <span class="fnn">fix_the_call</span> ;;
+<span class="q">esac</span></pre>
+    </div>
+  </div></section>
+
+  <section class="band white"><div class="wrap cfg">
+    <div>
+      <p class="k2">your defaults</p>
+      <h3 class="sh">One file sets <span>the rules.</span></h3>
+      <p class="lead2">Each seat's model and effort, the chair, the budgets. A flag overrides any of it for one run.</p>
+      <div class="over"><code>--chair</code><code>--rounds</code><code>--timeout</code><code>dootsabha config show</code></div>
+    </div>
+    <figure class="yml" data-anim aria-label="An example dootsabha config.yaml">
+        <div class="tb"><i></i><i></i><i></i><span>config.yaml</span><small>~/.config/dootsabha</small></div>
+<pre><span class="l"><span class="k">providers</span><span class="p">:</span></span><span class="l">  <span class="k">codex</span><span class="p">:</span></span><span class="l">    <span class="k">model</span><span class="p">:</span> <span class="s">gpt-6.1-sol</span></span><span class="l">  <span class="k">grok</span><span class="p">:</span></span><span class="l">    <span class="k">model</span><span class="p">:</span> <span class="s">grok-4.7</span></span><span class="l">    <span class="k">flags</span><span class="p">:</span> <span class="p">[</span><span class="s">--reasoning-effort</span><span class="p">,</span> <span class="s">high</span><span class="p">]</span></span><span class="l">  <span class="k">claude</span><span class="p">:</span></span><span class="l">    <span class="k">model</span><span class="p">:</span> <span class="s">claude-opus-5-5</span></span><span class="l"><span class="k">council</span><span class="p">:</span></span><span class="l hl">  <span class="k">chair</span><span class="p">:</span> <span class="s">claude</span>        <span class="c"># who writes the verdict</span></span><span class="l">  <span class="k">rounds</span><span class="p">:</span> <span class="n">1</span>            <span class="c"># up to 5</span></span><span class="l"><span class="k">timeout</span><span class="p">:</span> <span class="n">10m</span>           <span class="c"># each agent call</span></span><span class="l"><span class="k">session_timeout</span><span class="p">:</span> <span class="n">30m</span>   <span class="c"># the whole sitting</span></span></pre>
+      </figure>
+  </div></section>
+
+  <section class="band"><div class="wrap">
+    <div class="end">
+      <div><h3>Your next PR, <span>on trial.</span></h3><ul><li>council<em>sabhā</em></li><li>consult<em>parāmarśa</em></li><li>review<em>samīkṣā</em></li><li>refine<em>saṃśodhana</em></li></ul></div>
+      <div class="lines"><code><i>$</i> curl -fsSL https://dootsabha.pages.dev/install.sh | sh</code><code><i>$</i> npx skills add indrasvat/dootsabha</code><code><i>$</i> dootsabha status</code></div>
+    </div>
+    <ol class="refs" aria-label="Sources"><li id="ref-B-1"><span>1</span><a href="https://arxiv.org/abs/2310.01798" title="Large Language Models Cannot Self-Correct Reasoning Yet">Huang 2023</a></li><li id="ref-B-2"><span>2</span><a href="https://arxiv.org/abs/2404.13076" title="LLM Evaluators Recognize and Favor Their Own Generations">Panickssery 2024</a></li><li id="ref-B-3"><span>3</span><a href="https://arxiv.org/abs/2306.05685" title="Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena">Zheng 2023</a></li><li id="ref-B-4"><span>4</span><a href="https://arxiv.org/abs/2404.18796" title="Replacing Judges with Juries: a Panel of Diverse Models">Verga 2024</a></li><li id="ref-B-5"><span>5</span><a href="https://arxiv.org/abs/2305.14325" title="Improving Factuality and Reasoning through Multiagent Debate">Du 2023</a></li><li id="ref-B-6"><span>6</span><a href="https://github.com/karpathy/llm-council" title="llm-council: the same three stages, for a person at a browser">Karpathy · llm-council</a></li></ol>
+    <div class="foot"><span>Dūtasabhā · a council of messengers</span><span class="made">made with <svg class="hrt" viewBox="0 0 16 14" aria-label="love" role="img"><path d="M8 13.4 1.6 7.3A3.9 3.9 0 0 1 8 2.4a3.9 3.9 0 0 1 6.4 4.9Z" fill="#D2402F"/></svg> and <span class="squig">red ink</span> by <a href="https://github.com/indrasvat">indrasvat</a></span><span>MIT · github.com/indrasvat/dootsabha</span></div>
+  </div></section>
+</main>
+<script>
+(function(){
+  document.querySelectorAll('.yml .l').forEach(function(l){ l.style.setProperty('--i', Array.prototype.indexOf.call(l.parentNode.children, l)); });
+
+  var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); io.unobserve(e.target); } }); }, {threshold:.25});
+  document.querySelectorAll('[data-anim]').forEach(function(a){ io.observe(a); });
+
+  var tui = document.getElementById('tui');
+  document.getElementById('replay').addEventListener('click', function(){ tui.classList.remove('go'); void tui.offsetWidth; tui.classList.add('go'); });
+
+  var exam = document.getElementById('exam'), btn = document.getElementById('convene'), auto;
+  function convene(){
+    clearTimeout(auto);
+    if (exam.classList.contains('run')) { exam.classList.remove('run'); void exam.offsetWidth; }
+    exam.classList.add('run'); btn.textContent = 'Convene again ↻';
+  }
+  btn.addEventListener('click', convene);
+  new IntersectionObserver(function(es){ if(es[0].isIntersecting && !exam.classList.contains('run')){ auto = setTimeout(convene, 6000); } else clearTimeout(auto); }, {threshold:.5}).observe(exam);
+
+  document.querySelectorAll('.copy-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+      var txt=b.getAttribute('data-copy'), old=b.textContent;
+      var done=function(){ b.textContent='Copied'; setTimeout(function(){b.textContent=old;},1400); };
+      var fallback=function(){ var r=document.createRange(); r.selectNodeContents(b.previousElementSibling); var s=getSelection(); s.removeAllRanges(); s.addRange(r); };
+      if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, fallback); } else { fallback(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>

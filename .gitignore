@@ -69,3 +69,6 @@ Thumbs.db
 .agent/
 
 .DS_Store
+
+# Cloudflare wrangler local state
+.wrangler/
