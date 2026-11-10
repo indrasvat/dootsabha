@@ -23,6 +23,7 @@
 <style>
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 body{margin:0;background:#F7F4EC;color:#1D1B26;font-size:15px;line-height:1.5;overflow-x:clip}
 a{color:inherit}
 svg{max-width:100%}
@@ -31,7 +32,6 @@ svg{max-width:100%}
 html:not(.js) [data-anim],html:not(.js) [data-anim] *{opacity:1!important;transform:none!important}
 html:not(.js) .vB .bar .tr i{width:var(--w)}
 html:not(.js) .vB .tui s{display:none}
-.site{overflow-x:clip}
 .wrap{max-width:1140px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .copy-btn{appearance:none;border:0;cursor:pointer;font:inherit;flex:none}
 .copy-btn:active{transform:scale(.96)}
@@ -43,13 +43,11 @@ html:not(.js) .vB .tui s{display:none}
 .refs li span{margin-right:4px}
 .refs a{text-decoration:none}
 .refs a:hover,.refs li:target a{text-decoration:underline}
-.made a{white-space:nowrap}
-.made a{color:inherit;text-decoration:none;font-weight:600;border-bottom:1px solid currentColor}
+.made a{white-space:nowrap;color:inherit;text-decoration:none;font-weight:600;border-bottom:1px solid currentColor}
 .made a:hover{border-bottom-width:2px}
 .squig{text-decoration:underline wavy #D2402F;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}
 .hrt{width:.95em;height:.85em;vertical-align:-.08em;margin:0 1px}
 
-/* Config card: a syntax-highlighted config.yaml. Each variant sets the --y-* palette. */
 .cfg{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:24px 56px;align-items:center}
 .cfg p.lead2{margin:0;max-width:34ch}
 .cfg .over{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
@@ -59,7 +57,7 @@ html:not(.js) .vB .tui s{display:none}
 .yml .tb i{width:9px;height:9px;border-radius:50%;background:var(--y-line)}
 .yml .tb span{margin-left:8px;color:var(--y-fg)}
 .yml .tb small{margin-left:auto;font-size:11px}
-.cfg .yml pre{margin:0;padding:12px 0 14px;background:none;border:0;border-radius:0;box-shadow:none;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--y-fg);overflow-x:auto;counter-reset:ln;tab-size:2}
+.cfg .yml pre{margin:0;padding:12px 0 14px;background:none;border-radius:0;font-family:var(--mono);font-size:12.5px;line-height:1.75;color:var(--y-fg);overflow-x:auto;counter-reset:ln;tab-size:2}
 .yml .l{display:block;white-space:pre;padding:0 16px 0 0}
 .yml .l::before{counter-increment:ln;content:counter(ln);display:inline-block;width:40px;padding-right:14px;text-align:right;color:var(--y-c);opacity:.6}
 .yml .l.hl{background:var(--y-hl);box-shadow:inset 2px 0 var(--y-k)}
@@ -72,7 +70,6 @@ html:not(.js) .vB .tui s{display:none}
 /* With animation off, show the end state of anything an animation would have revealed. */
 @media (prefers-reduced-motion: reduce){html .vB .tui .tl,html .vB .tui em u{opacity:1;transform:none}html .vB .tui s{display:none}html .vB .run .stamp{opacity:.92;transform:rotate(-14deg)}}
 
-/* ═════════════ B · PARĪKṢĀ — spot the bug ═════════════ */
 .vB{--paper:#F7F4EC;--sheet:#FFFDF8;--ink:#1D1B26;--ink-2:#5C5866;--rule:#E4DFD2;--pen:#D2402F;--pen-soft:#FBE3DE;--codex:#0E7C86;--grok:#6B4FD8;--agy:#2F6BDB;--claude:#C8643B;--ok:#1E8A52;
   --dsp:"Instrument Serif",Georgia,serif;--txt:"Figtree",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   background:var(--paper);color:var(--ink);font-family:var(--txt);color-scheme:light}
@@ -112,7 +109,6 @@ html:not(.js) .vB .tui s{display:none}
 .vB .act{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--rule);background:var(--paper)}
 .vB .act button{appearance:none;border:0;cursor:pointer;font:inherit;font-weight:700;font-size:14px;background:var(--pen);color:#fff;border-radius:10px;padding:10px 16px;display:inline-flex;gap:8px;align-items:center}
 .vB .act button:hover{filter:brightness(1.05)}
-.vB .act small{font-family:var(--mono);font-size:11.5px;color:var(--ink-2)}
 .vB .seats{display:flex;gap:12px;font-family:var(--mono);font-size:12px}
 .vB .seats span{display:inline-flex;align-items:center;gap:6px}
 .vB .seats i{width:9px;height:9px;border-radius:50%}
@@ -216,7 +212,7 @@ html:not(.js) .vB .tui s{display:none}
 @media (max-width:900px){.vB .live{grid-template-columns:minmax(0,1fr)}.vB .contract{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:520px){.vB .tui{font-size:11px;padding:18px 12px 14px;min-height:0}.vB .contract{gap:0 18px}.vB .contract div{padding:14px 0 16px}.vB .contract p{font-size:13px}.vB .stages{font-size:18px}}
 .vB .pair{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
-.vB .tile{background:var(--paper);border-radius:18px;padding:26px;display:grid;gap:16px;align-content:start;min-width:0}
+.vB .tile{border-radius:18px;padding:26px;display:grid;gap:16px;align-content:start;min-width:0}
 .vB .tile h4{font-family:var(--dsp);font-weight:400;font-size:clamp(28px,3vw,38px);line-height:1.05;margin:0}
 .vB .tile h4 span{color:var(--pen)}
 .vB .term{background:var(--ink);color:#CFCBD8;border-radius:12px;padding:14px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.7;overflow-x:auto}
@@ -258,7 +254,7 @@ html:not(.js) .vB .tui s{display:none}
 .vB .flow .res small{font-size:11px;color:var(--ink-2)}
 .vB .term .q{color:#C9A7FF}.vB .term .nn{color:#F2B544}.vB .term .fnn{color:#7FD8A0}.vB .term .c{color:#8E8A9C;font-style:italic}
 .vB pre{margin:0;background:var(--ink);color:#CFCBD8;border-radius:12px;padding:16px;font-family:var(--mono);font-size:12.5px;line-height:1.75;overflow-x:auto}
-.vB pre i{font-style:normal;color:#F2B544}.vB pre b{color:#7FD8A0;font-weight:500}
+.vB pre i{font-style:normal;color:#F2B544}
 
 .vB .end{background:var(--ink);color:var(--paper);border-radius:22px;padding:44px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:24px 48px;align-items:center}
 .vB .end h3{font-family:var(--dsp);font-weight:400;font-size:clamp(36px,4.4vw,56px);line-height:1;margin:0 0 16px}
@@ -293,7 +289,7 @@ html:not(.js) .vB .tui s{display:none}
 </style>
 </head>
 <body>
-<main class="site vB">
+<main class="vB">
   <div class="wrap">
     <nav><a class="mark" href="/"><i></i>dootsabha</a><a class="gh" href="https://github.com/indrasvat/dootsabha">GitHub</a></nav>
     <div class="hero">
@@ -469,14 +465,12 @@ html:not(.js) .vB .tui s{display:none}
 (function(){
   document.querySelectorAll('.yml .l').forEach(function(l){ l.style.setProperty('--i', Array.prototype.indexOf.call(l.parentNode.children, l)); });
 
-  /* scroll-in animations */
   var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); io.unobserve(e.target); } }); }, {threshold:.25});
   document.querySelectorAll('[data-anim]').forEach(function(a){ io.observe(a); });
 
   var tui = document.getElementById('tui');
   document.getElementById('replay').addEventListener('click', function(){ tui.classList.remove('go'); void tui.offsetWidth; tui.classList.add('go'); });
 
-  /* convene runs the review; it also starts by itself after a pause */
   var exam = document.getElementById('exam'), btn = document.getElementById('convene'), auto;
   function convene(){
     clearTimeout(auto);
@@ -486,12 +480,6 @@ html:not(.js) .vB .tui s{display:none}
   btn.addEventListener('click', convene);
   new IntersectionObserver(function(es){ if(es[0].isIntersecting && !exam.classList.contains('run')){ auto = setTimeout(convene, 6000); } else clearTimeout(auto); }, {threshold:.5}).observe(exam);
 
-  document.addEventListener('click', function(e){
-    var a = e.target.closest && e.target.closest('a[href^="#ref-"]');
-    if(!a) return;
-    var t = document.getElementById(a.getAttribute('href').slice(1));
-    if(t){ e.preventDefault(); t.scrollIntoView({behavior:'smooth', block:'center'}); }
-  });
   document.querySelectorAll('.copy-btn').forEach(function(b){
     b.addEventListener('click', function(){
       var txt=b.getAttribute('data-copy'), old=b.textContent;

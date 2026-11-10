@@ -1,10 +1,8 @@
 name: Deploy Pages
 
-# Production deploy for dootsabha.pages.dev: pages/ plus the repo-root
-# install.sh, so `curl -fsSL https://dootsabha.pages.dev/install.sh | sh`
-# serves the same installer the README documents. The Pages project is
-# direct-upload, and this workflow's `--branch=production` is the only
-# path to production.
+# Serves pages/ plus the repo-root install.sh, so
+# `curl -fsSL https://dootsabha.pages.dev/install.sh | sh` runs the installer
+# the README documents.
 
 on:
   push:

@@ -1,7 +1,6 @@
 name: Deploy Pages Preview
 
-# Preview deploy for PRs that touch the site; comments the preview URL on
-# the PR. Secrets reach same-repo PRs only, so fork PRs skip the job. The
+# Secrets reach same-repo PRs only, so fork PRs skip the job. The
 # preview branch is pr-<number>, never the head ref: a branch named
 # "production" must not be able to publish to production.
 
