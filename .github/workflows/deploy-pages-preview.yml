@@ -26,18 +26,24 @@ jobs:
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          path: src
+          persist-credentials: false
 
       - name: Stage site and installer
+        # Staged outside the checkout, and wrangler runs from there: npx would
+        # otherwise resolve a node_modules/wrangler committed in the tree.
         run: |
-          mkdir deploy
-          cp -R pages/. deploy/
-          cp install.sh deploy/install.sh
+          mkdir "$RUNNER_TEMP/deploy"
+          cp -R src/pages/. "$RUNNER_TEMP/deploy/"
+          cp src/install.sh "$RUNNER_TEMP/deploy/install.sh"
 
       - name: Deploy preview to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: pr-${{ github.event.pull_request.number }}
+        working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
           npx --yes wrangler@4.153.0 pages deploy deploy \
@@ -50,7 +56,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          url="$(grep -Eo 'https://[a-z0-9-]+\.dootsabha\.pages\.dev' wrangler.log | tail -1)"
+          url="$(grep -Eo 'https://[a-z0-9-]+\.dootsabha\.pages\.dev' "$RUNNER_TEMP/wrangler.log" | tail -1)"
           [[ -n "$url" ]] || { echo "no deployment URL in wrangler output"; exit 1; }
           gh pr comment "$PR" --repo "$REPO" --edit-last --create-if-none \
             --body "Pages preview: $url"

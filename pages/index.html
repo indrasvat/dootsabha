@@ -16,6 +16,7 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<script>document.documentElement.classList.add('js')</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -26,6 +27,10 @@ body{margin:0;background:#F7F4EC;color:#1D1B26;font-size:15px;line-height:1.5;ov
 a{color:inherit}
 svg{max-width:100%}
 :focus-visible{outline:2px solid #D2402F;outline-offset:3px;border-radius:4px}
+/* Without JS nothing adds .go, so show every scroll-in block in its end state. */
+html:not(.js) [data-anim],html:not(.js) [data-anim] *{opacity:1!important;transform:none!important}
+html:not(.js) .vB .bar .tr i{width:var(--w)}
+html:not(.js) .vB .tui s{display:none}
 .site{overflow-x:clip}
 .wrap{max-width:1140px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 .copy-btn{appearance:none;border:0;cursor:pointer;font:inherit;flex:none}
@@ -64,6 +69,8 @@ svg{max-width:100%}
 @media (max-width:860px){.cfg{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:520px){.cfg .yml pre{font-size:10.5px}.yml .l{padding-right:8px}.yml .l::before{width:24px;padding-right:8px}.yml .c,.yml .tb small{display:none}}
 @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* With animation off, show the end state of anything an animation would have revealed. */
+@media (prefers-reduced-motion: reduce){html .vB .tui .tl,html .vB .tui em u{opacity:1;transform:none}html .vB .tui s{display:none}html .vB .run .stamp{opacity:.92;transform:rotate(-14deg)}}
 
 /* ═════════════ B · PARĪKṢĀ — spot the bug ═════════════ */
 .vB{--paper:#F7F4EC;--sheet:#FFFDF8;--ink:#1D1B26;--ink-2:#5C5866;--rule:#E4DFD2;--pen:#D2402F;--pen-soft:#FBE3DE;--codex:#0E7C86;--grok:#6B4FD8;--agy:#2F6BDB;--claude:#C8643B;--ok:#1E8A52;
@@ -143,11 +150,6 @@ svg{max-width:100%}
 .vB .bar.all{font-weight:700}
 .vB .sci p{margin:0 0 14px;font-family:var(--dsp);font-size:clamp(22px,2.3vw,28px);line-height:1.2}
 .vB .sci .cite{color:var(--pen);font-family:var(--mono);font-size:.5em}
-.vB .how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.vB .how div{display:grid;gap:10px;justify-items:start}
-.vB .how svg{width:100%;max-width:220px;height:auto}
-.vB .how b{font-size:18px}
-.vB .how em{font-family:var(--dsp);font-size:20px;color:var(--ink-2)}
 .vB .ledger{list-style:none;margin:0;padding:0;border-top:1.5px solid var(--ink)}
 .vB .ledger li{display:grid;grid-template-columns:44px minmax(0,1.25fr) minmax(0,1fr) 150px;gap:6px 28px;align-items:baseline;padding:22px 0 20px;border-bottom:1px solid var(--rule);opacity:0;transform:translateY(6px);transition:opacity .7s ease,transform .8s cubic-bezier(.22,1,.36,1)}
 .vB .ledger.go li{opacity:1;transform:none}
@@ -279,9 +281,6 @@ svg{max-width:100%}
 }
 @media (max-width:640px){
   .vB section.band{padding-block:64px}
-  .vB .how{grid-template-columns:minmax(0,1fr);gap:28px}
-  .vB .how div{grid-template-columns:120px minmax(0,1fr);align-items:center;column-gap:16px}
-  .vB .how svg{grid-row:span 2}
   .vB .end{padding:28px 20px}
   .vB .tile{padding:20px}
   .vB .install{width:100%}
@@ -301,7 +300,7 @@ svg{max-width:100%}
       <div>
         <h1 class="big">Your agent pushed this as done. <span>Spot the bug.</span></h1>
         <p class="lede">Real code, real council. Take a look, then press convene.</p>
-        <div class="install"><code><i>$</i> curl -fsSL dootsabha.pages.dev/install.sh | sh</code><button class="copy-btn" data-copy="curl -fsSL https://dootsabha.pages.dev/install.sh | sh">Copy</button></div>
+        <div class="install"><code><i>$</i> curl -fsSL https://dootsabha.pages.dev/install.sh | sh</code><button class="copy-btn" data-copy="curl -fsSL https://dootsabha.pages.dev/install.sh | sh">Copy</button></div>
         <div class="chips"><span>no API keys</span><span>your CLI logins</span><span>JSON + exit codes</span></div>
       </div>
       <div class="exam" id="exam">
@@ -400,10 +399,10 @@ svg{max-width:100%}
     <h3 class="sh">A contract, <span>not a chat.</span></h3>
     <div class="contract" data-anim>
       <div><code>--json</code><p>Exactly one document on stdout. Logs stay on stderr.</p></div>
-      <div><code>schema_version: 1</code><p>On every document and event. Fields are added, never renamed.</p></div>
+      <div><code>schema_version: 1</code><p>On every JSON document. Fields are added, never renamed.</p></div>
       <div><code>exit 0 2 3 4 5 6</code><p>One code per caller action. Branch on it; never parse prose.</p></div>
       <div><code>--progress-file</code><p>NDJSON to tail while it runs. The last line holds the exit code.</p></div>
-      <div><code>status --json</code><p>Which agents are installed, signed in and reachable, before you plan.</p></div>
+      <div><code>status --json</code><p>Which agents are installed and answering, before you plan.</p></div>
       <div><code>--timeout</code><p>A budget per call, a ceiling per run. Both exit 4 and say which fired.</p></div>
       <div><code>SIGTERM</code><p>Every agent stops first. The run still records how it ended.</p></div>
       <div><code>npx skills add</code><p>A skill that tells your agent when to convene and how to read the result.</p></div>
@@ -460,43 +459,24 @@ svg{max-width:100%}
   <section class="band"><div class="wrap">
     <div class="end">
       <div><h3>Your next PR, <span>on trial.</span></h3><ul><li>council<em>sabhā</em></li><li>consult<em>parāmarśa</em></li><li>review<em>samīkṣā</em></li><li>refine<em>saṃśodhana</em></li></ul></div>
-      <div class="lines"><code><i>$</i> curl -fsSL dootsabha.pages.dev/install.sh | sh</code><code><i>$</i> npx skills add indrasvat/dootsabha</code><code><i>$</i> dootsabha status</code></div>
+      <div class="lines"><code><i>$</i> curl -fsSL https://dootsabha.pages.dev/install.sh | sh</code><code><i>$</i> npx skills add indrasvat/dootsabha</code><code><i>$</i> dootsabha status</code></div>
     </div>
-    <ol class="refs" data-refs="B"></ol>
+    <ol class="refs" aria-label="Sources"><li id="ref-B-1"><span>1</span><a href="https://arxiv.org/abs/2310.01798" title="Large Language Models Cannot Self-Correct Reasoning Yet">Huang 2023</a></li><li id="ref-B-2"><span>2</span><a href="https://arxiv.org/abs/2404.13076" title="LLM Evaluators Recognize and Favor Their Own Generations">Panickssery 2024</a></li><li id="ref-B-3"><span>3</span><a href="https://arxiv.org/abs/2306.05685" title="Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena">Zheng 2023</a></li><li id="ref-B-4"><span>4</span><a href="https://arxiv.org/abs/2404.18796" title="Replacing Judges with Juries: a Panel of Diverse Models">Verga 2024</a></li><li id="ref-B-5"><span>5</span><a href="https://arxiv.org/abs/2305.14325" title="Improving Factuality and Reasoning through Multiagent Debate">Du 2023</a></li><li id="ref-B-6"><span>6</span><a href="https://github.com/karpathy/llm-council" title="llm-council: the same three stages, for a person at a browser">Karpathy · llm-council</a></li></ol>
     <div class="foot"><span>Dūtasabhā · a council of messengers</span><span class="made">made with <svg class="hrt" viewBox="0 0 16 14" aria-label="love" role="img"><path d="M8 13.4 1.6 7.3A3.9 3.9 0 0 1 8 2.4a3.9 3.9 0 0 1 6.4 4.9Z" fill="#D2402F"/></svg> and <span class="squig">red ink</span> by <a href="https://github.com/indrasvat">indrasvat</a></span><span>MIT · github.com/indrasvat/dootsabha</span></div>
   </div></section>
 </main>
 <script>
-
 (function(){
-  var REFS = [
-    ["Large Language Models Cannot Self-Correct Reasoning Yet","Huang 2023","https://arxiv.org/abs/2310.01798"],
-    ["LLM Evaluators Recognize and Favor Their Own Generations","Panickssery 2024","https://arxiv.org/abs/2404.13076"],
-    ["Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena","Zheng 2023","https://arxiv.org/abs/2306.05685"],
-    ["Replacing Judges with Juries: a Panel of Diverse Models","Verga 2024","https://arxiv.org/abs/2404.18796"],
-    ["Improving Factuality and Reasoning through Multiagent Debate","Du 2023","https://arxiv.org/abs/2305.14325"],
-    ["llm-council: the same three stages, for a person at a browser","Karpathy · llm-council","https://github.com/karpathy/llm-council"]
-  ];
-  document.querySelectorAll('[data-refs]').forEach(function(ol){
-    var v = ol.getAttribute('data-refs');
-    ol.setAttribute('aria-label','Sources');
-    ol.innerHTML = REFS.map(function(r,i){ return '<li id="ref-'+v+'-'+(i+1)+'"><span>'+(i+1)+'</span><a href="'+r[2]+'" title="'+r[0]+'">'+r[1]+'</a></li>'; }).join('');
-  });
-
   document.querySelectorAll('.yml .l').forEach(function(l){ l.style.setProperty('--i', Array.prototype.indexOf.call(l.parentNode.children, l)); });
 
   /* scroll-in animations */
-  var anims = Array.prototype.slice.call(document.querySelectorAll('[data-anim]'));
-  function goAll(){ anims.forEach(function(a){ a.classList.add('go'); }); }
-  if ('IntersectionObserver' in window) {
-    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); io.unobserve(e.target); } }); }, {threshold:.25});
-    anims.forEach(function(a){ io.observe(a); });
-  } else goAll();
+  var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('go'); io.unobserve(e.target); } }); }, {threshold:.25});
+  document.querySelectorAll('[data-anim]').forEach(function(a){ io.observe(a); });
 
   var tui = document.getElementById('tui');
   document.getElementById('replay').addEventListener('click', function(){ tui.classList.remove('go'); void tui.offsetWidth; tui.classList.add('go'); });
 
-  /* B: convene runs the review; it also starts by itself after a pause */
+  /* convene runs the review; it also starts by itself after a pause */
   var exam = document.getElementById('exam'), btn = document.getElementById('convene'), auto;
   function convene(){
     clearTimeout(auto);
@@ -504,10 +484,7 @@ svg{max-width:100%}
     exam.classList.add('run'); btn.textContent = 'Convene again ↻';
   }
   btn.addEventListener('click', convene);
-  if ('IntersectionObserver' in window) {
-    var eo = new IntersectionObserver(function(es){ if(es[0].isIntersecting && !exam.classList.contains('run')){ auto = setTimeout(convene, 6000); } else clearTimeout(auto); }, {threshold:.5});
-    eo.observe(exam);
-  }
+  new IntersectionObserver(function(es){ if(es[0].isIntersecting && !exam.classList.contains('run')){ auto = setTimeout(convene, 6000); } else clearTimeout(auto); }, {threshold:.5}).observe(exam);
 
   document.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a[href^="#ref-"]');
