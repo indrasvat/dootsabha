@@ -1,6 +1,6 @@
 #!/bin/sh
 # install.sh — dootsabha installer
-# curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | sh
+# curl -fsSL https://dootsabha.pages.dev/install.sh | sh
 #
 # Options (env vars):
 #   INSTALL_DIR=/path    Override install directory

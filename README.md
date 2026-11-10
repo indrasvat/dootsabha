@@ -6,6 +6,8 @@
 
 **The Council of AI Messengers** — a plugin-extensible Go CLI that orchestrates AI coding agents through council-mode deliberation, peer review, and synthesis.
 
+**[dootsabha.pages.dev](https://dootsabha.pages.dev)**
+
 ```
 dootsabha council "What's the best way to implement a rate limiter in Go?"
 ```
@@ -64,7 +66,7 @@ grok --version   # optional
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | sh
+curl -fsSL https://dootsabha.pages.dev/install.sh | sh
 ```
 
 Detects your OS/arch, downloads the latest release, verifies the checksum, and installs to a directory on your `$PATH`. The installer resolves the latest release through GitHub's public web redirect first, so normal installs do not spend anonymous GitHub API quota. It also installs the [agent skill](#skill) with `npx skills add indrasvat/dootsabha --global --yes` when `npx` is available.
@@ -74,16 +76,16 @@ Detects your OS/arch, downloads the latest release, verifies the checksum, and i
 
 ```bash
 # Non-interactive with defaults (CI/scripts)
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | NONINTERACTIVE=1 sh
+curl -fsSL https://dootsabha.pages.dev/install.sh | NONINTERACTIVE=1 sh
 
 # Specific version or custom directory
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.1.0 INSTALL_DIR=~/.local/bin sh
+curl -fsSL https://dootsabha.pages.dev/install.sh | VERSION=v0.1.0 INSTALL_DIR=~/.local/bin sh
 
 # Skip the agent skill install
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | INSTALL_SKILL=0 sh
+curl -fsSL https://dootsabha.pages.dev/install.sh | INSTALL_SKILL=0 sh
 
 # If your network blocks GitHub redirects, pin a version to skip latest lookup
-curl -fsSL https://raw.githubusercontent.com/indrasvat/dootsabha/main/install.sh | VERSION=v0.4.2 sh
+curl -fsSL https://dootsabha.pages.dev/install.sh | VERSION=v0.4.2 sh
 
 # From source
 git clone https://github.com/indrasvat/dootsabha.git
